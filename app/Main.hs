@@ -16,8 +16,10 @@ module Main (
 import           Prelude
 
 import           Example
+import           Potato
 
 
 
 main :: IO ()
-main = exampleMain
+--main = exampleMain
+main = potatoMain

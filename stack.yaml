@@ -61,7 +61,7 @@ extra-deps:
 - github: pdlla/reflex-potatoes
   commit: 2af6a47273cb371abceab643ae787325631f8487
 - github: pdlla/potato-flow
-  commit: b2aea74ec828a7447146448d3714418e84229356
+  commit: 6d8107da5eae9f5134555a164912d9a784dab26e
 - github: pdlla/reflex-vty
   commit: 63c63505fc35e87e49e6a827ea127594f1121f61
 

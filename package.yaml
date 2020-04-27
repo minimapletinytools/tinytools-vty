@@ -73,6 +73,7 @@ dependencies:
 - containers
 - text
 - vty
+- time
 
 library:
   source-dirs: src
