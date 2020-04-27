@@ -16,6 +16,7 @@ import           Relude
 
 import           Potato.Flow
 import           Potato.Flow.Testing
+import           Reflex.Potato.Helpers
 
 
 import           Control.Applicative
@@ -23,10 +24,8 @@ import           Control.Monad
 import           Control.Monad.Fix
 import           Control.Monad.NodeId
 import           Data.Functor.Misc
-import           Data.Map                (Map)
 import qualified Data.Map                as Map
 import           Data.Maybe
-import           Data.Text               (Text)
 import qualified Data.Text               as T
 import qualified Data.Text.Zipper        as TZ
 import           Data.Time.Clock
@@ -100,7 +99,32 @@ canvasScreen canvas = do
   pane canvasRegion (constDyn True) $ do
     text $ current (fmap canvasToText canvas)
 
+
   -- TODO info pane in bottom right corner
+
+
+data Layers t = Layers {
+  _layers_potatoAdd :: Event t (LayerPos, SEltLabel)
+  , _layers_select  :: Event t LayerPos
+}
+
+layerScreen :: forall t m. (Reflex t, Adjustable t m, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m)
+  => Dynamic t SEltTree
+  -> VtyWidget t m (Layers t)
+layerScreen stree = do
+  pw <- displayWidth
+  ph <- displayHeight
+  addButton <- col $ do
+    fixed 1 $ debugFocus
+    fixed 1 $ text . current . fmap (show . length)$ stree
+    addButton <- fixed 3 $ textButtonStatic def "add"
+    stretch $ col $ simpleList (fmap (zip [0..]) stree) $ \ds -> do
+      fixed 1 $ text $ current $ fmap (_sEltLabel_name . snd) ds
+    return addButton
+  return Layers {
+    _layers_potatoAdd = fmap (const (0, SEltLabel "meow" (SEltBox simpleSBox))) addButton
+    , _layers_select = never
+  }
 
 
 
@@ -121,7 +145,7 @@ flowMain = mainWidget $ mdo
       V.EvKey (V.KChar 'y') [V.MCtrl] -> Just ()
       _ -> Nothing
     pfc = PFConfig {
-        _pfc_addElt     = fmap (const (0, SEltLabel "meow" (SEltBox simpleSBox))) addButton
+        _pfc_addElt     = _layers_potatoAdd layers
         , _pfc_removeElt  = never
         , _pfc_manipulate = never
         , _pfc_undo       = undoEv
@@ -129,10 +153,12 @@ flowMain = mainWidget $ mdo
         , _pfc_save = never
       }
   pfo <- holdPF pfc
+  potatoUpdated <- delayEvent $ _pfo_potato_changed pfo
   let
     layerTree = _pfo_layers pfo
-    potatoUpdated = updated $ _sEltLayerTree_view $ layerTree
-    selts = fmap (fmap (_sEltLabel_sElt)) $ _pfo_state pfo
+    stateUpdated = tag (_pfo_potato_state pfo) potatoUpdated
+    selts = fmap (fmap (_sEltLabel_sElt)) $ _pfo_potato_state pfo
+  treeDyn <- holdDyn [] stateUpdated
   --canvas :: Dynamic t Canvas
   canvas <- foldDyn potatoRender (emptyCanvas (LBox (LPoint (V2 0 0)) (LSize (V2 40 30)))) $ tag selts potatoUpdated
 
@@ -145,10 +171,8 @@ flowMain = mainWidget $ mdo
     wsRegion = DynRegion layersWidth 0 (liftA2 (-) dw layersWidth) dh
 
   -- layer pane
-  addButton <- pane layerRegion (constDyn True) $ col $ do
-    fixed 1 $ debugFocus
-    fixed 1 $ text . current . fmap (show . length) . _sEltLayerTree_view $ layerTree
-    fixed 3 $ textButtonStatic def "add"
+  layers <- pane layerRegion (constDyn True) $ layerScreen $ treeDyn
+
 
   -- workspace pane
   pane wsRegion (constDyn True) $ do

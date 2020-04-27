@@ -74,6 +74,7 @@ dependencies:
 - text
 - vty
 - time
+- reflex-potatoes
 
 library:
   source-dirs: src
