@@ -23,5 +23,5 @@ import           Potato
 
 main :: IO ()
 --main = exampleMain
-main = potatoMain
---main = flowMain
+--main = potatoMain
+main = flowMain

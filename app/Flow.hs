@@ -18,6 +18,7 @@ import           Potato.Flow
 import           Potato.Flow.Testing
 import           Reflex.Potato.Helpers
 import Potato.Reflex.Vty.Helpers
+import Potato.Reflex.Vty.Widget
 
 
 import           Control.Applicative
@@ -105,6 +106,14 @@ layerScreen stree = do
     , _layers_select = never
   }
 
+data Tool = TPan | TBox | TNothing deriving (Eq, Show)
+
+toolScreen :: forall t m. (Reflex t, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m)
+  => VtyWidget t m (Event t Tool)
+toolScreen = row $ do
+  pan <- fixed 5 $ textButton def "PAN"
+  box <- fixed 5 $ textButton def "BOX"
+  return $ leftmost [TPan <$ pan, TBox <$ box]
 
 
 flowMain :: IO ()
@@ -138,28 +147,21 @@ flowMain = mainWidget $ mdo
     stateUpdated = tag (_pfo_potato_state pfo) potatoUpdated
     selts = fmap (fmap (_sEltLabel_sElt)) $ _pfo_potato_state pfo
   treeDyn <- holdDyn [] stateUpdated
-  --canvas :: Dynamic t Canvas
-  canvas <- foldDyn potatoRender (emptyCanvas (LBox (LPoint (V2 0 0)) (LSize (V2 40 30)))) $ tag selts potatoUpdated
+  canvas <- foldDyn potatoRender (emptyCanvas (LBox (LPoint (V2 0 0)) (LSize (V2 40 30))))
+    $ tag selts potatoUpdated
 
-  -- compute regions
-  dw <- displayWidth
-  dh <- displayHeight
+  -- main panels
   let
-    layersWidth = constDyn 30
-    layerRegion = DynRegion 0 0 layersWidth dh
-    wsRegion = DynRegion layersWidth 0 (liftA2 (-) dw layersWidth) dh
+    leftPanel = col $ do
+      fixed 2 $ debugStream [fmapLabelShow "tool" tools]
+      tools' <- fixed 3 $ toolScreen
+      layers' <- stretch $ layerScreen $ treeDyn
+      return (layers', tools')
 
-  -- layer pane
-  layers <- pane layerRegion (constDyn True) $ layerScreen $ treeDyn
+    rightPanel = canvasScreen canvas
 
+  ((layers, tools), _) <- splitHDrag 35 (fill '*') leftPanel rightPanel
 
-  -- workspace pane
-  pane wsRegion (constDyn True) $ do
-    canvasScreen canvas
-    col $ do
-      fixed 1 $ debugFocus
-      fixed 5 $ do
-        debugSize
   return $ fforMaybe inp $ \case
     V.EvKey (V.KChar 'c') [V.MCtrl] -> Just ()
     _ -> Nothing

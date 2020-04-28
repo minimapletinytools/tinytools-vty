@@ -16,6 +16,7 @@ module Potato.Reflex.Vty.Helpers (
   , dragTest
   , richTextConfig_simpleForeColorAttr
   , debugStream
+  , fmapLabelShow
   , countEv
 ) where
 
@@ -66,6 +67,9 @@ dragTest = do
 
 richTextConfig_simpleForeColorAttr :: (Reflex t) => RichTextConfig t
 richTextConfig_simpleForeColorAttr = RichTextConfig $ constant (V.defAttr { V.attrForeColor = V.SetTo V.yellow})
+
+fmapLabelShow :: (Reflex t, Show a) => Text -> Event t a -> Event t Text
+fmapLabelShow t = fmap (\x -> t <> ": " <> show x)
 
 debugStream :: (Reflex t, MonadHold t m) => [Event t Text] -> VtyWidget t m ()
 debugStream evs = do

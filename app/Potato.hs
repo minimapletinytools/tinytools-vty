@@ -107,7 +107,7 @@ potatoMain = mainWidget $ do
         fixed 20 $ basicBox
         fixed 20 $ basicBox
         fixed 20 $ basicBox
-  splitHDrag (fill '=') leftW rightW
+  splitHDrag 40 (fill '=') leftW rightW
   return $ fforMaybe inp $ \case
     V.EvKey (V.KChar 'c') [V.MCtrl] -> Just ()
     _ -> Nothing

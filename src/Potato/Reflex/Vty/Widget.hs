@@ -75,17 +75,15 @@ splitH sizeFunD focD wA wB = do
 -- Starts with half the space allocated to each, and the first pane has focus.
 -- Clicking in a pane switches focus.
 splitHDrag :: (Reflex t, MonadFix m, MonadHold t m, MonadNodeId m)
-  => VtyWidget t m ()
+  => Int -- ^ initial width of left panel
+  -> VtyWidget t m ()
   -> VtyWidget t m a
   -> VtyWidget t m b
   -> VtyWidget t m (a,b)
-splitHDrag wS wA wB = mdo
+splitHDrag splitter0 wS wA wB = mdo
   dh <- displayHeight
   dw <- displayWidth
-  w0 <- sample $ current dw
   dragE <- drag V.BLeft
-  let
-    splitter0 = w0 `div` 2
   splitterCheckpoint <- holdDyn splitter0 $ leftmost [fst <$> ffilter snd dragSplitter, resizeSplitter]
   splitterPos <- holdDyn splitter0 $ leftmost [fst <$> dragSplitter, resizeSplitter]
   splitterFrac <- holdDyn ((1::Double) / 2) $ ffor (attach (current dh) (fst <$> dragSplitter)) $ \(h, x) ->
