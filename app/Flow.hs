@@ -61,15 +61,17 @@ canvasWidget :: forall t m. (Reflex t, MonadHold t m, MonadFix m, MonadNodeId m)
   -> VtyWidget t m (CanvasWidget t)
 canvasWidget CanvasWidgetConfig {..} = mdo
   inp <- input
+  let
+    escEv = fforMaybe inp $ \case
+      V.EvKey (V.KEsc) [] -> Just ()
+      _ -> Nothing
   pw <- displayWidth
   ph <- displayHeight
   pw0 <- sample $ current pw
   ph0 <- sample $ current ph
+  cursor <- holdDyn CSSelecting $ leftmost [fmap tool_cursorState _canvasWidgetConfig_tool, CSSelecting <$ escEv]
   LBox (LPoint (V2 cx0 cy0)) (LSize (V2 cw0 ch0)) <- sample $ current (fmap canvas_box _canvasWidgetConfig_canvas_temp)
   let
-    cursorState :: Behavior t CursorState
-    cursorState = constant CSPan
-
     -- position in screen space of upper left corner of this pane
     --panePos :: Dynamic t (Int, Int)
     --panePos = constDyn (-20,-20)
@@ -78,7 +80,7 @@ canvasWidget CanvasWidgetConfig {..} = mdo
   -- you could do this by checking if dragFrom is on the edges
   dragEv :: Event t ((Int,Int), Drag) <- dragAttachOnStart V.BLeft (current panePos)
   let
-    panEv = fmapMaybe (\(c,d) -> if c == CSPan then Just d else Nothing) $  attach cursorState dragEv
+    panEv = fmapMaybe (\(c,d) -> if c == CSPan then Just d else Nothing) $  attach (current cursor) dragEv
     panFoldFn ((sx,sy), Drag (fromX, fromY) (toX, toY) _ _ _) _ = (sx + toX-fromX, sy + toY-fromY)
   panePos <- foldDyn panFoldFn (cx0 - (cw0-pw0)`div`2, cy0 - (ch0-ph0)`div`2) panEv
 
@@ -94,7 +96,7 @@ canvasWidget CanvasWidgetConfig {..} = mdo
     text $ current (fmap canvasToText _canvasWidgetConfig_canvas_temp)
 
 
-  debugStream [fmapLabelShow "drag" dragEv, fmapLabelShow "input" inp]
+  debugStream [fmapLabelShow "drag" dragEv, fmapLabelShow "input" inp, fmapLabelShow "cursor" (updated cursor)]
   -- TODO info pane in bottom right corner
 
   return CanvasWidget {
@@ -130,6 +132,10 @@ layerWidget LayerWidgetConfig {..} = do
   }
 
 data Tool = TPan | TBox | TNothing deriving (Eq, Show)
+
+tool_cursorState :: Tool -> CursorState
+tool_cursorState TPan = CSPan
+tool_cursorState _ = CSSelecting
 
 data ToolWidget t = ToolWidget {
   _toolWidget_tool :: Event t Tool
