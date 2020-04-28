@@ -125,6 +125,13 @@ toolsWidget = row $ do
     _toolWidget_tool = leftmost [TPan <$ pan, TBox <$ box]
   }
 
+data ParamWidget t = ParamWidget {
+
+}
+
+paramWidget :: forall t m. (Reflex t, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m)
+ => VtyWidget t m (ParamWidget t)
+paramWidget = return ParamWidget {}
 
 flowMain :: IO ()
 flowMain = mainWidget $ mdo
@@ -166,11 +173,12 @@ flowMain = mainWidget $ mdo
       fixed 2 $ debugStream [fmapLabelShow "tool" (_toolWidget_tool tools)]
       tools' <- fixed 3 $ toolsWidget
       layers' <- stretch $ layerWidget $ treeDyn
-      return (layers', tools')
+      params' <- fixed 5 $ paramWidget
+      return (layers', tools', params')
 
     rightPanel = canvasWidget canvas
 
-  ((layers, tools), _) <- splitHDrag 35 (fill '*') leftPanel rightPanel
+  ((layers, tools, _), _) <- splitHDrag 35 (fill '*') leftPanel rightPanel
 
   return $ fforMaybe inp $ \case
     V.EvKey (V.KChar 'c') [V.MCtrl] -> Just ()
