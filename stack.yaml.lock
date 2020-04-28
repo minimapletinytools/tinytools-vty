@@ -131,19 +131,19 @@ packages:
   original:
     url: https://github.com/pdlla/potato-flow/archive/5910e6307b059694143e051e67000cc4f159411e.tar.gz
 - completed:
-    size: 355251
-    url: https://github.com/pdlla/reflex-vty/archive/15c233885901f84d968e0f42abc70b0f296af597.tar.gz
+    size: 355250
+    url: https://github.com/pdlla/reflex-vty/archive/bb53903a44f54101caada1aee294afb7f5e6a510.tar.gz
     cabal-file:
       size: 2510
       sha256: 145e6da8c4fa35fd9ecdf2574d0aea11c3e0cf3df79c173cef18baf6782ee288
     name: reflex-vty
     version: 0.1.3.0
-    sha256: ce3cd1cb2cb30547e7df8018e5b44d1be25631223936b4c67036473918798d90
+    sha256: 954d506ec45611914e35d227ce0f0b1e3157900017900af35d66af5f71ddf702
     pantry-tree:
       size: 1613
-      sha256: b5c5a98ce8779e982c656b72df4757764919ca77f034bb8c600dc43ea06fe1d6
+      sha256: 513e5786fb3dac323aea0cc0c80c87a9dd150dca3fe734dc78ae8e1c2ae600e4
   original:
-    url: https://github.com/pdlla/reflex-vty/archive/15c233885901f84d968e0f42abc70b0f296af597.tar.gz
+    url: https://github.com/pdlla/reflex-vty/archive/bb53903a44f54101caada1aee294afb7f5e6a510.tar.gz
 snapshots:
 - completed:
     size: 492027

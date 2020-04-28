@@ -31,7 +31,7 @@ import           Reflex.Class.Switchable
 import           Reflex.Network
 import           Reflex.Vty
 
-data CursorState = CSPan | CSSelect
+data CursorState = CSPan | CSSelecting deriving (Eq, Show)
 
 dynLBox_to_dynRegion :: (Reflex t) => Dynamic t LBox -> DynRegion t
 dynLBox_to_dynRegion dlb = r where
@@ -43,8 +43,8 @@ dynLBox_to_dynRegion dlb = r where
 
 translate_dynRegion :: (Reflex t) => Dynamic t (Int, Int) -> DynRegion t -> DynRegion t
 translate_dynRegion pos dr = dr {
-    _dynRegion_left = liftA2 (-) (_dynRegion_left dr) (fmap fst pos)
-    , _dynRegion_top = liftA2 (-) (_dynRegion_top dr) (fmap snd pos)
+    _dynRegion_left = liftA2 (+) (_dynRegion_left dr) (fmap fst pos)
+    , _dynRegion_top = liftA2 (+) (_dynRegion_top dr) (fmap snd pos)
   }
 
 
@@ -54,22 +54,34 @@ data CanvasWidgetConfig t = CanvasWidgetConfig {
 }
 
 data CanvasWidget t = CanvasWidget {
+  _canvasWidget_isManipulating :: Dynamic t Bool
 }
 canvasWidget :: forall t m. (Reflex t, MonadHold t m, MonadFix m, MonadNodeId m)
   => CanvasWidgetConfig t
   -> VtyWidget t m (CanvasWidget t)
-canvasWidget CanvasWidgetConfig {..} = do
+canvasWidget CanvasWidgetConfig {..} = mdo
+  inp <- input
   pw <- displayWidth
   ph <- displayHeight
+  pw0 <- sample $ current pw
+  ph0 <- sample $ current ph
+  LBox (LPoint (V2 cx0 cy0)) (LSize (V2 cw0 ch0)) <- sample $ current (fmap canvas_box _canvasWidgetConfig_canvas_temp)
   let
     cursorState :: Behavior t CursorState
     cursorState = constant CSPan
 
     -- position in screen space of upper left corner of this pane
-    panePos :: Dynamic t (Int, Int)
-    panePos = constDyn (-20,-20)
+    --panePos :: Dynamic t (Int, Int)
+    --panePos = constDyn (-20,-20)
 
-  dragEv <- drag V.BLeft
+  -- TODO make this so it doesn't trigger when you start drag off of this panel
+  -- you could do this by checking if dragFrom is on the edges
+  dragEv :: Event t ((Int,Int), Drag) <- dragAttachOnStart V.BLeft (current panePos)
+  let
+    panEv = fmapMaybe (\(c,d) -> if c == CSPan then Just d else Nothing) $  attach cursorState dragEv
+    panFoldFn ((sx,sy), Drag (fromX, fromY) (toX, toY) _ _ _) _ = (sx + toX-fromX, sy + toY-fromY)
+  panePos <- foldDyn panFoldFn (cx0 - (cw0-pw0)`div`2, cy0 - (ch0-ph0)`div`2) panEv
+
 
   -- fill the background with whatever
   fill '░'
@@ -82,9 +94,12 @@ canvasWidget CanvasWidgetConfig {..} = do
     text $ current (fmap canvasToText _canvasWidgetConfig_canvas_temp)
 
 
+  debugStream [fmapLabelShow "drag" dragEv, fmapLabelShow "input" inp]
   -- TODO info pane in bottom right corner
 
-  return CanvasWidget {}
+  return CanvasWidget {
+      _canvasWidget_isManipulating = constDyn False
+    }
 
 
 data LayerWidgetConfig t = LayerWidgetConfig {
@@ -147,12 +162,14 @@ flowMain = mainWidget $ mdo
 
   -- potato flow stuff
   let
+    -- TODO disable when manipulating _canvasWidget_isManipulating
     undoEv = fforMaybe inp $ \case
       V.EvKey (V.KChar 'z') [V.MCtrl] -> Just ()
       _ -> Nothing
     redoEv = fforMaybe inp $ \case
       V.EvKey (V.KChar 'y') [V.MCtrl] -> Just ()
       _ -> Nothing
+
     pfc = PFConfig {
         _pfc_addElt     = _layerWidget_potatoAdd layers
         , _pfc_removeElt  = never
