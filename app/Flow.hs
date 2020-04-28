@@ -1,12 +1,6 @@
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE GADTs                 #-}
-{-# LANGUAGE LambdaCase            #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE RankNTypes            #-}
-{-# LANGUAGE RecursiveDo           #-}
-{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE RecursiveDo   #-}
+
 {-# OPTIONS_GHC -threaded #-}
 
 module Flow (
@@ -53,12 +47,18 @@ translate_dynRegion pos dr = dr {
     , _dynRegion_top = liftA2 (-) (_dynRegion_top dr) (fmap snd pos)
   }
 
+
+data CanvasWidgetConfig t = CanvasWidgetConfig {
+  _canvasWidgetConfig_tool :: Event t Tool
+  , _canvasWidgetConfig_canvas_temp :: Dynamic t Canvas
+}
+
 data CanvasWidget t = CanvasWidget {
 }
 canvasWidget :: forall t m. (Reflex t, MonadHold t m, MonadFix m, MonadNodeId m)
-  => Dynamic t Canvas
+  => CanvasWidgetConfig t
   -> VtyWidget t m (CanvasWidget t)
-canvasWidget canvas = do
+canvasWidget CanvasWidgetConfig {..} = do
   pw <- displayWidth
   ph <- displayHeight
   let
@@ -77,9 +77,9 @@ canvasWidget canvas = do
   -- draw the canvas
   -- TODO make this efficient -_-
   let
-    canvasRegion = translate_dynRegion panePos $ dynLBox_to_dynRegion (fmap canvas_box canvas)
+    canvasRegion = translate_dynRegion panePos $ dynLBox_to_dynRegion (fmap canvas_box _canvasWidgetConfig_canvas_temp)
   pane canvasRegion (constDyn True) $ do
-    text $ current (fmap canvasToText canvas)
+    text $ current (fmap canvasToText _canvasWidgetConfig_canvas_temp)
 
 
   -- TODO info pane in bottom right corner
@@ -87,22 +87,26 @@ canvasWidget canvas = do
   return CanvasWidget {}
 
 
+data LayerWidgetConfig t = LayerWidgetConfig {
+  _layerWidgetConfig_temp_sEltTree :: Dynamic t SEltTree
+}
+
 data LayerWidget t = LayerWidget {
   _layerWidget_potatoAdd :: Event t (LayerPos, SEltLabel)
   , _layerWidget_select  :: Event t LayerPos
 }
 
 layerWidget :: forall t m. (Reflex t, Adjustable t m, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m)
-  => Dynamic t SEltTree
+  => LayerWidgetConfig t
   -> VtyWidget t m (LayerWidget t)
-layerWidget stree = do
+layerWidget LayerWidgetConfig {..} = do
   pw <- displayWidth
   ph <- displayHeight
   addButton <- col $ do
     fixed 1 $ debugFocus
-    fixed 1 $ text . current . fmap (show . length)$ stree
+    fixed 1 $ text . current . fmap (show . length)$ _layerWidgetConfig_temp_sEltTree
     addButton <- fixed 3 $ textButtonStatic def "add"
-    stretch $ col $ simpleList (fmap (zip [0..]) stree) $ \ds -> do
+    stretch $ col $ simpleList (fmap (zip [0..]) _layerWidgetConfig_temp_sEltTree) $ \ds -> do
       fixed 1 $ text $ current $ fmap (_sEltLabel_name . snd) ds
     return addButton
   return LayerWidget {
@@ -172,11 +176,13 @@ flowMain = mainWidget $ mdo
     leftPanel = col $ do
       fixed 2 $ debugStream [fmapLabelShow "tool" (_toolWidget_tool tools)]
       tools' <- fixed 3 $ toolsWidget
-      layers' <- stretch $ layerWidget $ treeDyn
+      layers' <- stretch $ layerWidget $ LayerWidgetConfig treeDyn
       params' <- fixed 5 $ paramWidget
       return (layers', tools', params')
 
-    rightPanel = canvasWidget canvas
+    rightPanel = canvasWidget $ CanvasWidgetConfig
+      (_toolWidget_tool tools)
+      canvas
 
   ((layers, tools, _), _) <- splitHDrag 35 (fill '*') leftPanel rightPanel
 
