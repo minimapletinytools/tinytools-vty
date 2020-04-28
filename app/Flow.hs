@@ -17,6 +17,7 @@ import           Relude
 import           Potato.Flow
 import           Potato.Flow.Testing
 import           Reflex.Potato.Helpers
+import Potato.Reflex.Vty.Helpers
 
 
 import           Control.Applicative
@@ -34,28 +35,6 @@ import           Reflex
 import           Reflex.Class.Switchable
 import           Reflex.Network
 import           Reflex.Vty
-
-debugFocus :: (Reflex t, Monad m) => VtyWidget t m ()
-debugFocus = do
-  f <- focus
-  text $ T.pack . show <$> current f
-
-debugInput :: (Reflex t, MonadHold t m) => VtyWidget t m ()
-debugInput = do
-  lastEvent <- hold "No event yet" . fmap show =<< input
-  text $ T.pack <$> lastEvent
-
-debugSize ::  (Reflex t, MonadHold t m) => VtyWidget t m ()
-debugSize = do
-  ldw <- displayWidth
-  ldh <- displayHeight
-  let combine w h = "w: " <> show w <> " h: " <> show h
-  text $ liftA2 combine (current ldw) (current ldh)
-
-dragTest :: (Reflex t, MonadHold t m, MonadFix m) => VtyWidget t m ()
-dragTest = do
-  lastEvent <- hold "No event yet" . fmap show =<< drag V.BLeft
-  text $ T.pack <$> lastEvent
 
 data CursorState = CSPan | CSSelect
 
@@ -90,7 +69,7 @@ canvasScreen canvas = do
   dragEv <- drag V.BLeft
 
   -- fill the background with whatever
-  fill '█'
+  fill '░'
 
   -- draw the canvas
   -- TODO make this efficient -_-

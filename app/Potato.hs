@@ -35,20 +35,8 @@ import           Reflex.Class.Switchable
 import           Reflex.Network
 import           Reflex.Vty
 
-debugFocus :: (Reflex t, Monad m) => VtyWidget t m ()
-debugFocus = do
-  f <- focus
-  text $ T.pack . show <$> current f
-
-debugInput :: (Reflex t, MonadHold t m) => VtyWidget t m ()
-debugInput = do
-  lastEvent <- hold "No event yet" . fmap show =<< input
-  text $ T.pack <$> lastEvent
-
-dragTest :: (Reflex t, MonadHold t m, MonadFix m) => VtyWidget t m ()
-dragTest = do
-  lastEvent <- hold "No event yet" . fmap show =<< drag V.BLeft
-  text $ T.pack <$> lastEvent
+import Potato.Reflex.Vty.Widget
+import Potato.Reflex.Vty.Helpers
 
 scrolling :: (Reflex t, MonadHold t m, MonadFix m, PostBuild t m, MonadNodeId m) => VtyWidget t m ()
 scrolling = do
@@ -104,16 +92,22 @@ potatoMain = mainWidget $ do
   tickEv <- tickLossy 1 currentTime
   ticks <- foldDyn (+) 0 (fmap (const 1) tickEv)
   inp <- input
-  col $ do
-    fixed 1 $ text $ T.pack . show <$> current ticks
-    stretch $ scrolling
-    fixed 20 $ mdo
-      t <- multilineTest (fmap (const (id)) tickEv)
-      return ()
-    stretch $ row $ do
-      fixed 20 $ basicBox
-      fixed 20 $ basicBox
-      fixed 20 $ basicBox
-    return $ fforMaybe inp $ \case
-      V.EvKey (V.KChar 'c') [V.MCtrl] -> Just ()
-      _ -> Nothing
+  dragEv <- drag V.BLeft
+  --splitH (pure (`div` 2 )) (pure (True, True)) (return ()) $
+  let
+    leftW = col $ do
+      fixed 2 $ debugStream [fmap show dragEv]
+    rightW = col $ do
+      fixed 1 $ text $ T.pack . show <$> current ticks
+      stretch $ scrolling
+      fixed 20 $ mdo
+        t <- multilineTest (fmap (const (id)) tickEv)
+        return ()
+      stretch $ row $ do
+        fixed 20 $ basicBox
+        fixed 20 $ basicBox
+        fixed 20 $ basicBox
+  splitHDrag (fill '=') leftW rightW
+  return $ fforMaybe inp $ \case
+    V.EvKey (V.KChar 'c') [V.MCtrl] -> Just ()
+    _ -> Nothing
