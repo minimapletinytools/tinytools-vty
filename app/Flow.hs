@@ -53,10 +53,12 @@ translate_dynRegion pos dr = dr {
     , _dynRegion_top = liftA2 (-) (_dynRegion_top dr) (fmap snd pos)
   }
 
-canvasScreen :: forall t m. (Reflex t, MonadHold t m, MonadFix m, MonadNodeId m)
+data CanvasWidget t = CanvasWidget {
+}
+canvasWidget :: forall t m. (Reflex t, MonadHold t m, MonadFix m, MonadNodeId m)
   => Dynamic t Canvas
-  -> VtyWidget t m ()
-canvasScreen canvas = do
+  -> VtyWidget t m (CanvasWidget t)
+canvasWidget canvas = do
   pw <- displayWidth
   ph <- displayHeight
   let
@@ -82,16 +84,18 @@ canvasScreen canvas = do
 
   -- TODO info pane in bottom right corner
 
+  return CanvasWidget {}
 
-data Layers t = Layers {
-  _layers_potatoAdd :: Event t (LayerPos, SEltLabel)
-  , _layers_select  :: Event t LayerPos
+
+data LayerWidget t = LayerWidget {
+  _layerWidget_potatoAdd :: Event t (LayerPos, SEltLabel)
+  , _layerWidget_select  :: Event t LayerPos
 }
 
-layerScreen :: forall t m. (Reflex t, Adjustable t m, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m)
+layerWidget :: forall t m. (Reflex t, Adjustable t m, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m)
   => Dynamic t SEltTree
-  -> VtyWidget t m (Layers t)
-layerScreen stree = do
+  -> VtyWidget t m (LayerWidget t)
+layerWidget stree = do
   pw <- displayWidth
   ph <- displayHeight
   addButton <- col $ do
@@ -101,9 +105,9 @@ layerScreen stree = do
     stretch $ col $ simpleList (fmap (zip [0..]) stree) $ \ds -> do
       fixed 1 $ text $ current $ fmap (_sEltLabel_name . snd) ds
     return addButton
-  return Layers {
-    _layers_potatoAdd = fmap (const (0, SEltLabel "meow" (SEltBox simpleSBox))) addButton
-    , _layers_select = never
+  return LayerWidget {
+    _layerWidget_potatoAdd = fmap (const (0, SEltLabel "meow" (SEltBox simpleSBox))) addButton
+    , _layerWidget_select = never
   }
 
 data Tool = TPan | TBox | TNothing deriving (Eq, Show)
@@ -133,7 +137,7 @@ flowMain = mainWidget $ mdo
       V.EvKey (V.KChar 'y') [V.MCtrl] -> Just ()
       _ -> Nothing
     pfc = PFConfig {
-        _pfc_addElt     = _layers_potatoAdd layers
+        _pfc_addElt     = _layerWidget_potatoAdd layers
         , _pfc_removeElt  = never
         , _pfc_manipulate = never
         , _pfc_undo       = undoEv
@@ -155,10 +159,10 @@ flowMain = mainWidget $ mdo
     leftPanel = col $ do
       fixed 2 $ debugStream [fmapLabelShow "tool" tools]
       tools' <- fixed 3 $ toolScreen
-      layers' <- stretch $ layerScreen $ treeDyn
+      layers' <- stretch $ layerWidget $ treeDyn
       return (layers', tools')
 
-    rightPanel = canvasScreen canvas
+    rightPanel = canvasWidget canvas
 
   ((layers, tools), _) <- splitHDrag 35 (fill '*') leftPanel rightPanel
 
