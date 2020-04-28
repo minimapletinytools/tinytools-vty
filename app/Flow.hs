@@ -112,12 +112,18 @@ layerWidget stree = do
 
 data Tool = TPan | TBox | TNothing deriving (Eq, Show)
 
-toolScreen :: forall t m. (Reflex t, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m)
-  => VtyWidget t m (Event t Tool)
-toolScreen = row $ do
+data ToolWidget t = ToolWidget {
+  _toolWidget_tool :: Event t Tool
+}
+
+toolsWidget :: forall t m. (Reflex t, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m)
+  => VtyWidget t m (ToolWidget t)
+toolsWidget = row $ do
   pan <- fixed 5 $ textButton def "PAN"
   box <- fixed 5 $ textButton def "BOX"
-  return $ leftmost [TPan <$ pan, TBox <$ box]
+  return ToolWidget {
+    _toolWidget_tool = leftmost [TPan <$ pan, TBox <$ box]
+  }
 
 
 flowMain :: IO ()
@@ -157,8 +163,8 @@ flowMain = mainWidget $ mdo
   -- main panels
   let
     leftPanel = col $ do
-      fixed 2 $ debugStream [fmapLabelShow "tool" tools]
-      tools' <- fixed 3 $ toolScreen
+      fixed 2 $ debugStream [fmapLabelShow "tool" (_toolWidget_tool tools)]
+      tools' <- fixed 3 $ toolsWidget
       layers' <- stretch $ layerWidget $ treeDyn
       return (layers', tools')
 
