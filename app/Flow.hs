@@ -30,8 +30,14 @@ import           Reflex
 import           Reflex.Class.Switchable
 import           Reflex.Network
 import           Reflex.Vty
+import qualified Text.Show
 
-data CursorState = CSPan | CSSelecting deriving (Eq, Show)
+data CursorState = CSPan | CSSelecting | CSBox deriving (Eq)
+
+instance Show CursorState where
+  show CSPan = "PAN"
+  show CSSelecting = "SELECT"
+  show CSBox = "BOX"
 
 dynLBox_to_dynRegion :: (Reflex t) => Dynamic t LBox -> DynRegion t
 dynLBox_to_dynRegion dlb = r where
@@ -56,48 +62,48 @@ data CanvasWidgetConfig t = CanvasWidgetConfig {
 data CanvasWidget t = CanvasWidget {
   _canvasWidget_isManipulating :: Dynamic t Bool
 }
-canvasWidget :: forall t m. (Reflex t, MonadHold t m, MonadFix m, MonadNodeId m)
+canvasWidget :: forall t m. (Reflex t, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m)
   => CanvasWidgetConfig t
   -> VtyWidget t m (CanvasWidget t)
 canvasWidget CanvasWidgetConfig {..} = mdo
   inp <- input
+
+  -- ::cursor::
   let
     escEv = fforMaybe inp $ \case
       V.EvKey (V.KEsc) [] -> Just ()
       _ -> Nothing
-  pw <- displayWidth
-  ph <- displayHeight
-  pw0 <- sample $ current pw
-  ph0 <- sample $ current ph
   cursor <- holdDyn CSSelecting $ leftmost [fmap tool_cursorState _canvasWidgetConfig_tool, CSSelecting <$ escEv]
-  LBox (LPoint (V2 cx0 cy0)) (LSize (V2 cw0 ch0)) <- sample $ current (fmap canvas_box _canvasWidgetConfig_canvas_temp)
-  let
-    -- position in screen space of upper left corner of this pane
-    --panePos :: Dynamic t (Int, Int)
-    --panePos = constDyn (-20,-20)
 
+  -- ::panning::
   -- TODO make this so it doesn't trigger when you start drag off of this panel
   -- you could do this by checking if dragFrom is on the edges
-  dragEv :: Event t ((Int,Int), Drag) <- dragAttachOnStart V.BLeft (current panePos)
+  dragEv :: Event t ((Int,Int), Drag2) <- drag2AttachOnStart V.BLeft (current panePos)
+  LBox (LPoint (V2 cx0 cy0)) (LSize (V2 cw0 ch0)) <- sample $ current (fmap canvas_box _canvasWidgetConfig_canvas_temp)
+  pw0 <- displayWidth >>= sample . current
+  ph0 <- displayHeight >>= sample . current
   let
     panEv = fmapMaybe (\(c,d) -> if c == CSPan then Just d else Nothing) $  attach (current cursor) dragEv
-    panFoldFn ((sx,sy), Drag (fromX, fromY) (toX, toY) _ _ _) _ = (sx + toX-fromX, sy + toY-fromY)
+    panFoldFn ((sx,sy), Drag2 (fromX, fromY) (toX, toY) _ _ _) _ = (sx + toX-fromX, sy + toY-fromY)
   panePos <- foldDyn panFoldFn (cx0 - (cw0-pw0)`div`2, cy0 - (ch0-ph0)`div`2) panEv
 
+  -- ::tools::
 
-  -- fill the background with whatever
-  fill '░'
 
-  -- draw the canvas
+  -- ::draw the canvas::
   -- TODO make this efficient -_-
   let
     canvasRegion = translate_dynRegion panePos $ dynLBox_to_dynRegion (fmap canvas_box _canvasWidgetConfig_canvas_temp)
+  fill '░'
   pane canvasRegion (constDyn True) $ do
     text $ current (fmap canvasToText _canvasWidgetConfig_canvas_temp)
 
+  -- ::info pane::
+  col $ do
+    fixed 2 $ debugStream [fmapLabelShow "drag" dragEv, fmapLabelShow "input" inp, fmapLabelShow "cursor" (updated cursor)]
+    fixed 1 $ row $ do
+      fixed 15 $ text $ fmap (\x -> "cursor: " <> show x) $ current cursor
 
-  debugStream [fmapLabelShow "drag" dragEv, fmapLabelShow "input" inp, fmapLabelShow "cursor" (updated cursor)]
-  -- TODO info pane in bottom right corner
 
   return CanvasWidget {
       _canvasWidget_isManipulating = constDyn False
@@ -135,6 +141,7 @@ data Tool = TPan | TBox | TNothing deriving (Eq, Show)
 
 tool_cursorState :: Tool -> CursorState
 tool_cursorState TPan = CSPan
+tool_cursorState TBox = CSBox
 tool_cursorState _ = CSSelecting
 
 data ToolWidget t = ToolWidget {

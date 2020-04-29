@@ -18,7 +18,7 @@ module Potato.Reflex.Vty.Helpers (
   , debugStream
   , fmapLabelShow
   , countEv
-  , dragAttachOnStart
+  , drag2AttachOnStart
 ) where
 
 
@@ -26,6 +26,7 @@ import           Relude
 
 import           Potato.Flow
 import           Potato.Flow.Testing
+import           Potato.Reflex.Vty.Widget
 import           Reflex.Potato.Helpers
 
 
@@ -34,12 +35,12 @@ import           Control.Monad
 import           Control.Monad.Fix
 import           Control.Monad.NodeId
 import           Data.Functor.Misc
-import qualified Data.Map                as Map
+import qualified Data.Map                 as Map
 import           Data.Maybe
-import qualified Data.Text               as T
-import qualified Data.Text.Zipper        as TZ
+import qualified Data.Text                as T
+import qualified Data.Text.Zipper         as TZ
 import           Data.Time.Clock
-import qualified Graphics.Vty            as V
+import qualified Graphics.Vty             as V
 import           Reflex
 import           Reflex.Class.Switchable
 import           Reflex.Network
@@ -81,7 +82,7 @@ debugStream evs = do
 countEv :: (Reflex t, MonadHold t m, MonadFix m) => Event t a -> m (Dynamic t Int)
 countEv ev = foldDyn (\_ b -> b+1) 0 ev
 
--- | Converts raw vty mouse drag events into an event stream of 'Drag's
+{-
 dragAttachOnStart
   :: forall t m a. (Reflex t, MonadFix m, MonadHold t m)
   => V.Button
@@ -118,3 +119,22 @@ dragAttachOnStart btn beh = mdo
     newDrag = push f (attach (current dragD) inp)
   dragD <- holdDyn Nothing $ Just <$> newDrag
   return (fmapMaybe id $ updated dragD)
+-}
+
+
+drag2AttachOnStart
+  :: forall t m a. (Reflex t, MonadFix m, MonadHold t m)
+  => V.Button
+  -> Behavior t a
+  -> VtyWidget t m (Event t (a, Drag2))
+drag2AttachOnStart btn beh = do
+  dragEv <- drag2 V.BLeft
+  let
+    foldfn d ma = do
+      anew <- case ma of
+        Nothing -> sample beh
+        Just (a, _) | _drag2_state d == DragStart -> sample beh
+        Just (a, _) -> return a
+      return $ Just (anew, d)
+  dragBeh <- foldDynM foldfn Nothing dragEv
+  return $ fmapMaybe id $ updated dragBeh

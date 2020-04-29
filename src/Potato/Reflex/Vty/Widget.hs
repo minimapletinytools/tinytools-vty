@@ -1,43 +1,49 @@
-{-# LANGUAGE DefaultSignatures #-}
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE DefaultSignatures          #-}
+{-# LANGUAGE DeriveFunctor              #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE FunctionalDependencies     #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE RecursiveDo #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE LambdaCase                 #-}
+{-# LANGUAGE RankNTypes                 #-}
+{-# LANGUAGE RecursiveDo                #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE StandaloneDeriving         #-}
+{-# LANGUAGE TupleSections              #-}
+{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE UndecidableInstances       #-}
 
 module Potato.Reflex.Vty.Widget
   ( splitH
   , splitHDrag
+  , DragState(..)
+  , Drag2(..)
+  , drag2
+  , drag2_start
   ) where
 
-import Prelude
+import           Prelude
 
-import Control.Applicative (liftA2)
-import Control.Monad.Fix (MonadFix)
-import Data.Set (Set)
-import qualified Data.Set as Set
-import Data.Text (Text)
-import qualified Data.Text as T
-import qualified Data.Text.Zipper as TZ
-import Graphics.Vty (Image)
-import qualified Graphics.Vty as V
+import           Control.Applicative  (liftA2)
+import           Control.Monad.Fix    (MonadFix)
+import           Data.Set             (Set)
+import qualified Data.Set             as Set
+import           Data.Text            (Text)
+import qualified Data.Text            as T
+import qualified Data.Text.Zipper     as TZ
+import           Graphics.Vty         (Image)
+import qualified Graphics.Vty         as V
 
-import Reflex
-import Reflex.Class ()
-import Reflex.Host.Class (MonadReflexCreateTrigger)
-import Reflex.Vty.Widget
-import Reflex.Vty.Host
+import           Reflex
+import           Reflex.Class         ()
+import           Reflex.Host.Class    (MonadReflexCreateTrigger)
+import           Reflex.Vty.Host
+import           Reflex.Vty.Widget
 
 
-import Control.Monad.NodeId
+import           Control.Monad.NodeId
+
+-- new stuff
 
 -- | A plain split of the available space into vertically stacked panes.
 -- No visual separator is built in here.
@@ -109,3 +115,53 @@ splitHDrag splitter0 wS wA wB = mdo
       m <- mouseDown V.BLeft
       x' <- x
       return (m, x')
+
+
+-- updated stuff
+
+data DragState = DragStart | Dragging | DragEnd deriving (Eq, Ord, Show)
+
+-- | Information about a drag operation
+data Drag2 = Drag2
+  { _drag2_from      :: (Int, Int) -- ^ Where the drag began
+  , _drag2_to        :: (Int, Int) -- ^ Where the mouse currently is
+  , _drag2_button    :: V.Button -- ^ Which mouse button is dragging
+  , _drag2_modifiers :: [V.Modifier] -- ^ What modifiers are held
+  , _drag2_state     :: DragState -- ^ Whether the drag ended (the mouse button was released)
+  }
+  deriving (Eq, Ord, Show)
+
+-- | Converts raw vty mouse drag events into an event stream of 'Drag's
+drag2
+  :: (Reflex t, MonadFix m, MonadHold t m)
+  => V.Button
+  -> VtyWidget t m (Event t Drag2)
+drag2 btn = mdo
+  inp <- input
+  let f :: Maybe Drag2 -> V.Event -> Maybe Drag2
+      f Nothing = \case
+        V.EvMouseDown x y btn' mods
+          | btn == btn' -> Just $ Drag2 (x,y) (x,y) btn' mods DragStart
+          | otherwise   -> Nothing
+        _ -> Nothing
+      f (Just (Drag2 from _ _ mods st)) = \case
+        V.EvMouseDown x y btn' mods'
+          | st == DragEnd && btn == btn'  -> Just $ Drag2 (x,y) (x,y) btn' mods' DragStart
+          | btn == btn'         -> Just $ Drag2 from (x,y) btn mods' Dragging
+          | otherwise           -> Nothing -- Ignore other buttons.
+        V.EvMouseUp x y (Just btn')
+          | st == DragEnd        -> Nothing
+          | btn == btn' -> Just $ Drag2 from (x,y) btn mods DragEnd
+          | otherwise   -> Nothing
+        V.EvMouseUp x y Nothing -- Terminal doesn't specify mouse up button,
+                                -- assume it's the right one.
+          | st == DragEnd      -> Nothing
+          | otherwise -> Just $ Drag2 from (x,y) btn mods DragEnd
+        _ -> Nothing
+  let
+    newDrag = attachWithMaybe f (current dragD) inp
+  dragD <- holdDyn Nothing $ Just <$> newDrag
+  return (fmapMaybe id $ updated dragD)
+
+drag2_start :: (Reflex t) => Event t Drag2 -> Event t Drag2
+drag2_start = ffilter (\x -> _drag2_state x == DragStart)
