@@ -75,6 +75,8 @@ dependencies:
 - vty
 - time
 - reflex-potatoes
+- dependent-sum
+- these
 
 library:
   source-dirs: src
