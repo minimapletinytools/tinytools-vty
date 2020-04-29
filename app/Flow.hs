@@ -57,11 +57,15 @@ translate_dynRegion pos dr = dr {
 data CanvasWidgetConfig t = CanvasWidgetConfig {
   _canvasWidgetConfig_tool :: Event t Tool
   , _canvasWidgetConfig_canvas_temp :: Dynamic t Canvas
+
+  -- TODO pass in selected info
 }
 
 data CanvasWidget t = CanvasWidget {
   _canvasWidget_isManipulating :: Dynamic t Bool
+  , _canvasWidget_addSEltLabel :: Event t (LayerPos, SEltLabel)
 }
+
 canvasWidget :: forall t m. (Reflex t, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m)
   => CanvasWidgetConfig t
   -> VtyWidget t m (CanvasWidget t)
@@ -74,12 +78,11 @@ canvasWidget CanvasWidgetConfig {..} = mdo
       V.EvKey (V.KEsc) [] -> Just ()
       _ -> Nothing
   cursor <- holdDyn CSSelecting $ leftmost [fmap tool_cursorState _canvasWidgetConfig_tool, CSSelecting <$ escEv]
-  dragEv :: Event t ((CursorState, (Int,Int)), Drag2) <- drag2AttachOnStart V.BLeft (ffor2 (current cursor)  (current panePos) (,))
+  dragEv :: Event t ((CursorState, (Int,Int)), Drag2) <- drag2AttachOnStart V.BLeft (ffor2 (current cursor)  (current panPos) (,))
   let
     cursorDragEv c' = fmapMaybe (\((c,p),d) -> if c == c' then Just (p,d) else Nothing) $ dragEv
     cursorStartEv c' = fmapMaybe (\((c,p),d) -> if _drag2_state d == DragStart && c == c' then Just (p,d) else Nothing) $ dragEv
     cursorEndEv c' = fmapMaybe (\((c,p),d) -> if _drag2_state d == DragEnd && c == c' then Just (p,d) else Nothing) $ dragEv
-
 
   -- ::panning::
   -- TODO make this so it doesn't trigger when you start drag off of this panel
@@ -89,17 +92,21 @@ canvasWidget CanvasWidgetConfig {..} = mdo
   ph0 <- displayHeight >>= sample . current
   let
     panFoldFn ((sx,sy), Drag2 (fromX, fromY) (toX, toY) _ _ _) _ = (sx + toX-fromX, sy + toY-fromY)
-  panePos <- foldDyn panFoldFn (cx0 - (cw0-pw0)`div`2, cy0 - (ch0-ph0)`div`2) $ cursorDragEv CSPan
+
+  -- panPos is position of upper left corner of canvas relative to screen
+  panPos <- foldDyn panFoldFn (cx0 - (cw0-pw0)`div`2, cy0 - (ch0-ph0)`div`2) $ cursorDragEv CSPan
 
   -- ::tools::
-
-
-  --cursorStartEv CSBox
+  let
+    boxPushFn ((px,py), Drag2 (fromX, fromY) _ _ _ _) = do
+      pos <- return 0
+      return $ (pos, SEltLabel "<box>" $ SEltBox $ SBox (LBox (LPoint (V2 (fromX-px) (fromY-py))) (LSize (V2 1 1))) def)
+    newBoxEv = pushAlways boxPushFn $ cursorStartEv CSBox
 
   -- ::draw the canvas::
   -- TODO make this efficient -_-
   let
-    canvasRegion = translate_dynRegion panePos $ dynLBox_to_dynRegion (fmap canvas_box _canvasWidgetConfig_canvas_temp)
+    canvasRegion = translate_dynRegion panPos $ dynLBox_to_dynRegion (fmap canvas_box _canvasWidgetConfig_canvas_temp)
   fill '░'
   pane canvasRegion (constDyn True) $ do
     text $ current (fmap canvasToText _canvasWidgetConfig_canvas_temp)
@@ -113,6 +120,7 @@ canvasWidget CanvasWidgetConfig {..} = mdo
 
   return CanvasWidget {
       _canvasWidget_isManipulating = constDyn False
+      , _canvasWidget_addSEltLabel = leftmostwarn "canvas add" [newBoxEv]
     }
 
 
@@ -190,7 +198,7 @@ flowMain = mainWidget $ mdo
       _ -> Nothing
 
     pfc = PFConfig {
-        _pfc_addElt     = _layerWidget_potatoAdd layers
+        _pfc_addElt     = leftmost [_layerWidget_potatoAdd layersW, _canvasWidget_addSEltLabel canvasW]
         , _pfc_removeElt  = never
         , _pfc_manipulate = never
         , _pfc_undo       = undoEv
@@ -220,7 +228,7 @@ flowMain = mainWidget $ mdo
       (_toolWidget_tool tools)
       canvas
 
-  ((layers, tools, _), _) <- splitHDrag 35 (fill '*') leftPanel rightPanel
+  ((layersW, tools, _), canvasW) <- splitHDrag 35 (fill '*') leftPanel rightPanel
 
   return $ fforMaybe inp $ \case
     V.EvKey (V.KChar 'c') [V.MCtrl] -> Just ()
