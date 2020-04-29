@@ -134,8 +134,7 @@ translate_dynRegion pos dr = dr {
 data CanvasWidgetConfig t = CanvasWidgetConfig {
   _canvasWidgetConfig_tool          :: Event t Tool
   , _canvasWidgetConfig_canvas_temp :: Dynamic t Canvas
-
-  -- TODO pass in selected info
+  , _canvasWidgetConfig_selectionManager :: SelectionManager t
 }
 
 data CanvasWidget t = CanvasWidget {
@@ -216,6 +215,7 @@ canvasWidget CanvasWidgetConfig {..} = mdo
 
 data LayerWidgetConfig t = LayerWidgetConfig {
   _layerWidgetConfig_temp_sEltTree :: Dynamic t SEltTree
+  , _layerWidgetConfig_selectionManager :: SelectionManager t
 }
 
 data LayerWidget t = LayerWidget {
@@ -309,6 +309,12 @@ flowMain = mainWidget $ mdo
     $ tag selts potatoUpdated
 
   -- ::selection stuff::
+  selectionManager <- holdSelectionManager
+    SelectionManagerConfig {
+      _selectionManagerConfig_newElt_layerPos = _canvasWidget_addSEltLabel canvasW
+      , _selectionManagerConfig_sEltLayerTree = layerTree
+      , _selectionManagerConfig_select = never
+    }
 
 
   -- main panels
@@ -316,13 +322,14 @@ flowMain = mainWidget $ mdo
     leftPanel = col $ do
       fixed 2 $ debugStream [fmapLabelShow "tool" (_toolWidget_tool tools)]
       tools' <- fixed 3 $ toolsWidget
-      layers' <- stretch $ layerWidget $ LayerWidgetConfig treeDyn
+      layers' <- stretch $ layerWidget $ LayerWidgetConfig treeDyn selectionManager
       params' <- fixed 5 $ paramWidget
       return (layers', tools', params')
 
     rightPanel = canvasWidget $ CanvasWidgetConfig
       (_toolWidget_tool tools)
       canvas
+      selectionManager
 
   ((layersW, tools, _), canvasW) <- splitHDrag 35 (fill '*') leftPanel rightPanel
 
