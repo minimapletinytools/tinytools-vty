@@ -67,19 +67,19 @@ canvasWidget :: forall t m. (Reflex t, PostBuild t m, MonadHold t m, MonadFix m,
   -> VtyWidget t m (CanvasWidget t)
 canvasWidget CanvasWidgetConfig {..} = mdo
   inp <- input
-  dragEv :: Event t ((Int,Int), Drag2) <- drag2AttachOnStart V.BLeft (current panePos)
 
   -- ::cursor::
   let
     escEv = fforMaybe inp $ \case
       V.EvKey (V.KEsc) [] -> Just ()
       _ -> Nothing
-    -- double checks protects against cursor switched midway through dragging (though this should never happen)
-    cursorDragEv' c' = fmapMaybe (\(c,(p,d)) -> if c == c' then Just (c,p,d) else Nothing) $  attach (current cursor) dragEv
-    cursorDragEv = fmap (\(_,p,d) -> (p,d)) . cursorDragEv'
-    cursorStartEv c' = fmapMaybe (\(c,p,d) -> if _drag2_state d == DragStart && c == c' then Just (p,d) else Nothing) $ cursorDragEv' c'
-    cursorEndEv c' = fmapMaybe (\(c,p,d) -> if _drag2_state d == DragEnd && c == c' then Just (p,d) else Nothing) $ cursorDragEv' c'
   cursor <- holdDyn CSSelecting $ leftmost [fmap tool_cursorState _canvasWidgetConfig_tool, CSSelecting <$ escEv]
+  dragEv :: Event t ((CursorState, (Int,Int)), Drag2) <- drag2AttachOnStart V.BLeft (ffor2 (current cursor)  (current panePos) (,))
+  let
+    cursorDragEv c' = fmapMaybe (\((c,p),d) -> if c == c' then Just (p,d) else Nothing) $ dragEv
+    cursorStartEv c' = fmapMaybe (\((c,p),d) -> if _drag2_state d == DragStart && c == c' then Just (p,d) else Nothing) $ dragEv
+    cursorEndEv c' = fmapMaybe (\((c,p),d) -> if _drag2_state d == DragEnd && c == c' then Just (p,d) else Nothing) $ dragEv
+
 
   -- ::panning::
   -- TODO make this so it doesn't trigger when you start drag off of this panel
@@ -92,10 +92,9 @@ canvasWidget CanvasWidgetConfig {..} = mdo
   panePos <- foldDyn panFoldFn (cx0 - (cw0-pw0)`div`2, cy0 - (ch0-ph0)`div`2) $ cursorDragEv CSPan
 
   -- ::tools::
-  let
-    toolEv tool = fmapMaybe (\(c,d) -> if c == tool then Just d else Nothing) $  attach (current cursor) dragEv
-    --toolEv CSBox
 
+
+  --cursorStartEv CSBox
 
   -- ::draw the canvas::
   -- TODO make this efficient -_-
