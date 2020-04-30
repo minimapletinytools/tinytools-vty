@@ -81,7 +81,7 @@ flowMain = mainWidget $ mdo
     stateUpdated = tag (_pfo_potato_state pfo) potatoUpdated
     selts = fmap (fmap (_sEltLabel_sElt . thd3)) $ _pfo_potato_state pfo
   superTreeDyn <- holdDyn [] stateUpdated
-  canvas <- foldDyn potatoRender (emptyCanvas (LBox (LPoint (V2 0 0)) (LSize (V2 100 40))))
+  canvas <- foldDyn potatoRender (emptyRenderedCanvas (LBox (LPoint (V2 0 0)) (LSize (V2 100 40))))
     $ tag selts potatoUpdated
 
   -- ::selection stuff::

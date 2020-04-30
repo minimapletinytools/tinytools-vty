@@ -32,9 +32,9 @@ import           Reflex.Vty
 
 
 data CanvasWidgetConfig t = CanvasWidgetConfig {
-  _canvasWidgetConfig_tool               :: Event t Tool
-  , _canvasWidgetConfig_canvas_temp      :: Dynamic t Canvas
-  , _canvasWidgetConfig_selectionManager :: SelectionManager t
+  _canvasWidgetConfig_tool                  :: Event t Tool
+  , _canvasWidgetConfig_renderedCanvas_temp :: Dynamic t RenderedCanvas
+  , _canvasWidgetConfig_selectionManager    :: SelectionManager t
 }
 
 data CanvasWidget t = CanvasWidget {
@@ -65,7 +65,7 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
   -- ::panning::
   -- TODO make this so it doesn't trigger when you start drag off of this panel
   -- you could do this by checking if dragFrom is on the edges
-  LBox (LPoint (V2 cx0 cy0)) (LSize (V2 cw0 ch0)) <- sample $ current (fmap canvas_box _canvasWidgetConfig_canvas_temp)
+  LBox (LPoint (V2 cx0 cy0)) (LSize (V2 cw0 ch0)) <- sample $ current (fmap renderedCanvas_box _canvasWidgetConfig_renderedCanvas_temp)
   pw0 <- displayWidth >>= sample . current
   ph0 <- displayHeight >>= sample . current
   let
@@ -94,10 +94,10 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
   -- ::draw the canvas::
   -- TODO make this efficient -_-
   let
-    canvasRegion = translate_dynRegion panPos $ dynLBox_to_dynRegion (fmap canvas_box _canvasWidgetConfig_canvas_temp)
+    canvasRegion = translate_dynRegion panPos $ dynLBox_to_dynRegion (fmap renderedCanvas_box _canvasWidgetConfig_renderedCanvas_temp)
   fill '░'
   pane canvasRegion (constDyn True) $ do
-    text $ current (fmap canvasToText _canvasWidgetConfig_canvas_temp)
+    text $ current (fmap renderedCanvasToText _canvasWidgetConfig_renderedCanvas_temp)
 
   -- ::info pane::
   col $ do
