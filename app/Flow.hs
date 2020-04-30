@@ -1,312 +1,40 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE RecursiveDo     #-}
 
-{-# OPTIONS_GHC -threaded #-}
-
 module Flow (
   flowMain
 ) where
 import           Relude
 
 import           Potato.Flow
+import           Potato.Flow.Reflex.Vty.Canvas
+import           Potato.Flow.Reflex.Vty.Layer
+import           Potato.Flow.Reflex.Vty.Manipulator
+import           Potato.Flow.Reflex.Vty.Selection
+import           Potato.Flow.Reflex.Vty.Tools
 import           Potato.Flow.Testing
 import           Potato.Reflex.Vty.Helpers
 import           Potato.Reflex.Vty.Widget
-import           Reflex.Potato.Helpers
 
 
-import           Control.Applicative
-import           Control.Monad
 import           Control.Monad.Fix
 import           Control.Monad.NodeId
-import           Data.Dependent.Sum        (DSum ((:=>)))
-import qualified Data.IntMap.Strict as IM
-import           Data.Functor.Misc
-import qualified Data.Map                  as Map
-import           Data.Maybe
-import qualified Data.Text                 as T
-import qualified Data.Text.Zipper          as TZ
+import           Data.Dependent.Sum                 (DSum ((:=>)))
+import qualified Data.IntMap.Strict                 as IM
+import qualified Data.List                          as L
 import           Data.Time.Clock
-import Data.These
-import qualified Data.List as L
-import qualified Graphics.Vty              as V
-import           Reflex
-import           Reflex.Class.Switchable
-import           Reflex.Network
-import           Reflex.Vty
 import qualified Text.Show
 
-data SelectionManagerConfig t = SelectionManagerConfig {
-  -- connect to _canvasWidget_addSEltLabel to auto select new elts
-  _selectionManagerConfig_newElt_layerPos :: Event t (LayerPos, SEltLabel)
-  -- connect to _sEltLayerTree_changeView
-  , _selectionManagerConfig_sEltLayerTree :: SEltLayerTree t
-  -- TODO multi-select
-  , _selectionManagerConfig_select :: Event t LayerPos
-}
-
-data SelectionManager t = SelectionManager {
-  _selectionManager_selected :: Dynamic t Selected
-}
-
-holdSelectionManager :: forall t m. (Reflex t, MonadHold t m, MonadFix m)
-  => SelectionManagerConfig t
-  -> m (SelectionManager t)
-holdSelectionManager SelectionManagerConfig {..} = do
-  let
-    newSingle = fmapMaybe (\im -> if IM.size im == 1 then IM.lookupMin im else Nothing)
-      $ _sEltLayerTree_changeView _selectionManagerConfig_sEltLayerTree
-    alignfn = \case
-      These (lp,sl) (rid,_) -> Just [(rid, lp, sl)]
-      _ -> Nothing
-    -- we make an unchecked assumption that these two events coincide and refer to the same new element
-    selFromNew = alignEventWithMaybe alignfn _selectionManagerConfig_newElt_layerPos newSingle
-    selFromLayers = fmap (:[]) $ sEltLayerTree_tagSuperSEltByPos _selectionManagerConfig_sEltLayerTree _selectionManagerConfig_select
-  selected <- holdDyn [] $ leftmostwarn "SelectionManager" [selFromNew, selFromLayers]
-  return
-    SelectionManager {
-      _selectionManager_selected = selected
-    }
-
-data ManipulatorWidgetConfig t = ManipulatorWidgetConfig {
-  _manipulatorWigetConfig_selected  :: Dynamic t Selected
-  , _manipulatorWidgetConfig_panPos :: Behavior t (Int, Int)
-  -- TODO currently pane drag won't register release events off the pane, so we need to make sure to pipe in those release events
-  , _manipulatorWidgetConfig_drag   :: Event t ((CursorState, (Int,Int)), Drag2)
-  -- TODO
-  --, _manipulatorWidgetConfig_cancel :: Event t ()
-}
-
-data ManipulatorWidget t = ManipulatorWidget {
-  _manipulatorWidget_modify :: Event t (Bool, ControllersWithId) -- ^ first param is whether we should undo previous action or not
-  , _manipulatorWidget_manipulating :: Dynamic t Bool
-}
-
-holdManipulatorWidget :: forall t m. (Reflex t, MonadHold t m, MonadFix m, NotReady t m, Adjustable t m, PostBuild t m)
-  => ManipulatorWidgetConfig t
-  -> VtyWidget t m (ManipulatorWidget t)
-holdManipulatorWidget ManipulatorWidgetConfig {..} = do
-  let
-    selectionChangedEv = updated _manipulatorWigetConfig_selected
-  dynManipulator <- toManipulator $ selectionChangedEv
-  let
-    -- recreate the manipulator each time the selection changes
-    mapfn :: Selected -> VtyWidget t m (Event t (Bool, ControllersWithId))
-    mapfn _ = mdo
-      -- TODO hook up to didStart
-      let
-        -- TODO figure this out
-        dragging = cursorDragStateEv (Just CSBox) (Just Dragging) _manipulatorWidgetConfig_drag
-        dragEnd = cursorDragStateEv Nothing (Just DragEnd) _manipulatorWidgetConfig_drag
-      wasManip <- holdDyn False $ leftmost [didStart $> True, dragging $> True, dragEnd $> False]
-
-      manipulator <- sample $ current dynManipulator
-        -- assumes manipulator is always referring to same SEltLabel
-        -- TODO add assert to ensure it doesn't change
-      (didStart, w) <- case manipulator of
-        (MTagBox :=> Identity (MBox {..})) -> do
-          let
-            LBox (LPoint (V2 x y)) (LSize (V2 w h)) = _mBox_box
-            -- TODO draw 4 corner images
-            -- create 8 drag events
-            pushfn :: ((Int,Int), Drag2) -> PushM t (Maybe (Bool, ControllersWithId))
-            pushfn (_, Drag2 (fromX, fromY) (toX, toY) _ _ _) = do
-              let
-                r = CTagBox :=> (Identity $ CBox {
-                    _cBox_box = DeltaLBox 0 $ LSize (V2 (toX-fromX) (toY-fromY))
-                  })
-              wasManip' <- sample $ current wasManip
-              return . Just $ (wasManip', IM.singleton _mBox_target r) where
-          return $ (never, push pushfn (cursorDragStateEv (Just CSBox) (Just Dragging) _manipulatorWidgetConfig_drag))
-      return w
-
-  dynWidget :: Dynamic t (VtyWidget t m (Event t (Bool, ControllersWithId)))
-    <- holdDyn (return never) (fmap mapfn selectionChangedEv)
-  modifyEv :: Event t (Bool, ControllersWithId)
-    <- networkView dynWidget >>= switchHold never
-  return
-    ManipulatorWidget {
-      -- TODO
-      _manipulatorWidget_modify = modifyEv
-      -- TODO
-      , _manipulatorWidget_manipulating = undefined
-    }
-
-data CursorState = CSPan | CSSelecting | CSBox deriving (Eq)
-
-instance Show CursorState where
-  show CSPan       = "PAN"
-  show CSSelecting = "SELECT"
-  show CSBox       = "BOX"
-
--- returns pan position at start of drag and dragging info filtered for cursor/drag state
-cursorDragStateEv :: (Reflex t)
-  => Maybe CursorState -- ^ cursor state to select for
-  -> Maybe DragState
-  -> Event t ((CursorState, (Int,Int)), Drag2) -- ^ ((cursor, panPos), drag)
-  -> Event t ((Int,Int), Drag2)
-cursorDragStateEv c' d' dragEv = r where
-  fmapMaybeFn ((c,p),d) = if maybe True (_drag2_state d  ==) d' && maybe True (c ==) c'
-    then Just (p,d)
-    else Nothing
-  r = fmapMaybe fmapMaybeFn dragEv
+import qualified Graphics.Vty                       as V
+import           Reflex
+import           Reflex.Network
+import           Reflex.Potato.Helpers
+import           Reflex.Vty
 
 
-dynLBox_to_dynRegion :: (Reflex t) => Dynamic t LBox -> DynRegion t
-dynLBox_to_dynRegion dlb = r where
-  x' = flip fmap dlb $ \(LBox (LPoint (V2 x y)) (LSize (V2 w h))) -> x
-  y' = flip fmap dlb $ \(LBox (LPoint (V2 x y)) (LSize (V2 w h))) -> y
-  w' = flip fmap dlb $ \(LBox (LPoint (V2 x y)) (LSize (V2 w h))) -> w
-  h' = flip fmap dlb $ \(LBox (LPoint (V2 x y)) (LSize (V2 w h))) -> h
-  r = DynRegion x' y' w' h'
-
-translate_dynRegion :: (Reflex t) => Dynamic t (Int, Int) -> DynRegion t -> DynRegion t
-translate_dynRegion pos dr = dr {
-    _dynRegion_left = liftA2 (+) (_dynRegion_left dr) (fmap fst pos)
-    , _dynRegion_top = liftA2 (+) (_dynRegion_top dr) (fmap snd pos)
-  }
 
 
-data CanvasWidgetConfig t = CanvasWidgetConfig {
-  _canvasWidgetConfig_tool          :: Event t Tool
-  , _canvasWidgetConfig_canvas_temp :: Dynamic t Canvas
-  , _canvasWidgetConfig_selectionManager :: SelectionManager t
-}
 
-data CanvasWidget t = CanvasWidget {
-  _canvasWidget_isManipulating :: Dynamic t Bool
-  , _canvasWidget_addSEltLabel :: Event t (LayerPos, SEltLabel)
-  , _canvasWidget_manipulatorWidget :: ManipulatorWidget t
-}
-
-canvasWidget :: forall t m. (Reflex t, Adjustable t m, PostBuild t m, NotReady t m, MonadHold t m, MonadFix m, MonadNodeId m)
-  => CanvasWidgetConfig t
-  -> VtyWidget t m (CanvasWidget t)
-canvasWidget CanvasWidgetConfig {..} = mdo
-  inp <- input
-
-  -- ::cursor::
-  let
-    escEv = fforMaybe inp $ \case
-      V.EvKey (V.KEsc) [] -> Just ()
-      _ -> Nothing
-  cursor <- holdDyn CSSelecting $ leftmost [fmap tool_cursorState _canvasWidgetConfig_tool, CSSelecting <$ escEv]
-  dragEv :: Event t ((CursorState, (Int,Int)), Drag2) <- drag2AttachOnStart V.BLeft (ffor2 (current cursor)  (current panPos) (,))
-  let
-    cursorDragEv c' = cursorDragStateEv (Just c') Nothing dragEv
-    cursorDraggingEv c' = cursorDragStateEv (Just c') (Just Dragging) dragEv
-    cursorStartEv c' = cursorDragStateEv (Just c') (Just DragStart) dragEv
-    cursorEndEv c' = cursorDragStateEv (Just c') (Just DragEnd) dragEv
-
-  -- ::panning::
-  -- TODO make this so it doesn't trigger when you start drag off of this panel
-  -- you could do this by checking if dragFrom is on the edges
-  LBox (LPoint (V2 cx0 cy0)) (LSize (V2 cw0 ch0)) <- sample $ current (fmap canvas_box _canvasWidgetConfig_canvas_temp)
-  pw0 <- displayWidth >>= sample . current
-  ph0 <- displayHeight >>= sample . current
-  let
-    panFoldFn ((sx,sy), Drag2 (fromX, fromY) (toX, toY) _ _ _) _ = (sx + toX-fromX, sy + toY-fromY)
-
-  -- panPos is position of upper left corner of canvas relative to screen
-  panPos <- foldDyn panFoldFn (cx0 - (cw0-pw0)`div`2, cy0 - (ch0-ph0)`div`2) $ cursorDragEv CSPan
-
-  -- ::tools::
-  let
-    boxPushFn ((px,py), Drag2 (fromX, fromY) _ _ _ _) = do
-      pos <- return 0
-      return $ (pos, SEltLabel "<box>" $ SEltBox $ SBox (LBox (LPoint (V2 (fromX-px) (fromY-py))) (LSize (V2 1 1))) def)
-    newBoxEv = pushAlways boxPushFn $ cursorStartEv CSBox
-
-  -- ::manipulators::
-  let
-    manipCfg = ManipulatorWidgetConfig {
-        _manipulatorWigetConfig_selected = _selectionManager_selected _canvasWidgetConfig_selectionManager
-        , _manipulatorWidgetConfig_panPos = current panPos
-        -- TODO this is not correct
-        , _manipulatorWidgetConfig_drag = dragEv
-      }
-  manipulatorW <- holdManipulatorWidget manipCfg
-
-  -- ::draw the canvas::
-  -- TODO make this efficient -_-
-  let
-    canvasRegion = translate_dynRegion panPos $ dynLBox_to_dynRegion (fmap canvas_box _canvasWidgetConfig_canvas_temp)
-  fill '░'
-  pane canvasRegion (constDyn True) $ do
-    text $ current (fmap canvasToText _canvasWidgetConfig_canvas_temp)
-
-  -- ::info pane::
-  col $ do
-    fixed 2 $ debugStream
-      [
-      never
-      --, fmapLabelShow "drag" dragEv
-      --, fmapLabelShow "input" inp
-      --, fmapLabelShow "cursor" (updated cursor)
-      --, fmapLabelShow "selection" (updated $ _selectionManager_selected _canvasWidgetConfig_selectionManager)
-      , fmapLabelShow "manip" $ _manipulatorWidget_modify manipulatorW
-      ]
-    fixed 1 $ row $ do
-      fixed 15 $ text $ fmap (\x -> "cursor: " <> show x) $ current cursor
-
-
-  return CanvasWidget {
-      -- TODO
-      _canvasWidget_isManipulating = constDyn False
-      , _canvasWidget_addSEltLabel = leftmostwarn "canvas add" [newBoxEv]
-      , _canvasWidget_manipulatorWidget = manipulatorW
-    }
-
-
-data LayerWidgetConfig t = LayerWidgetConfig {
-  _layerWidgetConfig_temp_sEltTree :: Dynamic t SEltTree
-  , _layerWidgetConfig_selectionManager :: SelectionManager t
-}
-
-data LayerWidget t = LayerWidget {
-  _layerWidget_select  :: Event t LayerPos
-  , _layerWidget_changeName :: Event t ControllersWithId
-}
-
-layerWidget :: forall t m. (Reflex t, Adjustable t m, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m)
-  => LayerWidgetConfig t
-  -> VtyWidget t m (LayerWidget t)
-layerWidget LayerWidgetConfig {..} = do
-  pw <- displayWidth
-  ph <- displayHeight
-  addButton <- col $ do
-    fixed 1 $ debugFocus
-    fixed 1 $ text . current . fmap (show . length)$ _layerWidgetConfig_temp_sEltTree
-    addButton <- fixed 3 $ textButtonStatic def "add"
-    -- note this is only possible because you added PostBuild to Layout
-    stretch $ col $ simpleList (fmap (zip [0..]) _layerWidgetConfig_temp_sEltTree) $ \ds -> do
-      fixed 1 $ text $ current $ fmap (_sEltLabel_name . snd) ds
-
-    return addButton
-  return LayerWidget {
-    _layerWidget_select = never
-    , _layerWidget_changeName = never
-  }
-
-data Tool = TPan | TBox | TNothing deriving (Eq, Show)
-
-tool_cursorState :: Tool -> CursorState
-tool_cursorState TPan = CSPan
-tool_cursorState TBox = CSBox
-tool_cursorState _    = CSSelecting
-
-data ToolWidget t = ToolWidget {
-  _toolWidget_tool :: Event t Tool
-}
-
-toolsWidget :: forall t m. (Reflex t, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m)
-  => VtyWidget t m (ToolWidget t)
-toolsWidget = row $ do
-  pan <- fixed 5 $ textButton def "PAN"
-  box <- fixed 5 $ textButton def "BOX"
-  return ToolWidget {
-    _toolWidget_tool = leftmost [TPan <$ pan, TBox <$ box]
-  }
 
 data ParamWidget t = ParamWidget {
 
@@ -368,12 +96,12 @@ flowMain = mainWidget $ mdo
   let
     leftPanel = col $ do
       fixed 2 $ debugStream [fmapLabelShow "tool" (_toolWidget_tool tools)]
-      tools' <- fixed 3 $ toolsWidget
-      layers' <- stretch $ layerWidget $ LayerWidgetConfig treeDyn selectionManager
+      tools' <- fixed 3 $ holdToolsWidget
+      layers' <- stretch $ holdLayerWidget $ LayerWidgetConfig treeDyn selectionManager
       params' <- fixed 5 $ paramWidget
       return (layers', tools', params')
 
-    rightPanel = canvasWidget $ CanvasWidgetConfig
+    rightPanel = holdCanvasWidget $ CanvasWidgetConfig
       (_toolWidget_tool tools)
       canvas
       selectionManager
