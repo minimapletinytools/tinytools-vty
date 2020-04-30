@@ -264,8 +264,8 @@ data LayerWidgetConfig t = LayerWidgetConfig {
 }
 
 data LayerWidget t = LayerWidget {
-  _layerWidget_potatoAdd :: Event t (LayerPos, SEltLabel)
-  , _layerWidget_select  :: Event t LayerPos
+  _layerWidget_select  :: Event t LayerPos
+  , _layerWidget_changeName :: Event t ControllersWithId
 }
 
 layerWidget :: forall t m. (Reflex t, Adjustable t m, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m)
@@ -278,12 +278,14 @@ layerWidget LayerWidgetConfig {..} = do
     fixed 1 $ debugFocus
     fixed 1 $ text . current . fmap (show . length)$ _layerWidgetConfig_temp_sEltTree
     addButton <- fixed 3 $ textButtonStatic def "add"
+    -- note this is only possible because you added PostBuild to Layout
     stretch $ col $ simpleList (fmap (zip [0..]) _layerWidgetConfig_temp_sEltTree) $ \ds -> do
       fixed 1 $ text $ current $ fmap (_sEltLabel_name . snd) ds
+
     return addButton
   return LayerWidget {
-    _layerWidget_potatoAdd = fmap (const (0, SEltLabel "meow" (SEltBox simpleSBox))) addButton
-    , _layerWidget_select = never
+    _layerWidget_select = never
+    , _layerWidget_changeName = never
   }
 
 data Tool = TPan | TBox | TNothing deriving (Eq, Show)
@@ -333,7 +335,7 @@ flowMain = mainWidget $ mdo
       _ -> Nothing
 
     pfc = PFConfig {
-        _pfc_addElt     = leftmost [_layerWidget_potatoAdd layersW, _canvasWidget_addSEltLabel canvasW]
+        _pfc_addElt     = _canvasWidget_addSEltLabel canvasW
         , _pfc_removeElt  = never
         , _pfc_manipulate = doManipulate
         , _pfc_undo       = leftmost [undoEv, undoBeforeManipulate]
