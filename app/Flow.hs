@@ -158,6 +158,7 @@ canvasWidget CanvasWidgetConfig {..} = mdo
   dragEv :: Event t ((CursorState, (Int,Int)), Drag2) <- drag2AttachOnStart V.BLeft (ffor2 (current cursor)  (current panPos) (,))
   let
     cursorDragEv c' = fmapMaybe (\((c,p),d) -> if c == c' then Just (p,d) else Nothing) $ dragEv
+    cursorDraggingEv c' = fmapMaybe (\((c,p),d) -> if _drag2_state d == Dragging && c == c' then Just (p,d) else Nothing) $ dragEv
     cursorStartEv c' = fmapMaybe (\((c,p),d) -> if _drag2_state d == DragStart && c == c' then Just (p,d) else Nothing) $ dragEv
     cursorEndEv c' = fmapMaybe (\((c,p),d) -> if _drag2_state d == DragEnd && c == c' then Just (p,d) else Nothing) $ dragEv
 
@@ -183,10 +184,10 @@ canvasWidget CanvasWidgetConfig {..} = mdo
   -- ::manipulators::
   let
     manipCfg = ManipulatorWidgetConfig {
-        _manipulatorWigetConfig_selected = undefined
+        _manipulatorWigetConfig_selected = _selectionManager_selected _canvasWidgetConfig_selectionManager
         , _manipulatorWidgetConfig_panPos = current panPos
         -- TODO this is not correct
-        , _manipulatorWidgetConfig_drag = cursorDragEv CSBox
+        , _manipulatorWidgetConfig_drag = cursorDraggingEv CSBox
       }
   manipulatorW <- holdManipulatorWidget manipCfg
 
@@ -200,7 +201,14 @@ canvasWidget CanvasWidgetConfig {..} = mdo
 
   -- ::info pane::
   col $ do
-    fixed 2 $ debugStream [fmapLabelShow "drag" dragEv, fmapLabelShow "input" inp, fmapLabelShow "cursor" (updated cursor)]
+    fixed 2 $ debugStream
+      [
+      never
+      --, fmapLabelShow "drag" dragEv
+      , fmapLabelShow "input" inp
+      , fmapLabelShow "cursor" (updated cursor)
+      , fmapLabelShow "selection" (updated $ _selectionManager_selected _canvasWidgetConfig_selectionManager)
+      ]
     fixed 1 $ row $ do
       fixed 15 $ text $ fmap (\x -> "cursor: " <> show x) $ current cursor
 
