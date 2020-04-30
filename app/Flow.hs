@@ -68,7 +68,6 @@ holdSelectionManager SelectionManagerConfig {..} = do
       _selectionManager_selected = selected
     }
 
-
 data ManipulatorWidgetConfig t = ManipulatorWidgetConfig {
   _manipulatorWigetConfig_selected  :: Dynamic t Selected
   , _manipulatorWidgetConfig_panPos :: Behavior t (Int, Int)
@@ -76,9 +75,9 @@ data ManipulatorWidgetConfig t = ManipulatorWidgetConfig {
 }
 
 data ManipulatorWidget t = ManipulatorWidget {
-  _manipulatorWidget_modify :: Event t ControllersWithId
+  _manipulatorWidget_modify :: Event t (Bool, ControllersWithId) -- ^ first param is whether we should undo previous action or not
+  , _manipulatorWidget_manipulating :: Dynamic t Bool
 }
-
 
 holdManipulatorWidget :: forall t m. (Reflex t, MonadHold t m, MonadFix m, NotReady t m, Adjustable t m, PostBuild t m)
   => ManipulatorWidgetConfig t
@@ -103,11 +102,11 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = do
   modifyEv :: Event t ControllersWithId <- networkView dynWidget >>= switchHold never
   return
     ManipulatorWidget {
-      _manipulatorWidget_modify = modifyEv
+      -- TODO 
+      _manipulatorWidget_modify = fmap (\x -> (False, x)) modifyEv
+      -- TODO
+      , _manipulatorWidget_manipulating = undefined
     }
-
-
-
 
 data CursorState = CSPan | CSSelecting | CSBox deriving (Eq)
 
@@ -140,7 +139,7 @@ data CanvasWidgetConfig t = CanvasWidgetConfig {
 data CanvasWidget t = CanvasWidget {
   _canvasWidget_isManipulating :: Dynamic t Bool
   , _canvasWidget_addSEltLabel :: Event t (LayerPos, SEltLabel)
-  , _canvasWidget_manipulate :: Event t ControllersWithId
+  , _canvasWidget_manipulatorWidget :: ManipulatorWidget t
 }
 
 canvasWidget :: forall t m. (Reflex t, Adjustable t m, PostBuild t m, NotReady t m, MonadHold t m, MonadFix m, MonadNodeId m)
@@ -204,7 +203,7 @@ canvasWidget CanvasWidgetConfig {..} = mdo
     fixed 2 $ debugStream
       [
       never
-      --, fmapLabelShow "drag" dragEv
+      , fmapLabelShow "drag" dragEv
       , fmapLabelShow "input" inp
       , fmapLabelShow "cursor" (updated cursor)
       , fmapLabelShow "selection" (updated $ _selectionManager_selected _canvasWidgetConfig_selectionManager)
@@ -217,7 +216,7 @@ canvasWidget CanvasWidgetConfig {..} = mdo
       -- TODO
       _canvasWidget_isManipulating = constDyn False
       , _canvasWidget_addSEltLabel = leftmostwarn "canvas add" [newBoxEv]
-      , _canvasWidget_manipulate = _manipulatorWidget_modify manipulatorW
+      , _canvasWidget_manipulatorWidget = manipulatorW
     }
 
 
@@ -298,8 +297,8 @@ flowMain = mainWidget $ mdo
     pfc = PFConfig {
         _pfc_addElt     = leftmost [_layerWidget_potatoAdd layersW, _canvasWidget_addSEltLabel canvasW]
         , _pfc_removeElt  = never
-        , _pfc_manipulate = _canvasWidget_manipulate canvasW
-        , _pfc_undo       = undoEv
+        , _pfc_manipulate = doManipulate
+        , _pfc_undo       = leftmost [undoEv, undoBeforeManipulate]
         , _pfc_redo       = redoEv
         , _pfc_save = never
       }
@@ -341,6 +340,14 @@ flowMain = mainWidget $ mdo
 
   ((layersW, tools, _), canvasW) <- splitHDrag 35 (fill '*') leftPanel rightPanel
 
+  -- prep manipulate event
+  let
+    manipulatorW = _canvasWidget_manipulatorWidget canvasW
+    undoBeforeManipulate = fmapMaybe (\x -> if fst x then Just () else Nothing) $ _manipulatorWidget_modify manipulatorW
+    doManipulate' = fmap snd $ _manipulatorWidget_modify manipulatorW
+  doManipulate <- sequenceEvents undoBeforeManipulate doManipulate'
+
+  -- handle escape events
   return $ fforMaybe inp $ \case
     V.EvKey (V.KChar 'c') [V.MCtrl] -> Just ()
     _ -> Nothing

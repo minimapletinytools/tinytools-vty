@@ -76,7 +76,7 @@ fmapLabelShow t = fmap (\x -> t <> ": " <> show x)
 
 debugStream :: (Reflex t, MonadHold t m) => [Event t Text] -> VtyWidget t m ()
 debugStream evs = do
-  t <- holdDyn "" $ mergeWith (\a b -> a <> " | " <> b) evs
+  t <- holdDyn "" $ mergeWith (\a b -> a <> "\n" <> b) evs
   richText richTextConfig_simpleForeColorAttr (current t)
 
 countEv :: (Reflex t, MonadHold t m, MonadFix m) => Event t a -> m (Dynamic t Int)
