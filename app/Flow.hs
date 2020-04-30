@@ -23,6 +23,7 @@ import           Data.Dependent.Sum                 (DSum ((:=>)))
 import qualified Data.IntMap.Strict                 as IM
 import qualified Data.List                          as L
 import           Data.Time.Clock
+import           Data.Tuple.Extra
 import qualified Text.Show
 
 import qualified Graphics.Vty                       as V
@@ -78,8 +79,8 @@ flowMain = mainWidget $ mdo
   let
     layerTree = _pfo_layers pfo
     stateUpdated = tag (_pfo_potato_state pfo) potatoUpdated
-    selts = fmap (fmap (_sEltLabel_sElt)) $ _pfo_potato_state pfo
-  treeDyn <- holdDyn [] stateUpdated
+    selts = fmap (fmap (_sEltLabel_sElt . thd3)) $ _pfo_potato_state pfo
+  superTreeDyn <- holdDyn [] stateUpdated
   canvas <- foldDyn potatoRender (emptyCanvas (LBox (LPoint (V2 0 0)) (LSize (V2 100 40))))
     $ tag selts potatoUpdated
 
@@ -97,7 +98,7 @@ flowMain = mainWidget $ mdo
     leftPanel = col $ do
       fixed 2 $ debugStream [fmapLabelShow "tool" (_toolWidget_tool tools)]
       tools' <- fixed 3 $ holdToolsWidget
-      layers' <- stretch $ holdLayerWidget $ LayerWidgetConfig treeDyn selectionManager
+      layers' <- stretch $ holdLayerWidget $ LayerWidgetConfig superTreeDyn selectionManager
       params' <- fixed 5 $ paramWidget
       return (layers', tools', params')
 

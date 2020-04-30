@@ -20,6 +20,7 @@ import           Control.Monad.Fix
 import           Data.Dependent.Sum                (DSum ((:=>)))
 import qualified Data.IntMap.Strict                as IM
 import           Data.These
+import           Data.Tuple.Extra
 
 import           Reflex
 import           Reflex.Network
@@ -27,7 +28,7 @@ import           Reflex.Vty
 
 
 data LayerWidgetConfig t = LayerWidgetConfig {
-  _layerWidgetConfig_temp_sEltTree      :: Dynamic t SEltTree
+  _layerWidgetConfig_temp_sEltTree      :: Dynamic t [SuperSEltLabel]
   , _layerWidgetConfig_selectionManager :: SelectionManager t
 }
 
@@ -42,15 +43,13 @@ holdLayerWidget :: forall t m. (Reflex t, Adjustable t m, PostBuild t m, MonadHo
 holdLayerWidget LayerWidgetConfig {..} = do
   pw <- displayWidth
   ph <- displayHeight
-  addButton <- col $ do
+  col $ do
     fixed 1 $ debugFocus
     fixed 1 $ text . current . fmap (show . length)$ _layerWidgetConfig_temp_sEltTree
-    addButton <- fixed 3 $ textButtonStatic def "add"
+    --addButton <- fixed 3 $ textButtonStatic def "add"
     -- note this is only possible because you added PostBuild to Layout
-    stretch $ col $ simpleList (fmap (zip [0..]) _layerWidgetConfig_temp_sEltTree) $ \ds -> do
-      fixed 1 $ text $ current $ fmap (_sEltLabel_name . snd) ds
-
-    return addButton
+    stretch $ col $ simpleList _layerWidgetConfig_temp_sEltTree $ \ds -> do
+      fixed 1 $ text $ current $ fmap (_sEltLabel_name . thd3) ds
   return LayerWidget {
     _layerWidget_select = never
     , _layerWidget_changeName = never
