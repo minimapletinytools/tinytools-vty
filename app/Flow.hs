@@ -86,17 +86,25 @@ holdManipulatorWidget :: forall t m. (Reflex t, MonadHold t m, MonadFix m, NotRe
   => ManipulatorWidgetConfig t
   -> VtyWidget t m (ManipulatorWidget t)
 holdManipulatorWidget ManipulatorWidgetConfig {..} = do
-  manip <- toManipulator (updated _manipulatorWigetConfig_selected)
   let
-    mapfn :: Manipulator -> VtyWidget t m (Event t (Bool, ControllersWithId))
-    mapfn m = do
-      w <- case m of
+    selectionChangedEv = updated _manipulatorWigetConfig_selected
+  dynManipulator <- toManipulator $ selectionChangedEv
+  let
+    -- recreate the manipulator each time the selection changes
+    mapfn :: Selected -> VtyWidget t m (Event t (Bool, ControllersWithId))
+    mapfn _ = mdo
+      -- TODO hook up to didStart
+      let
+        -- TODO figure this out
+        dragging = cursorDragStateEv (Just CSBox) (Just Dragging) _manipulatorWidgetConfig_drag
+        dragEnd = cursorDragStateEv Nothing (Just DragEnd) _manipulatorWidgetConfig_drag
+      wasManip <- holdDyn False $ leftmost [didStart $> True, dragging $> True, dragEnd $> False]
+
+      manipulator <- sample $ current dynManipulator
+        -- assumes manipulator is always referring to same SEltLabel
+        -- TODO add assert to ensure it doesn't change
+      (didStart, w) <- case manipulator of
         (MTagBox :=> Identity (MBox {..})) -> do
-          let
-            dragStart = cursorDragStateEv (Just CSBox) (Just DragStart) _manipulatorWidgetConfig_drag
-            dragEnd = cursorDragStateEv Nothing (Just DragEnd) _manipulatorWidgetConfig_drag
-          -- TODO not working because this is getting recreated every time
-          wasManip <- holdDyn False $ leftmost [dragStart $> True, dragEnd $> False]
           let
             LBox (LPoint (V2 x y)) (LSize (V2 w h)) = _mBox_box
             -- TODO draw 4 corner images
@@ -109,11 +117,11 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = do
                   })
               wasManip' <- sample $ current wasManip
               return . Just $ (wasManip', IM.singleton _mBox_target r) where
-          return $ push pushfn (cursorDragStateEv (Just CSBox) (Just Dragging) _manipulatorWidgetConfig_drag)
+          return $ (never, push pushfn (cursorDragStateEv (Just CSBox) (Just Dragging) _manipulatorWidgetConfig_drag))
       return w
-  -- TODO need to track manipulator changes and selection changes separately so manipulator is not always being remade
+
   dynWidget :: Dynamic t (VtyWidget t m (Event t (Bool, ControllersWithId)))
-    <- holdDyn (return never) (fmap mapfn (updated manip))
+    <- holdDyn (return never) (fmap mapfn selectionChangedEv)
   modifyEv :: Event t (Bool, ControllersWithId)
     <- networkView dynWidget >>= switchHold never
   return
