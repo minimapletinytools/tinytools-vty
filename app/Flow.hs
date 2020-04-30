@@ -71,7 +71,10 @@ holdSelectionManager SelectionManagerConfig {..} = do
 data ManipulatorWidgetConfig t = ManipulatorWidgetConfig {
   _manipulatorWigetConfig_selected  :: Dynamic t Selected
   , _manipulatorWidgetConfig_panPos :: Behavior t (Int, Int)
-  , _manipulatorWidgetConfig_drag   :: Event t ((Int,Int), Drag2)
+  -- TODO currently pane drag won't register release events off the pane, so we need to make sure to pipe in those release events
+  , _manipulatorWidgetConfig_drag   :: Event t ((CursorState, (Int,Int)), Drag2)
+  -- TODO
+  --, _manipulatorWidgetConfig_cancel :: Event t ()
 }
 
 data ManipulatorWidget t = ManipulatorWidget {
@@ -86,23 +89,28 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = do
   manip <- toManipulator (updated _manipulatorWigetConfig_selected)
   let
     mapfn :: Manipulator -> VtyWidget t m (Event t ControllersWithId)
-    mapfn m = case m of
-      (MTagBox :=> Identity (MBox {..})) -> do
-        let
-          LBox (LPoint (V2 x y)) (LSize (V2 w h)) = _mBox_box
-          -- TODO draw 4 corner images
-          -- create 8 drag events
-          mapfn :: ((Int,Int), Drag2) -> Maybe ControllersWithId
-          mapfn (_, Drag2 (fromX, fromY) (toX, toY) _ _ _) = Just $ IM.singleton _mBox_target r where
-            r = CTagBox :=> (Identity $ CBox {
-                _cBox_box = DeltaLBox 0 $ LSize (V2 (toX-fromX) (toY-fromY))
-              })
-        return $ fmapMaybe mapfn _manipulatorWidgetConfig_drag
-  dynWidget :: Dynamic t (VtyWidget t m (Event t ControllersWithId)) <- holdDyn (return never) (fmap mapfn (updated manip))
-  modifyEv :: Event t ControllersWithId <- networkView dynWidget >>= switchHold never
+    mapfn m = do
+      --firstManip <- holdDyn True $
+      w <- case m of
+        (MTagBox :=> Identity (MBox {..})) -> do
+          let
+            LBox (LPoint (V2 x y)) (LSize (V2 w h)) = _mBox_box
+            -- TODO draw 4 corner images
+            -- create 8 drag events
+            mapfn :: ((Int,Int), Drag2) -> Maybe ControllersWithId
+            mapfn (_, Drag2 (fromX, fromY) (toX, toY) _ _ _) = Just $ IM.singleton _mBox_target r where
+              r = CTagBox :=> (Identity $ CBox {
+                  _cBox_box = DeltaLBox 0 $ LSize (V2 (toX-fromX) (toY-fromY))
+                })
+          return $ fmapMaybe mapfn (cursorDragStateEv (Just CSBox) (Just Dragging) _manipulatorWidgetConfig_drag)
+      return w
+  dynWidget :: Dynamic t (VtyWidget t m (Event t ControllersWithId))
+    <- holdDyn (return never) (fmap mapfn (updated manip))
+  modifyEv :: Event t ControllersWithId
+    <- networkView dynWidget >>= switchHold never
   return
     ManipulatorWidget {
-      -- TODO 
+      -- TODO
       _manipulatorWidget_modify = fmap (\x -> (False, x)) modifyEv
       -- TODO
       , _manipulatorWidget_manipulating = undefined
@@ -114,6 +122,19 @@ instance Show CursorState where
   show CSPan       = "PAN"
   show CSSelecting = "SELECT"
   show CSBox       = "BOX"
+
+-- returns pan position at start of drag and dragging info filtered for cursor/drag state
+cursorDragStateEv :: (Reflex t)
+  => Maybe CursorState -- ^ cursor state to select for
+  -> Maybe DragState
+  -> Event t ((CursorState, (Int,Int)), Drag2) -- ^ ((cursor, panPos), drag)
+  -> Event t ((Int,Int), Drag2)
+cursorDragStateEv c' d' dragEv = r where
+  fmapMaybeFn ((c,p),d) = if maybe True (_drag2_state d  ==) d' && maybe True (c ==) c'
+    then Just (p,d)
+    else Nothing
+  r = fmapMaybe fmapMaybeFn dragEv
+
 
 dynLBox_to_dynRegion :: (Reflex t) => Dynamic t LBox -> DynRegion t
 dynLBox_to_dynRegion dlb = r where
@@ -156,10 +177,10 @@ canvasWidget CanvasWidgetConfig {..} = mdo
   cursor <- holdDyn CSSelecting $ leftmost [fmap tool_cursorState _canvasWidgetConfig_tool, CSSelecting <$ escEv]
   dragEv :: Event t ((CursorState, (Int,Int)), Drag2) <- drag2AttachOnStart V.BLeft (ffor2 (current cursor)  (current panPos) (,))
   let
-    cursorDragEv c' = fmapMaybe (\((c,p),d) -> if c == c' then Just (p,d) else Nothing) $ dragEv
-    cursorDraggingEv c' = fmapMaybe (\((c,p),d) -> if _drag2_state d == Dragging && c == c' then Just (p,d) else Nothing) $ dragEv
-    cursorStartEv c' = fmapMaybe (\((c,p),d) -> if _drag2_state d == DragStart && c == c' then Just (p,d) else Nothing) $ dragEv
-    cursorEndEv c' = fmapMaybe (\((c,p),d) -> if _drag2_state d == DragEnd && c == c' then Just (p,d) else Nothing) $ dragEv
+    cursorDragEv c' = cursorDragStateEv (Just c') Nothing dragEv
+    cursorDraggingEv c' = cursorDragStateEv (Just c') (Just Dragging) dragEv
+    cursorStartEv c' = cursorDragStateEv (Just c') (Just DragStart) dragEv
+    cursorEndEv c' = cursorDragStateEv (Just c') (Just DragEnd) dragEv
 
   -- ::panning::
   -- TODO make this so it doesn't trigger when you start drag off of this panel
@@ -186,7 +207,7 @@ canvasWidget CanvasWidgetConfig {..} = mdo
         _manipulatorWigetConfig_selected = _selectionManager_selected _canvasWidgetConfig_selectionManager
         , _manipulatorWidgetConfig_panPos = current panPos
         -- TODO this is not correct
-        , _manipulatorWidgetConfig_drag = cursorDraggingEv CSBox
+        , _manipulatorWidgetConfig_drag = dragEv
       }
   manipulatorW <- holdManipulatorWidget manipCfg
 
