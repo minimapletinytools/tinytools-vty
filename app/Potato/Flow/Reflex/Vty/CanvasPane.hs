@@ -12,16 +12,12 @@ import           Relude
 
 import           Potato.Flow
 import           Potato.Reflex.Vty.Widget
-import           Reflex.Potato.Helpers
 
-import           Control.Monad.Fix
-import           Data.Dependent.Sum       (DSum ((:=>)))
-import qualified Data.IntMap.Strict       as IM
-import           Data.These
 import qualified Text.Show
 
 import           Reflex
 import           Reflex.Vty
+
 
 
 
@@ -49,10 +45,10 @@ cursorDragStateEv c' d' dragEv = r where
 
 dynLBox_to_dynRegion :: (Reflex t) => Dynamic t LBox -> DynRegion t
 dynLBox_to_dynRegion dlb = r where
-  x' = flip fmap dlb $ \(LBox (LPoint (V2 x y)) (LSize (V2 w h))) -> x
-  y' = flip fmap dlb $ \(LBox (LPoint (V2 x y)) (LSize (V2 w h))) -> y
-  w' = flip fmap dlb $ \(LBox (LPoint (V2 x y)) (LSize (V2 w h))) -> w
-  h' = flip fmap dlb $ \(LBox (LPoint (V2 x y)) (LSize (V2 w h))) -> h
+  x' = flip fmap dlb $ \(LBox (LPoint (V2 x _)) _) -> x
+  y' = flip fmap dlb $ \(LBox (LPoint (V2 _ y)) _) -> y
+  w' = flip fmap dlb $ \(LBox _ (LSize (V2 w _))) -> w
+  h' = flip fmap dlb $ \(LBox _ (LSize (V2 _ h))) -> h
   r = DynRegion x' y' w' h'
 
 translate_dynRegion :: (Reflex t) => Dynamic t (Int, Int) -> DynRegion t -> DynRegion t

@@ -10,21 +10,15 @@ module Potato.Flow.Reflex.Vty.Layer (
 import           Relude
 
 import           Potato.Flow
-import           Potato.Flow.Reflex.Vty.CanvasPane
 import           Potato.Flow.Reflex.Vty.Selection
 import           Potato.Reflex.Vty.Helpers
-import           Potato.Reflex.Vty.Widget
-import           Reflex.Potato.Helpers
 
 import           Control.Monad.Fix
-import           Data.Dependent.Sum                (DSum ((:=>)))
-import qualified Data.IntMap.Strict                as IM
-import           Data.These
 import           Data.Tuple.Extra
 
 import           Reflex
-import           Reflex.Network
 import           Reflex.Vty
+
 
 
 data LayerWidgetConfig t = LayerWidgetConfig {
@@ -41,8 +35,8 @@ holdLayerWidget :: forall t m. (Reflex t, Adjustable t m, PostBuild t m, MonadHo
   => LayerWidgetConfig t
   -> VtyWidget t m (LayerWidget t)
 holdLayerWidget LayerWidgetConfig {..} = do
-  pw <- displayWidth
-  ph <- displayHeight
+  --pw <- displayWidth
+  --ph <- displayHeight
   col $ do
     fixed 1 $ debugFocus
     fixed 1 $ text . current . fmap (show . length)$ _layerWidgetConfig_temp_sEltTree

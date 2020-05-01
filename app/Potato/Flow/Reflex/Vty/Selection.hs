@@ -19,6 +19,7 @@ import           Data.These
 import           Reflex
 
 
+
 data SelectionManagerConfig t = SelectionManagerConfig {
   -- connect to _canvasWidget_addSEltLabel to auto select new elts
   _selectionManagerConfig_newElt_layerPos :: Event t (LayerPos, SEltLabel)

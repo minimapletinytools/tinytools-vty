@@ -12,23 +12,17 @@ import           Potato.Flow.Reflex.Vty.Layer
 import           Potato.Flow.Reflex.Vty.Manipulator
 import           Potato.Flow.Reflex.Vty.Selection
 import           Potato.Flow.Reflex.Vty.Tools
-import           Potato.Flow.Testing
 import           Potato.Reflex.Vty.Helpers
 import           Potato.Reflex.Vty.Widget
 
 
 import           Control.Monad.Fix
 import           Control.Monad.NodeId
-import           Data.Dependent.Sum                 (DSum ((:=>)))
-import qualified Data.IntMap.Strict                 as IM
-import qualified Data.List                          as L
 import           Data.Time.Clock
 import           Data.Tuple.Extra
-import qualified Text.Show
 
 import qualified Graphics.Vty                       as V
 import           Reflex
-import           Reflex.Network
 import           Reflex.Potato.Helpers
 import           Reflex.Vty
 
@@ -45,12 +39,14 @@ paramWidget :: forall t m. (Reflex t, PostBuild t m, MonadHold t m, MonadFix m, 
  => VtyWidget t m (ParamWidget t)
 paramWidget = return ParamWidget {}
 
+
+
 flowMain :: IO ()
 flowMain = mainWidget $ mdo
   -- external inputs
   currentTime <- liftIO $ getCurrentTime
   tickEv <- tickLossy 1 currentTime
-  ticks <- foldDyn (+) 0 (fmap (const 1) tickEv)
+  ticks <- foldDyn (+) (0 :: Int) (fmap (const 1) tickEv)
   inp <- input
 
   -- potato flow stuff

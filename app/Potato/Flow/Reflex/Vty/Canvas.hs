@@ -7,6 +7,7 @@ module Potato.Flow.Reflex.Vty.Canvas (
   , holdCanvasWidget
 ) where
 
+
 import           Relude
 
 import           Potato.Flow
@@ -19,13 +20,9 @@ import           Potato.Reflex.Vty.Widget
 import           Reflex.Potato.Helpers
 
 import           Control.Monad.Fix
-import           Data.Dependent.Sum                 (DSum ((:=>)))
-import qualified Data.IntMap.Strict                 as IM
-import           Data.These
 
 import qualified Graphics.Vty                       as V
 import           Reflex
-import           Reflex.Network
 import           Reflex.Vty
 
 
@@ -58,9 +55,9 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
   dragEv :: Event t ((CursorState, (Int,Int)), Drag2) <- drag2AttachOnStart V.BLeft (ffor2 (current cursor)  (current panPos) (,))
   let
     cursorDragEv c' = cursorDragStateEv (Just c') Nothing dragEv
-    cursorDraggingEv c' = cursorDragStateEv (Just c') (Just Dragging) dragEv
+    --cursorDraggingEv c' = cursorDragStateEv (Just c') (Just Dragging) dragEv
     cursorStartEv c' = cursorDragStateEv (Just c') (Just DragStart) dragEv
-    cursorEndEv c' = cursorDragStateEv (Just c') (Just DragEnd) dragEv
+    --cursorEndEv c' = cursorDragStateEv (Just c') (Just DragEnd) dragEv
 
   -- ::panning::
   -- TODO make this so it doesn't trigger when you start drag off of this panel

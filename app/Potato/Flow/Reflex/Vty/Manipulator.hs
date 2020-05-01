@@ -12,14 +12,12 @@ import           Relude
 
 import           Potato.Flow
 import           Potato.Reflex.Vty.Widget
-import           Reflex.Potato.Helpers
 import Potato.Flow.Reflex.Vty.CanvasPane
 
 
 import           Control.Monad.Fix
 import           Data.Dependent.Sum        (DSum ((:=>)))
 import qualified Data.IntMap.Strict as IM
-import Data.These
 
 import           Reflex
 import           Reflex.Network
@@ -67,7 +65,7 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = do
       (didStart, w) <- case manipulator of
         (MTagBox :=> Identity (MBox {..})) -> do
           let
-            LBox (LPoint (V2 x y)) (LSize (V2 w h)) = _mBox_box
+            --LBox (LPoint (V2 x y)) (LSize (V2 w h)) = _mBox_box
             -- TODO draw 4 corner images
             -- create 8 drag events
             pushfn :: ((Int,Int), Drag2) -> PushM t (Maybe (Bool, ControllersWithId))
@@ -81,6 +79,7 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = do
           return $ (never, push pushfn (cursorDragStateEv (Just CSBox) (Just Dragging) _manipulatorWidgetConfig_drag))
         _ -> undefined
       return w
+
 
   dynWidget :: Dynamic t (VtyWidget t m (Event t (Bool, ControllersWithId)))
     <- holdDyn (return never) (fmap mapfn selectionChangedEv)
