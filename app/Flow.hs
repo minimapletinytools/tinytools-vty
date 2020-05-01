@@ -70,6 +70,8 @@ flowMain = mainWidget $ mdo
         , _pfc_undo       = leftmost [undoEv, undoBeforeManipulate]
         , _pfc_redo       = redoEv
         , _pfc_save = never
+        , _pfc_load = never
+        , _pfc_resizeCanvas = never
       }
   pfo <- holdPF pfc
 
@@ -81,6 +83,8 @@ flowMain = mainWidget $ mdo
     stateUpdated = tag (_pfo_potato_state pfo) potatoUpdated
     selts = fmap (fmap (_sEltLabel_sElt . thd3)) $ _pfo_potato_state pfo
   superTreeDyn <- holdDyn [] stateUpdated
+
+  -- TODO hook up to _pfo_canvas
   canvas <- foldDyn potatoRender (emptyRenderedCanvas (LBox (LPoint (V2 0 0)) (LSize (V2 100 40))))
     $ tag selts potatoUpdated
 

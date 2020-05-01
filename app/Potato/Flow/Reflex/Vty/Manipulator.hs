@@ -74,7 +74,7 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = do
             pushfn (_, Drag2 (fromX, fromY) (toX, toY) _ _ _) = do
               let
                 r = CTagBox :=> (Identity $ CBox {
-                    _cBox_box = DeltaLBox 0 $ LSize (V2 (toX-fromX) (toY-fromY))
+                    _cBox_deltaBox = DeltaLBox 0 $ LSize (V2 (toX-fromX) (toY-fromY))
                   })
               wasManip' <- sample $ current wasManip
               return . Just $ (wasManip', IM.singleton _mBox_target r) where
