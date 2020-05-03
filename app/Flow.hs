@@ -81,7 +81,7 @@ flowMain = mainWidget $ mdo
   superTreeDyn <- holdDyn [] stateUpdated
 
   -- TODO hook up to _pfo_canvas
-  canvas <- foldDyn potatoRender (emptyRenderedCanvas (LBox (LPoint (V2 0 0)) (LSize (V2 100 40))))
+  canvas <- foldDyn potatoRender (emptyRenderedCanvas (LBox (V2 0 0) (V2 100 40)))
     $ tag selts potatoUpdated
 
   -- ::selection stuff::

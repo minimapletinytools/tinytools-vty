@@ -45,10 +45,10 @@ cursorDragStateEv c' d' dragEv = r where
 
 dynLBox_to_dynRegion :: (Reflex t) => Dynamic t LBox -> DynRegion t
 dynLBox_to_dynRegion dlb = r where
-  x' = flip fmap dlb $ \(LBox (LPoint (V2 x _)) _) -> x
-  y' = flip fmap dlb $ \(LBox (LPoint (V2 _ y)) _) -> y
-  w' = flip fmap dlb $ \(LBox _ (LSize (V2 w _))) -> w
-  h' = flip fmap dlb $ \(LBox _ (LSize (V2 _ h))) -> h
+  x' = flip fmap dlb $ \(LBox (V2 x _) _) -> x
+  y' = flip fmap dlb $ \(LBox (V2 _ y) _) -> y
+  w' = flip fmap dlb $ \(LBox _ (V2 w _)) -> w
+  h' = flip fmap dlb $ \(LBox _ (V2 _ h)) -> h
   r = DynRegion x' y' w' h'
 
 translate_dynRegion :: (Reflex t) => Dynamic t (Int, Int) -> DynRegion t -> DynRegion t

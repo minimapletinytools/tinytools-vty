@@ -62,7 +62,7 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
   -- ::panning::
   -- TODO make this so it doesn't trigger when you start drag off of this panel
   -- you could do this by checking if dragFrom is on the edges
-  LBox (LPoint (V2 cx0 cy0)) (LSize (V2 cw0 ch0)) <- sample $ current (fmap renderedCanvas_box _canvasWidgetConfig_renderedCanvas_temp)
+  LBox (V2 cx0 cy0) (V2 cw0 ch0) <- sample $ current (fmap renderedCanvas_box _canvasWidgetConfig_renderedCanvas_temp)
   pw0 <- displayWidth >>= sample . current
   ph0 <- displayHeight >>= sample . current
   let
@@ -75,7 +75,7 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
   let
     boxPushFn ((px,py), Drag2 (fromX, fromY) _ _ _ _) = do
       pos <- return 0
-      return $ (pos, SEltLabel "<box>" $ SEltBox $ SBox (LBox (LPoint (V2 (fromX-px) (fromY-py))) (LSize (V2 1 1))) def)
+      return $ (pos, SEltLabel "<box>" $ SEltBox $ SBox (LBox (V2 (fromX-px) (fromY-py)) (V2 1 1)) def)
     newBoxEv = pushAlways boxPushFn $ cursorStartEv CSBox
 
   -- ::manipulators::
