@@ -110,6 +110,7 @@ flowMain = mainWidget $ mdo
   ((layersW, tools, _), canvasW) <- splitHDrag 35 (fill '*') leftPanel rightPanel
 
   -- prep manipulate event
+  -- MANY FRAMES via ManipulatorWidget (ok, as undo manipulation currently is 1 frame in potato-flow, and the previous operation to undo is always a manipulate operation)
   let
     manipulatorW = _canvasWidget_manipulatorWidget canvasW
     undoBeforeManipulate = fmapMaybe (\x -> if fst x then Just () else Nothing) $ _manipulatorWidget_modify manipulatorW
