@@ -18,6 +18,8 @@ import           Potato.Reflex.Vty.Widget
 
 import           Control.Monad.Fix
 import           Control.Monad.NodeId
+import qualified Data.IntMap.Strict                 as IM
+import           Data.These
 import           Data.Time.Clock
 import           Data.Tuple.Extra
 
@@ -68,27 +70,55 @@ flowMain = mainWidget $ mdo
         , _pfc_save = never
         , _pfc_load = never
         , _pfc_resizeCanvas = never
+        , _pfc_addFolder = never
       }
   pfo <- holdPF pfc
 
-  -- ::prep PFO data::
-  -- delaying one frame ensures we can sample most recent behaviors
-  potatoUpdated <- delayEvent $ _pfo_potato_changed pfo
-  let
-    layerTree = _pfo_layers pfo
-    stateUpdated = tag (_pfo_potato_state pfo) potatoUpdated
-    selts = fmap (fmap (_sEltLabel_sElt . thd3)) $ _pfo_potato_state pfo
-  superTreeDyn <- holdDyn [] stateUpdated
 
-  -- TODO hook up to _pfo_canvas
-  canvas <- foldDyn potatoRender (emptyRenderedCanvas (LBox (V2 0 0) (V2 100 40)))
-    $ tag selts potatoUpdated
+  -- ::prep broadphase/canvas::
+  -- TODO move into Canvas.hs I guess
+  let
+    bpc = BroadPhaseConfig $ fmap (fmap snd) $ _sEltLayerTree_changeView (_pfo_layers pfo)
+    --renderfn :: ([LBox], BPTree, REltIdMap (Maybe SEltLabel)) -> RenderedCanvas -> PushM t RenderedCanvas
+    renderfn (boxes, bpt, cslmap) rc = case boxes of
+      [] -> return rc
+      (b:bs) -> case intersect_LBox (renderedCanvas_box rc) (foldl' union_LBox b bs) of
+        Nothing -> return rc
+        Just aabb -> do
+          slmap <- sample . current . _directory_contents . _sEltLayerTree_directory . _pfo_layers $ pfo
+          let
+            rids = broadPhase_cull aabb bpt
+            seltls = flip fmap rids $ \rid -> case IM.lookup rid cslmap of
+              Nothing -> case IM.lookup rid slmap of
+                Nothing -> error "this should never happen, because broadPhase_cull should only give existing seltls"
+                Just seltl -> seltl
+              Just mseltl -> case mseltl of
+                Nothing -> error "this should never happen, because deleted seltl would have been culled in broadPhase_cull"
+                Just seltl -> seltl
+            newrc = render aabb (map _sEltLabel_sElt seltls) rc
+          return $ newrc
+    --foldCanvasFn :: (These ([LBox], BPTree, REltIdMap (Maybe SEltLabel)) LBox) -> RenderedCanvas -> PushM t RenderedCanvas
+    foldCanvasFn (This x) rc = renderfn x rc
+    foldCanvasFn (That lbx) _ = do
+      bpt <- sample . current $ _broadPhase_bPTree broadPhase
+      -- TODO only redo what's needed
+      let renderBoxes = [lbx]
+      renderfn (renderBoxes, bpt, IM.empty) (emptyRenderedCanvas lbx)
+    foldCanvasFn (These _ _) _ = error "resize and change events should never occur simultaneously"
+  broadPhase <- holdBroadPhase bpc
+  let
+    defaultCanvasLBox = LBox (V2 0 0) (V2 100 50)
+  canvas <- foldDynM foldCanvasFn (emptyRenderedCanvas defaultCanvasLBox)
+    $ alignEventWithMaybe Just (_broadPhase_render broadPhase) (updated . _canvas_box $ _pfo_canvas pfo)
+
+
+
 
   -- ::selection stuff::
   selectionManager <- holdSelectionManager
     SelectionManagerConfig {
       _selectionManagerConfig_newElt_layerPos = _canvasWidget_addSEltLabel canvasW
-      , _selectionManagerConfig_sEltLayerTree = layerTree
+      , _selectionManagerConfig_sEltLayerTree = _pfo_layers pfo
       , _selectionManagerConfig_select = never
     }
 
@@ -96,9 +126,15 @@ flowMain = mainWidget $ mdo
   -- main panels
   let
     leftPanel = col $ do
-      fixed 2 $ debugStream [fmapLabelShow "tool" (_toolWidget_tool tools)]
+      fixed 5 $ debugStream [
+        never
+        --, fmapLabelShow "tool" (_toolWidget_tool tools)
+        --, fmapLabelShow "canvas size" $ updated . _canvas_box $ _pfo_canvas pfo
+        --, fmapLabelShow "render" $ fmap fst3 (_broadPhase_render broadPhase)
+        --, fmapLabelShow "change" $ fmap (fmap snd) $ _sEltLayerTree_changeView (_pfo_layers pfo)
+        ]
       tools' <- fixed 3 $ holdToolsWidget
-      layers' <- stretch $ holdLayerWidget $ LayerWidgetConfig superTreeDyn selectionManager
+      layers' <- stretch $ holdLayerWidget $ LayerWidgetConfig (constDyn []) selectionManager
       params' <- fixed 5 $ paramWidget
       return (layers', tools', params')
 
