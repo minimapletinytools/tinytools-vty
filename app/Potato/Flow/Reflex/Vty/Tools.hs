@@ -11,6 +11,7 @@ module Potato.Flow.Reflex.Vty.Tools (
 import           Relude
 
 import           Potato.Flow.Reflex.Vty.CanvasPane
+import           Potato.Flow.Reflex.Vty.PFWidgetCtx
 
 import           Control.Monad.Fix
 import           Control.Monad.NodeId

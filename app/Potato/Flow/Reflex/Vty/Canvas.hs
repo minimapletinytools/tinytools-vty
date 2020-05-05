@@ -13,6 +13,7 @@ import           Relude
 import           Potato.Flow
 import           Potato.Flow.Reflex.Vty.CanvasPane
 import           Potato.Flow.Reflex.Vty.Manipulator
+import           Potato.Flow.Reflex.Vty.PFWidgetCtx
 import           Potato.Flow.Reflex.Vty.Selection
 import           Potato.Flow.Reflex.Vty.Tools
 import           Potato.Reflex.Vty.Helpers
@@ -29,7 +30,8 @@ import           Reflex.Vty
 
 
 data CanvasWidgetConfig t = CanvasWidgetConfig {
-  _canvasWidgetConfig_tool                  :: Event t Tool
+  _canvasWidgetConfig_pfctx                 :: PFWidgetCtx t
+  , _canvasWidgetConfig_tool                :: Event t Tool
   , _canvasWidgetConfig_renderedCanvas_temp :: Dynamic t RenderedCanvas
   , _canvasWidgetConfig_selectionManager    :: SelectionManager t
 }

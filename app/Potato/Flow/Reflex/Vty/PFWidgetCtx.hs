@@ -1,6 +1,6 @@
 {-# LANGUAGE UndecidableInstances #-}
 
-module Potato.Flow.Reflex.Vty.PFWidget (
+module Potato.Flow.Reflex.Vty.PFWidgetCtx (
   PFWidgetCtx(..)
 ) where
 

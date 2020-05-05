@@ -11,7 +11,7 @@ import           Potato.Flow.Reflex.Vty.Attrs
 import           Potato.Flow.Reflex.Vty.Canvas
 import           Potato.Flow.Reflex.Vty.Layer
 import           Potato.Flow.Reflex.Vty.Manipulator
-import           Potato.Flow.Reflex.Vty.PFWidget
+import           Potato.Flow.Reflex.Vty.PFWidgetCtx
 import           Potato.Flow.Reflex.Vty.Selection
 import           Potato.Flow.Reflex.Vty.Tools
 import           Potato.Reflex.Vty.Helpers
@@ -128,7 +128,8 @@ mainPFWidget pfctx = mdo
   -- ::selection stuff::
   selectionManager <- holdSelectionManager
     SelectionManagerConfig {
-      _selectionManagerConfig_newElt_layerPos = _canvasWidget_addSEltLabel canvasW
+      _selectionManagerConfig_pfctx = pfctx
+      , _selectionManagerConfig_newElt_layerPos = _canvasWidget_addSEltLabel canvasW
       , _selectionManagerConfig_sEltLayerTree = _pfo_layers pfo
       , _selectionManagerConfig_select = never
     }
@@ -144,14 +145,21 @@ mainPFWidget pfctx = mdo
         --, fmapLabelShow "change" $ fmap (fmap snd) $ _sEltLayerTree_changeView (_pfo_layers pfo)
         ]
       tools' <- fixed 3 $ holdToolsWidget
-      layers' <- stretch $ holdLayerWidget $ LayerWidgetConfig (constDyn []) selectionManager
+      layers' <- stretch $ holdLayerWidget $ LayerWidgetConfig {
+            _layerWidgetConfig_pfctx              = pfctx
+            -- TODO fix or delete
+            , _layerWidgetConfig_temp_sEltTree    = constDyn []
+            , _layerWidgetConfig_selectionManager = selectionManager
+          }
       params' <- fixed 5 $ paramWidget
       return (layers', tools', params')
 
-    rightPanel = holdCanvasWidget $ CanvasWidgetConfig
-      (_toolWidget_tool tools)
-      canvas
-      selectionManager
+    rightPanel = holdCanvasWidget $ CanvasWidgetConfig {
+        _canvasWidgetConfig_pfctx = pfctx
+        , _canvasWidgetConfig_tool = (_toolWidget_tool tools)
+        , _canvasWidgetConfig_renderedCanvas_temp = canvas
+        , _canvasWidgetConfig_selectionManager = selectionManager
+      }
 
   ((layersW, tools, _), canvasW) <- splitHDrag 35 (fill '*') leftPanel rightPanel
 

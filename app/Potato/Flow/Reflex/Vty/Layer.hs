@@ -10,6 +10,7 @@ module Potato.Flow.Reflex.Vty.Layer (
 import           Relude
 
 import           Potato.Flow
+import           Potato.Flow.Reflex.Vty.PFWidgetCtx
 import           Potato.Flow.Reflex.Vty.Selection
 import           Potato.Reflex.Vty.Helpers
 
@@ -22,7 +23,8 @@ import           Reflex.Vty
 
 
 data LayerWidgetConfig t = LayerWidgetConfig {
-  _layerWidgetConfig_temp_sEltTree      :: Dynamic t [SuperSEltLabel]
+  _layerWidgetConfig_pfctx              :: PFWidgetCtx t
+  , _layerWidgetConfig_temp_sEltTree    :: Dynamic t [SuperSEltLabel]
   , _layerWidgetConfig_selectionManager :: SelectionManager t
 }
 

@@ -13,6 +13,7 @@ import           Relude
 import           Potato.Flow
 import           Potato.Reflex.Vty.Widget
 import Potato.Flow.Reflex.Vty.CanvasPane
+import           Potato.Flow.Reflex.Vty.PFWidgetCtx
 
 
 import           Control.Monad.Fix
@@ -35,7 +36,7 @@ data ManipulatorWidgetConfig t = ManipulatorWidgetConfig {
   -- TODO
   --, _manipulatorWidgetConfig_cancel :: Event t ()
   -- TODO
-  --, _manipulatorWidgetConfig_justCreated :: Behavior t Bool 
+  --, _manipulatorWidgetConfig_justCreated :: Behavior t Bool
 }
 
 data ManipulatorWidget t = ManipulatorWidget {
