@@ -79,6 +79,11 @@ dependencies:
 - these
 - extra
 
+- mtl
+- data-default
+
+
+
 library:
   source-dirs: src
 

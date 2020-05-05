@@ -43,6 +43,30 @@ import           Reflex.Vty.Widget
 
 import           Control.Monad.NodeId
 
+
+
+
+
+import           Control.Applicative  (liftA2)
+import           Control.Monad.Fix    (MonadFix)
+import           Control.Monad.Reader
+import           Control.Monad.Trans  (lift)
+import           Data.Default         (Default (..))
+import           Data.Set             (Set)
+import qualified Data.Set             as Set
+import           Data.Text            (Text)
+import qualified Data.Text            as T
+import qualified Data.Text.Zipper     as TZ
+import           Graphics.Vty         (Image)
+import qualified Graphics.Vty         as V
+import           Reflex
+import           Reflex.Class         ()
+import           Reflex.Host.Class    (MonadReflexCreateTrigger)
+
+import           Reflex.Vty.Host
+
+import           Control.Monad.NodeId
+
 -- new stuff
 
 -- | A plain split of the available space into vertically stacked panes.
@@ -106,9 +130,9 @@ splitHDrag splitter0 wS wA wB = mdo
     [ True <$ mA
     , False <$ mB
     ]
-  (mA, rA) <- pane regA focA $ withMouseDown wA
+  (mA, rA) <- pane2 regA focA $ withMouseDown wA
   pane regS (pure False) wS
-  (mB, rB) <- pane regB (not <$> focA) $ withMouseDown wB
+  (mB, rB) <- pane2 regB (not <$> focA) $ withMouseDown wB
   return (rA, rB)
   where
     withMouseDown x = do
@@ -165,3 +189,82 @@ drag2 btn = mdo
 
 drag2_start :: (Reflex t) => Event t Drag2 -> Event t Drag2
 drag2_start = ffilter (\x -> _drag2_state x == DragStart)
+
+
+
+-- | Translates and crops an 'Image' so that it is contained by
+-- the given 'Region'.
+withinImage
+  :: Region
+  -> Image
+  -> Image
+withinImage (Region left top width height)
+  | width < 0 || height < 0 = withinImage (Region left top 0 0)
+  | otherwise = V.translate left top . V.crop width height
+
+
+-- |
+-- * 'Tracking' state means actively tracking the current stream of mouse events
+-- * 'NotTracking' state means not tracking the current stream of mouse events
+-- * 'WaitingForInput' means state will be set on next 'EvMouseDown' event
+data MouseTrackingState = Tracking V.Button | NotTracking | WaitingForInput deriving (Show, Eq)
+
+-- | Low-level widget combinator that runs a child 'VtyWidget' within
+-- a given region and context. This widget filters and modifies the input
+-- that the child widget receives such that:
+-- * unfocused widgets receive no key events
+-- * mouse inputs outside the region are ignored
+-- * mouse inputs inside the region have their coordinates translated such
+--   that (0,0) is the top-left corner of the region
+pane2
+  :: forall t m a. (Reflex t, MonadHold t m, Monad m, MonadNodeId m, MonadFix m)
+  => DynRegion t
+  -> Dynamic t Bool -- ^ Whether the widget should be focused when the parent is.
+  -> VtyWidget t m a
+  -> VtyWidget t m a
+pane2 dr foc child = VtyWidget $ do
+  ctx <- lift ask
+  let
+    reg = currentRegion dr
+    isWithin :: Region -> Int -> Int -> Bool
+    isWithin (Region l t w h) x y = not . or $ [ x < l
+                                               , y < t
+                                               , x >= l + w
+                                               , y >= t + h ]
+    trackMouse ::
+      VtyEvent
+      -> (MouseTrackingState, Maybe VtyEvent)
+      -> PushM t (Maybe (MouseTrackingState, Maybe VtyEvent))
+    trackMouse e (tracking, _) = do
+      reg'@(Region l t _ _) <- sample reg
+      -- consider using attachPromptlyDyn instead to get most up to date focus, which allows us to ignore mouse inputs when there is no focus (for stuff like ignoring mouse input when there is a popup)
+      focused <- sample . current $ foc
+      return $ case e of
+        V.EvKey _ _ | not focused -> Nothing
+        V.EvMouseDown x y btn m ->
+          if tracking == Tracking btn || (tracking == WaitingForInput && isWithin reg' x y)
+            then Just (Tracking btn, Just $ V.EvMouseDown (x - l) (y - t) btn m)
+            else Just (NotTracking, Nothing)
+        -- vty has mouse buttons override others (seems to be based on ordering of Button) when multiple are pressed.
+        -- So it's possible for child widget to miss out on a 'EvMouseUp' event
+        -- Perhaps a better option is to have both 'pane' and 'drag' report ALL mouse up events?
+        V.EvMouseUp x y mbtn -> case mbtn of
+          Nothing -> case tracking of
+            Tracking _ -> Just (WaitingForInput, Just $ V.EvMouseUp (x - l) (y - t) mbtn)
+            _ -> Just (WaitingForInput, Nothing)
+          Just btn -> if tracking == Tracking btn
+            -- only report EvMouseUp for the button we are tracking
+            then Just (WaitingForInput, Just $ V.EvMouseUp (x - l) (y - t) mbtn)
+            else Just (WaitingForInput, Nothing)
+        _ -> Just (tracking, Just e)
+  dynInputEvTracking <- foldDynMaybeM trackMouse (WaitingForInput, Nothing) $ _vtyWidgetCtx_input ctx
+  let ctx' = VtyWidgetCtx
+        { _vtyWidgetCtx_input = fmapMaybe snd $ updated dynInputEvTracking
+        , _vtyWidgetCtx_focus = liftA2 (&&) (_vtyWidgetCtx_focus ctx) foc
+        , _vtyWidgetCtx_width = _dynRegion_width dr
+        , _vtyWidgetCtx_height = _dynRegion_height dr
+        }
+  (result, images) <- lift . lift $ runVtyWidget ctx' child
+  let images' = liftA2 (\r is -> map (withinImage r) is) reg images
+  tellImages images'
+  return result
