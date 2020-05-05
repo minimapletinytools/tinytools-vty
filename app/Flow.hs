@@ -45,25 +45,26 @@ paramWidget = return ParamWidget {}
 
 
 flowMain :: IO ()
-flowMain = mainWidget $ do
-  let
-    ctx = PFWidgetCtx {
-        _pFWidgetCtx_attr_default = constDyn lg_default
-        , _pFWidgetCtx_attr_manipulator = constDyn lg_manip
-        , _pFWidgetCtx_ev_cancel        = never
-      }
-  mainPFWidget ctx
+flowMain = mainWidget mainPFWidget
 
 
 mainPFWidget :: forall t m. (Reflex t, MonadHold t m, MonadFix m, NotReady t m, Adjustable t m, PostBuild t m, PerformEvent t m, TriggerEvent t m, MonadNodeId m, MonadIO (Performable m), MonadIO m)
-  => PFWidgetCtx t
-  -> VtyWidget t m (Event t ())
-mainPFWidget pfctx = mdo
+  => VtyWidget t m (Event t ())
+mainPFWidget = mdo
   -- external inputs
   currentTime <- liftIO $ getCurrentTime
   tickEv <- tickLossy 1 currentTime
   ticks <- foldDyn (+) (0 :: Int) (fmap (const 1) tickEv)
   inp <- input
+
+  let
+    pfctx = PFWidgetCtx {
+        _pFWidgetCtx_attr_default = constDyn lg_default
+        , _pFWidgetCtx_attr_manipulator = constDyn lg_manip
+        , _pFWidgetCtx_ev_cancel        = fforMaybe inp $ \case
+          V.EvKey (V.KEsc) [] -> Just ()
+          _ -> Nothing
+      }
 
   -- potato flow stuff
   let
@@ -139,6 +140,7 @@ mainPFWidget pfctx = mdo
     leftPanel = col $ do
       fixed 5 $ debugStream [
         never
+        , fmapLabelShow "input" inp
         --, fmapLabelShow "tool" (_toolWidget_tool tools)
         --, fmapLabelShow "canvas size" $ updated . _canvas_box $ _pfo_canvas pfo
         --, fmapLabelShow "render" $ fmap fst3 (_broadPhase_render broadPhase)
