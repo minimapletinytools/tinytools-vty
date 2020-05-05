@@ -34,6 +34,8 @@ data ManipulatorWidgetConfig t = ManipulatorWidgetConfig {
   , _manipulatorWidgetConfig_drag   :: Event t ((CursorState, (Int,Int)), Drag2)
   -- TODO
   --, _manipulatorWidgetConfig_cancel :: Event t ()
+  -- TODO
+  --, _manipulatorWidgetConfig_justCreated :: Behavior t Bool 
 }
 
 data ManipulatorWidget t = ManipulatorWidget {

@@ -41,8 +41,6 @@ paramWidget :: forall t m. (Reflex t, PostBuild t m, MonadHold t m, MonadFix m, 
  => VtyWidget t m (ParamWidget t)
 paramWidget = return ParamWidget {}
 
-
-
 flowMain :: IO ()
 flowMain = mainWidget $ mdo
   -- external inputs
