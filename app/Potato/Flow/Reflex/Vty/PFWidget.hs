@@ -2,7 +2,9 @@
 
 module Potato.Flow.Reflex.Vty.PFWidget (
   PFWidget(..)
-  , PFWidgetCtx
+  , PFWidgetCtx(..)
+  , runPFWidget
+  , unwrapPFWidget
 ) where
 
 import           Relude
@@ -16,18 +18,23 @@ import           Reflex.Host.Class            (MonadReflexCreateTrigger)
 import           Reflex.Vty
 
 import           Control.Monad.Fix
+import           Control.Monad.Reader.Class
 
+-- TODO rename
+-- we don't use 'Reader' for this because it doesn't play well with 'Layout' taking a 'VtyWidget'
 data PFWidgetCtx t = PFWidgetCtx {
   _pFWidgetCtx_attr_default       :: Dynamic t V.Attr
   , _pFWidgetCtx_attr_manipulator :: Dynamic t V.Attr
   , _pFWidgetCtx_ev_cancel        :: Event t ()
 }
 
+-- TODO delete stuff below here
 newtype PFWidget t m a = PFWidget { unPFWidget :: ReaderT (PFWidgetCtx t) m a }
   deriving
     ( Functor
     , Applicative
     , Monad
+    , MonadReader (PFWidgetCtx t)
     , MonadSample t
     , MonadHold t
     , MonadFix
@@ -60,9 +67,16 @@ instance (HasFocus t m, Monad m) => HasFocus t (PFWidget t m) where
   focus = PFWidget . lift $ focus
 
 -- | Runs a 'PFWidget' with a given context
-runPFWidget
-  :: (Reflex t, MonadNodeId m)
+runPFWidget :: (Reflex t, MonadNodeId m)
   => PFWidgetCtx t
   -> PFWidget t m a
   -> m a
 runPFWidget ctx w = runReaderT (unPFWidget w) ctx
+
+
+unwrapPFWidget :: (Reflex t, MonadNodeId m)
+  => PFWidget t m a
+  -> PFWidget t m (m a)
+unwrapPFWidget w = do
+  ctx <- ask
+  return $ runPFWidget ctx w

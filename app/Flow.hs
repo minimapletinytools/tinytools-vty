@@ -7,9 +7,11 @@ module Flow (
 import           Relude
 
 import           Potato.Flow
+import           Potato.Flow.Reflex.Vty.Attrs
 import           Potato.Flow.Reflex.Vty.Canvas
 import           Potato.Flow.Reflex.Vty.Layer
 import           Potato.Flow.Reflex.Vty.Manipulator
+import           Potato.Flow.Reflex.Vty.PFWidget
 import           Potato.Flow.Reflex.Vty.Selection
 import           Potato.Flow.Reflex.Vty.Tools
 import           Potato.Reflex.Vty.Helpers
@@ -41,8 +43,22 @@ paramWidget :: forall t m. (Reflex t, PostBuild t m, MonadHold t m, MonadFix m, 
  => VtyWidget t m (ParamWidget t)
 paramWidget = return ParamWidget {}
 
+
 flowMain :: IO ()
-flowMain = mainWidget $ mdo
+flowMain = mainWidget $ do
+  let
+    ctx = PFWidgetCtx {
+        _pFWidgetCtx_attr_default = constDyn lg_default
+        , _pFWidgetCtx_attr_manipulator = constDyn lg_manip
+        , _pFWidgetCtx_ev_cancel        = never
+      }
+  mainPFWidget ctx
+
+
+mainPFWidget :: forall t m. (Reflex t, MonadHold t m, MonadFix m, NotReady t m, Adjustable t m, PostBuild t m, PerformEvent t m, TriggerEvent t m, MonadNodeId m, MonadIO (Performable m), MonadIO m)
+  => PFWidgetCtx t
+  -> VtyWidget t m (Event t ())
+mainPFWidget pfctx = mdo
   -- external inputs
   currentTime <- liftIO $ getCurrentTime
   tickEv <- tickLossy 1 currentTime
@@ -109,9 +125,6 @@ flowMain = mainWidget $ mdo
   canvas <- foldDynM foldCanvasFn (emptyRenderedCanvas defaultCanvasLBox)
     $ alignEventWithMaybe Just (_broadPhase_render broadPhase) (updated . _canvas_box $ _pfo_canvas pfo)
 
-
-
-
   -- ::selection stuff::
   selectionManager <- holdSelectionManager
     SelectionManagerConfig {
@@ -119,7 +132,6 @@ flowMain = mainWidget $ mdo
       , _selectionManagerConfig_sEltLayerTree = _pfo_layers pfo
       , _selectionManagerConfig_select = never
     }
-
 
   -- main panels
   let

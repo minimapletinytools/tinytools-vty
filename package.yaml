@@ -78,6 +78,7 @@ dependencies:
 - dependent-sum
 - these
 - extra
+- mtl
 
 library:
   source-dirs: src
