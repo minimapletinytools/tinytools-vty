@@ -32,7 +32,7 @@ data SelectionManagerConfig t = SelectionManagerConfig {
 }
 
 data SelectionManager t = SelectionManager {
-  _selectionManager_selected :: Dynamic t (Bool, [SuperSEltLabel]) -- (selection via newly created (but not pasted), list of selected elements)
+  _selectionManager_selected :: Dynamic t (Bool, [SuperSEltLabel]) -- (selection via newly created (but not pasted) only true for one frame where element was created, list of selected elements)
 }
 
 holdSelectionManager :: forall t m. (Reflex t, MonadHold t m, MonadFix m)
@@ -71,7 +71,7 @@ holdSelectionManager SelectionManagerConfig {..} = do
     selectionFoldFn (This x) _ = x
     -- this will happen if we create a new element, in which case we've already read the most updated value in 'selFromVeryNew' and can safely ignore than changes
     selectionFoldFn (These x _) _ = x
-    selectionFoldFn (That slm) (vn, ssls) = (vn, foldr innerfoldfn [] ssls) where
+    selectionFoldFn (That slm) (_, ssls) = (False, foldr innerfoldfn [] ssls) where
       innerfoldfn sl@(rid, lp, _) acc = case IM.lookup rid slm of
         Nothing -> sl : acc
         Just mseltl -> case mseltl of

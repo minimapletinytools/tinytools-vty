@@ -16,8 +16,6 @@ import Potato.Flow.Reflex.Vty.CanvasPane
 import           Potato.Flow.Reflex.Vty.PFWidgetCtx
 import           Potato.Reflex.Vty.Helpers
 
-
-import           Data.Constraint.Extras (Has')
 import Control.Lens (over, _1)
 import           Control.Monad.Fix
 import           Data.Dependent.Sum        (DSum ((:=>)))
@@ -38,29 +36,56 @@ needUndoFirst :: ManipState -> Bool
 needUndoFirst ManipStart = False
 needUndoFirst _ = True
 
-data HandleConfig t = HandleConfig {
-  _handleConfig_pfctx :: PFWidgetCtx t
-  , _handleConfig_position :: Behavior t (Int, Int)
-  , _handleConfig_graphic :: Behavior t Char
-  , _handleConfig_dragEv :: Event t ((Int,Int), Drag2)
+data HandleWidgetConfig t = HandleWidgetConfig {
+  _handleWidgetConfig_pfctx :: PFWidgetCtx t
+  , _handleWidgetConfig_position :: Behavior t (Int, Int)
+  , _handleWidgetConfig_graphic :: Behavior t Char
+  , _handleWidgetConfig_dragEv :: Event t ((Int,Int), Drag2)
+
+  -- N.B. very sensitive to timing, this needs to sync up one frame after networkHold
+  , _handleWidgetConfig_alreadyDragging :: Behavior t Bool
+}
+
+data HandleWidget t = HandleWidget {
+  _handleWidget_dragged :: Event t (ManipState, (Int, Int))
+  , _handleWidget_didCaptureInput :: Event t ()
 }
 
 -- TODO this needs to be able to render lines as well (or maybe that's a diff function)
 makeHandle :: forall t m. (Reflex t, MonadHold t m, MonadFix m)
-  => HandleConfig t
-  -> VtyWidget t m (Event t (ManipState, (Int, Int))) -- ^ (manipulation state, drag to position)
-makeHandle HandleConfig {..} = do
-  -- TODO drag events (must handle proper focus)
-    -- if down on dpos begin tracking
-    -- if up flip end flag
-
+  => HandleWidgetConfig t
+  -> VtyWidget t m (HandleWidget t) -- ^ (manipulation state, drag to position)
+makeHandle HandleWidgetConfig {..} = do
   -- draw image
-  -- TODO use _pFWidgetCtx_attr_manipulator attribute
-  --(x,y) <- sample bpos
   tellImages $ ffor
-    (ffor3 _handleConfig_position _handleConfig_graphic (current . _pFWidgetCtx_attr_manipulator $ _handleConfig_pfctx) (,,))
+    (ffor3 _handleWidgetConfig_position _handleWidgetConfig_graphic (current . _pFWidgetCtx_attr_manipulator $ _handleWidgetConfig_pfctx) (,,))
     $ \((x,y),graphic,attr) -> [V.translate x y $ V.charFill attr graphic 1 1]
-  return undefined
+
+  -- handle input
+  let
+    trackMouse ::
+      Drag2
+      -> (ManipState, Maybe (Int, Int))
+      -> PushM t (Maybe (ManipState, Maybe (Int, Int)))
+    trackMouse (Drag2 (fromX, fromY) (toX, toY) _ _ dstate) (tracking, _) = do
+      (x,y) <- sample _handleWidgetConfig_position
+      return $ case dstate of
+        DragStart -> if (fromX, fromY) == (x,y)
+          then Just (ManipStart,  Nothing)
+          else Nothing
+        Dragging -> if tracking /= ManipEnd
+          then Just (Manipulating, Just (toX-fromX, toY-fromY))
+          else Nothing
+        DragEnd -> if tracking == Manipulating
+          then Just (ManipEnd, Just (toX-fromX, toY-fromY))
+          else Nothing
+  trackingDyn <- foldDynMaybeM trackMouse (ManipEnd, Nothing) $ fmap snd _handleWidgetConfig_dragEv
+  return
+    HandleWidget {
+      _handleWidget_dragged = fmapMaybe (\(ms, mp) -> mp >>= (\p -> return (ms, p))) $ updated trackingDyn
+      , _handleWidget_didCaptureInput = updated trackingDyn $> ()
+    }
+
 
 
 data ManipulatorWidgetConfig t = ManipulatorWidgetConfig {
@@ -68,10 +93,6 @@ data ManipulatorWidgetConfig t = ManipulatorWidgetConfig {
   , _manipulatorWigetConfig_selected  :: Dynamic t (Bool, Selected)
   , _manipulatorWidgetConfig_panPos :: Behavior t (Int, Int)
   , _manipulatorWidgetConfig_drag   :: Event t ((CursorState, (Int,Int)), Drag2)
-  -- TODO
-  --, _manipulatorWidgetConfig_cancel :: Event t ()
-  -- TODO
-  --, _manipulatorWidgetConfig_justCreated :: Behavior t Bool
 }
 
 data ManipulatorWidget t = ManipulatorWidget {
@@ -81,15 +102,19 @@ data ManipulatorWidget t = ManipulatorWidget {
 
 data ManipSelectionType = MSTNone | MSTBox | MSTLine | MSTText | MSTBBox deriving (Show, Eq)
 
-holdManipulatorWidget :: forall t m. (Reflex t, MonadHold t m, MonadFix m, NotReady t m, Adjustable t m, PostBuild t m, Has' Show MTag Identity)
+holdManipulatorWidget :: forall t m. (Reflex t, MonadHold t m, MonadFix m, Adjustable t m)
   => ManipulatorWidgetConfig t
   -> VtyWidget t m (ManipulatorWidget t)
 holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
   let
-    dragStart = cursorDragStateEv Nothing (Just DragStart) _manipulatorWidgetConfig_drag
-    dragging = cursorDragStateEv Nothing (Just Dragging) _manipulatorWidgetConfig_drag
+    --dragStart = cursorDragStateEv Nothing (Just DragStart) _manipulatorWidgetConfig_drag
+    --dragging = cursorDragStateEv Nothing (Just Dragging) _manipulatorWidgetConfig_drag
     dragEnd = cursorDragStateEv Nothing (Just DragEnd) _manipulatorWidgetConfig_drag
     selectionChangedEv = updated _manipulatorWigetConfig_selected
+
+  -- tracks whether an elements was newly created or not
+  -- N.B. very timing dependent
+  newEltBeh <- hold False (fmap fst selectionChangedEv)
 
   -- Tracks whether we're manipulating. This is needed so that we don't undo the first manipulation event.
   bManipulating <- return . current
@@ -105,7 +130,6 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
     _ -> MSTNone
   dynManipSelTypeChange <- holdUniqDyn dynManipSelTypeChange'
 
-  -- NEW STUFF
   let
     selectManip :: MTag a -> Event t (Bool, a)
     selectManip mtag = r where
@@ -121,7 +145,6 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
   let
     boxManip_selectedEv = selectManip MTagBox
     boxManip_dmBox = fmap snd boxManip_selectedEv
-    boxManip_newElt = fmap fst boxManip_selectedEv
     boxManip_dlbox = fmap _mBox_box boxManip_dmBox
   boxManip_dynBox <- holdDyn Nothing (fmap Just boxManip_dmBox)
   let
@@ -129,11 +152,12 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
     boxManip = do
       brDyn' <- holdDyn (LBox 0 0) boxManip_dlbox
       let brBeh = ffor2 _manipulatorWidgetConfig_panPos (current brDyn') (\(px, py) (LBox (V2 x y) (V2 w h)) -> (x+px+w, y+py+h))
-      makeHandle $ HandleConfig {
-          _handleConfig_pfctx = _manipulatorWigetConfig_pfctx
-          , _handleConfig_position = brBeh
-          , _handleConfig_graphic = constant '┌'
-          , _handleConfig_dragEv = cursorDragStateEv (Just CSBox) Nothing _manipulatorWidgetConfig_drag
+      makeHandle $ HandleWidgetConfig {
+          _handleWidgetConfig_pfctx = _manipulatorWigetConfig_pfctx
+          , _handleWidgetConfig_position = brBeh
+          , _handleWidgetConfig_graphic = constant '┌'
+          , _handleWidgetConfig_dragEv = cursorDragStateEv (Just CSBox) Nothing _manipulatorWidgetConfig_drag
+          , _handleWidgetConfig_alreadyDragging = newEltBeh
         }
 
       debugStream [
