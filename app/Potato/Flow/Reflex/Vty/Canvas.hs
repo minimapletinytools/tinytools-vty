@@ -80,16 +80,6 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
       return $ (pos, SEltLabel "<box>" $ SEltBox $ SBox (LBox (V2 (fromX-px) (fromY-py)) (V2 1 1)) def)
     newBoxEv = pushAlways boxPushFn $ cursorStartEv CSBox
 
-  -- ::manipulators::
-  let
-    manipCfg = ManipulatorWidgetConfig {
-        _manipulatorWigetConfig_selected = _selectionManager_selected _canvasWidgetConfig_selectionManager
-        , _manipulatorWidgetConfig_panPos = current panPos
-        -- TODO this is not correct
-        , _manipulatorWidgetConfig_drag = dragEv
-      }
-  manipulatorW <- holdManipulatorWidget manipCfg
-
   -- ::draw the canvas::
   -- TODO make this efficient -_-
   let
@@ -107,11 +97,21 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
       --, fmapLabelShow "input" inp
       --, fmapLabelShow "cursor" (updated cursor)
       --, fmapLabelShow "selection" (updated $ _selectionManager_selected _canvasWidgetConfig_selectionManager)
-      , fmapLabelShow "manip" $ _manipulatorWidget_modify manipulatorW
+      --, fmapLabelShow "manip" $ _manipulatorWidget_modify manipulatorW
       ]
     fixed 1 $ row $ do
       fixed 15 $ text $ fmap (\x -> "cursor: " <> show x) $ current cursor
 
+
+  -- ::manipulators::
+  let
+    manipCfg = ManipulatorWidgetConfig {
+        _manipulatorWigetConfig_selected = _selectionManager_selected _canvasWidgetConfig_selectionManager
+        , _manipulatorWidgetConfig_panPos = current panPos
+        -- TODO this is not correct
+        , _manipulatorWidgetConfig_drag = dragEv
+      }
+  manipulatorW <- holdManipulatorWidget manipCfg
 
   return CanvasWidget {
       -- TODO
