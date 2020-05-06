@@ -107,6 +107,14 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
       r = alignEventWithMaybe alignfn (fmap fst $ selectionChangedEv) selectManip'
 
 
+  -- TODO you should prob split into functions...
+  -- BOX MANIPULATOR
+  let
+    boxManip_selectedEv = selectManip MTagBox
+    boxManip_dmBox = fmap snd boxManip_selectedEv
+    boxManip_newElt = fmap fst boxManip_selectedEv
+    boxManip_dlbox = fmap _mBox_box boxManip_dmBox
+  boxManip_dynBox <- holdDyn Nothing (fmap Just boxManip_dmBox)
   let
     boxManip :: VtyWidget t m (Event t (ManipState, ControllersWithId))
     boxManip = do
@@ -114,16 +122,7 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
       -- TODO this needs to be sampled inside a foldDynM to work
       (px, py) <- sample _manipulatorWidgetConfig_panPos
 
-      let
-        selectedEv = selectManip MTagBox
-        dmBox = fmap snd selectedEv
-        newElt = fmap fst selectedEv
-        dlbox = fmap _mBox_box dmBox
-      -- TODO due to late creation of boxManip, this misses out on the first box change event
-      -- you can solve this easily by moving this stuff outside of boxManip
-      dynBox <- holdDyn Nothing (fmap Just dmBox)
-
-      brBeh <- hold (20,20) $ fmap (\(LBox (V2 x y) (V2 w h)) -> (x+px+w, y+py+h)) dlbox
+      brBeh <- hold (20,20) $ fmap (\(LBox (V2 x y) (V2 w h)) -> (x+px+w, y+py+h)) boxManip_dlbox
       makeHandle brBeh '┌'
 
       debugStream [
@@ -134,7 +133,6 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
       -- TODO do this properly
       -- for now we assume brBeh is always the active handle
       let
-        -- TODO get mmbox inside in a not terrible way...
         pushfn :: (Maybe MBox, ((Int,Int), Drag2)) -> PushM t (Maybe (ManipState, ControllersWithId))
         pushfn (mmbox, (_, Drag2 (fromX, fromY) (toX, toY) _ _ _)) = if isNothing mmbox then return Nothing else do
           wasManipulating <- sample bManipulating
@@ -146,10 +144,7 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
                 _cBox_deltaBox = DeltaLBox 0 $ V2 (toX-fromX) (toY-fromY)
               })
           return . Just $ (ms, IM.singleton _mBox_target r) where
-        -- sucks that I have to use attachPromptly here :(, you could change this to regular attach but you would have to
-        -- 1. properly handle the Nothing case in pushfn
-        -- 2. reset dynBox to Nothing on switch, so that it doesn't render the previously selected box
-        pushinputev = attach (current dynBox) $ (cursorDragStateEv (Just CSBox) (Just Dragging) _manipulatorWidgetConfig_drag)
+        pushinputev = attach (current boxManip_dynBox) $ (cursorDragStateEv (Just CSBox) (Just Dragging) _manipulatorWidgetConfig_drag)
       return $ push pushfn pushinputev
 
     finalManip :: Event t (VtyWidget t m (Event t (ManipState, ControllersWithId)))
