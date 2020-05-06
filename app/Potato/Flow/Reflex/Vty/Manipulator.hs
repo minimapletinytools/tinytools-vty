@@ -118,11 +118,8 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
   let
     boxManip :: VtyWidget t m (Event t (ManipState, ControllersWithId))
     boxManip = do
-
-      -- TODO this needs to be sampled inside a foldDynM to work
-      (px, py) <- sample _manipulatorWidgetConfig_panPos
-
-      brBeh <- hold (20,20) $ fmap (\(LBox (V2 x y) (V2 w h)) -> (x+px+w, y+py+h)) boxManip_dlbox
+      brDyn' <- holdDyn (LBox 0 0) boxManip_dlbox
+      let brBeh = ffor2 _manipulatorWidgetConfig_panPos (current brDyn') (\(px, py) (LBox (V2 x y) (V2 w h)) -> (x+px+w, y+py+h))
       makeHandle brBeh '┌'
 
       debugStream [
