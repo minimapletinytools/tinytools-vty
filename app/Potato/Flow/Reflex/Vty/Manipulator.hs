@@ -38,12 +38,18 @@ needUndoFirst :: ManipState -> Bool
 needUndoFirst ManipStart = False
 needUndoFirst _ = True
 
+data HandleConfig t = HandleConfig {
+  _handleConfig_pfctx :: PFWidgetCtx t
+  , _handleConfig_position :: Behavior t (Int, Int)
+  , _handleConfig_graphic :: Behavior t Char
+  , _handleConfig_dragEv :: Event t ((Int,Int), Drag2)
+}
+
 -- TODO this needs to be able to render lines as well (or maybe that's a diff function)
 makeHandle :: forall t m. (Reflex t, MonadHold t m, MonadFix m)
-  => Behavior t (Int, Int) -- ^ position of handle
-  -> Char -- ^ handle graphic
+  => HandleConfig t
   -> VtyWidget t m (Event t (ManipState, (Int, Int))) -- ^ (manipulation state, drag to position)
-makeHandle bpos graphic = do
+makeHandle HandleConfig {..} = do
   -- TODO drag events (must handle proper focus)
     -- if down on dpos begin tracking
     -- if up flip end flag
@@ -51,12 +57,15 @@ makeHandle bpos graphic = do
   -- draw image
   -- TODO use _pFWidgetCtx_attr_manipulator attribute
   --(x,y) <- sample bpos
-  tellImages $ ffor (bpos) $ \(x,y) -> [V.translate x y $ V.charFill V.defAttr graphic 1 1]
+  tellImages $ ffor
+    (ffor3 _handleConfig_position _handleConfig_graphic (current . _pFWidgetCtx_attr_manipulator $ _handleConfig_pfctx) (,,))
+    $ \((x,y),graphic,attr) -> [V.translate x y $ V.charFill attr graphic 1 1]
   return undefined
 
 
 data ManipulatorWidgetConfig t = ManipulatorWidgetConfig {
-  _manipulatorWigetConfig_selected  :: Dynamic t (Bool, Selected)
+  _manipulatorWigetConfig_pfctx :: PFWidgetCtx t
+  , _manipulatorWigetConfig_selected  :: Dynamic t (Bool, Selected)
   , _manipulatorWidgetConfig_panPos :: Behavior t (Int, Int)
   , _manipulatorWidgetConfig_drag   :: Event t ((CursorState, (Int,Int)), Drag2)
   -- TODO
@@ -120,7 +129,12 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
     boxManip = do
       brDyn' <- holdDyn (LBox 0 0) boxManip_dlbox
       let brBeh = ffor2 _manipulatorWidgetConfig_panPos (current brDyn') (\(px, py) (LBox (V2 x y) (V2 w h)) -> (x+px+w, y+py+h))
-      makeHandle brBeh '┌'
+      makeHandle $ HandleConfig {
+          _handleConfig_pfctx = _manipulatorWigetConfig_pfctx
+          , _handleConfig_position = brBeh
+          , _handleConfig_graphic = constant '┌'
+          , _handleConfig_dragEv = cursorDragStateEv (Just CSBox) Nothing _manipulatorWidgetConfig_drag
+        }
 
       debugStream [
         never

@@ -106,7 +106,8 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
   -- ::manipulators::
   let
     manipCfg = ManipulatorWidgetConfig {
-        _manipulatorWigetConfig_selected = _selectionManager_selected _canvasWidgetConfig_selectionManager
+        _manipulatorWigetConfig_pfctx = _canvasWidgetConfig_pfctx
+        , _manipulatorWigetConfig_selected = _selectionManager_selected _canvasWidgetConfig_selectionManager
         , _manipulatorWidgetConfig_panPos = current panPos
         -- TODO this is not correct
         , _manipulatorWidgetConfig_drag = dragEv
