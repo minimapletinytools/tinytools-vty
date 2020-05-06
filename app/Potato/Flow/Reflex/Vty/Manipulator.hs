@@ -86,7 +86,6 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
   bManipulating <- return . current
     =<< (holdDyn False $ leftmost [dragEnd $> False, modifyEv $> True])
 
-
   dynManipulator <- toManipulator $ fmap snd selectionChangedEv
   -- see comments on 'manipWidget'
   dynManipSelTypeChange' <- holdDyn MSTNone $ ffor (updated dynManipulator) $ \case
@@ -129,11 +128,7 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
 
       debugStream [
         never
-        --, fmapLabelShow "dlbox" selectedEv
-        --, fmapLabelShow "dragging" _manipulatorWidgetConfig_drag
-        --, fmapLabelShow "cursor" $ cursorDragStateEv (Just CSBox) (Just Dragging) _manipulatorWidgetConfig_drag
         --, fmapLabelShow "modify" modifyEv
-        --, fmapLabelShow "dynManip" $ selectManip MTagBox
         ]
 
       -- TODO do this properly
@@ -165,9 +160,10 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
 
   -- NOTE the 'networkHold' here doesn't seem to play well with other places where I use 'runWithAdjust'
   -- thus, we use 'dynManipSelTypeChange' above instead to limit the number of times the widget changes (even if nothing actually changes)
+  -- CORRECTION, this is probbaly just because dynamics inside manip widgets are getting recreated by networkHold and less related to runWithAdjust conflicts
+  -- still better to have fewer network updates like this.
   manipWidget :: Dynamic t (Event t (ManipState, ControllersWithId))
     <- networkHold (return never) finalManip
-  --  <- boxManip >>= return . constDyn
   let
     modifyEv :: Event t (Bool, ControllersWithId)
     modifyEv = fmap (over _1 needUndoFirst) $ switchDyn manipWidget
@@ -175,52 +171,9 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
 
   debugStream [
     never
-    --, updated manipWidget $> "manip updated"
-    --, fmapLabelShow "poop" selectionChangedEv
-    --, fmapLabelShow "cursor" $ cursorDragStateEv (Just CSBox) (Just Dragging) _manipulatorWidgetConfig_drag
-    --, fmapLabelShow "modify" modifyEv
     --, fmapLabelShow "dynManip" $ selectManip MTagBox
     ]
 
-{-
-    --- OLD STUFF
-    -- recreate the manipulator each time the selection changes
-  let
-    mapfn :: Selected -> VtyWidget t m (Event t (Bool, ControllersWithId))
-    mapfn _ = mdo
-      -- TODO hook up to didStart
-      let
-        -- TODO figure this out
-        dragging = cursorDragStateEv (Just CSBox) (Just Dragging) _manipulatorWidgetConfig_drag
-        dragEnd = cursorDragStateEv Nothing (Just DragEnd) _manipulatorWidgetConfig_drag
-      wasManip <- holdDyn False $ leftmost [didStart $> True, dragging $> True, dragEnd $> False]
-
-      manipulator <- sample $ current dynManipulator
-      (didStart, w) <- case manipulator of
-        (MTagBox :=> Identity (MBox {..})) -> do
-          let
-            LBox (V2 x y) (V2 w h) = _mBox_box
-            -- TODO draw 4 corner images
-            -- TODO create 8 drag events
-            pushfn :: ((Int,Int), Drag2) -> PushM t (Maybe (Bool, ControllersWithId))
-            pushfn (_, Drag2 (fromX, fromY) (toX, toY) _ _ _) = do
-              let
-                r = CTagBox :=> (Identity $ CBox {
-                    _cBox_deltaBox = DeltaLBox 0 $ V2 (toX-fromX) (toY-fromY)
-                  })
-              wasManip' <- sample $ current wasManip
-              return . Just $ (wasManip', IM.singleton _mBox_target r) where
-          return $ (never, push pushfn (cursorDragStateEv (Just CSBox) (Just Dragging) _manipulatorWidgetConfig_drag))
-        _ -> undefined
-      return w
-
-
-  dynWidget :: Dynamic t (VtyWidget t m (Event t (Bool, ControllersWithId)))
-    <- holdDyn (return never) (fmap (mapfn . snd) selectionChangedEv)
-  modifyEv :: Event t (Bool, ControllersWithId)
-    <- networkView dynWidget >>= switchHold never
-
--}
   return
     ManipulatorWidget {
       -- TODO
