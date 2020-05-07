@@ -76,6 +76,10 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
     $ fmap (viaNonEmpty NE.head)
     $ fmap snd selectionChangedEv
 
+  let
+    wasLastModifyAdd = ffor3 (current isManipulatingDyn) newEltBeh selectionLayerPos (\m n lp -> if m && n then Just lp else Nothing)
+
+
   dynManipulator <- toManipulator $ fmap snd selectionChangedEv
   -- see comments on 'manipWidget'
   dynManipSelTypeChange' <- holdDyn MSTNone $ ffor (updated dynManipulator) $ \case
@@ -132,24 +136,17 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
         pushfn :: (BoxHandleType, (ManipState, (Int, Int))) -> PushM t (Maybe (ManipState, Either ControllersWithId (LayerPos, SEltLabel)))
         pushfn (bht, (ms, (dx, dy))) = do
           mmbox <- sample . current $ boxManip_dynBox
-
-          -- TODO pretty sure I can move these into a single dyn outside of boxManip
-          -- TODO is it possible to simplify?
-          -- these 2 conditions track whether we just created a new elt or not, wasManip is necessary because if you try to modify and element you just created it is still a new element
-          wasManip <- sample . current $ isManipulatingDyn
-          newElt <- sample newEltBeh
-          newEltLp <- sample selectionLayerPos
+          mremakelp <- sample wasLastModifyAdd
 
           return $ case mmbox of
             Nothing -> Nothing
-            Just MBox {..} -> if wasManip && newElt
-              then
-                assert (ms == ManipStart) $ Just $ (,) Manipulating $ Right $
-                  (newEltLp, SEltLabel "<box>" $ SEltBox $ SBox (LBox (_lBox_ul _mBox_box) (V2 dx dy)) def)
-              else
-                Just $ (,) ms $ Left $ IM.singleton _mBox_target $ CTagBox :=> (Identity $ CBox {
+            Just MBox {..} -> case mremakelp of
+              Just lp -> assert (ms == ManipStart) $ Just $ (,) Manipulating $ Right $
+                (lp, SEltLabel "<box>" $ SEltBox $ SBox (LBox (_lBox_ul _mBox_box) (V2 dx dy)) def)
+              Nothing -> Just $ (,) ms $ Left $ IM.singleton _mBox_target $ CTagBox :=> (Identity $ CBox {
                   _cBox_deltaBox = DeltaLBox 0 $ V2 dx dy
                 })
+
 
       return (push pushfn brHandleDragEv, _handleWidget_didCaptureInput brHandle)
 

@@ -70,8 +70,15 @@ makeDeltaBox bht (dx,dy) = case bht of
 
 
 data BoxManipWidgetConfig t = BoxManipWidgetConfig {
+
+  -- These two are very timing dependent :(
+  -- TODO is there some way to do this with toggle dyns or something instead?
   _boxManipWidgetConfig_wasLastModifyAdd :: Behavior t (Maybe Int)
+  , _boxManipWidgetConfig_isNewElt :: Behavior t Bool
+
+  -- TODO probably better if you somehow attach above things to this, then use this to create Dynamic that tracks what type of operation we need
   , _boxManipWidgetConfig_updated        :: Event t (Bool, MBox)
+
   -- TODO prob don't need/want cursor state here
   , _boxManipWidgetConfig_drag   :: Event t ((CursorState, (Int,Int)), Drag2)
   , _boxManipWidgetConfig_panPos :: Behavior t (Int, Int)
@@ -101,8 +108,7 @@ makeBoxManipWidget BoxManipWidgetConfig {..} = mdo
           , _handleWidgetConfig_graphic = constant '┌'
           -- TODO only pass on if our cursor type is CSSelecting (but make sure after creating a new elt, our cursor is switched to CSSelecting)
           , _handleWidgetConfig_dragEv = cursorDragStateEv Nothing Nothing _boxManipWidgetConfig_drag
-          -- TODO make sure this works, add comment why it's ok
-          , _handleWidgetConfig_forceDrag = fmap isJust _boxManipWidgetConfig_wasLastModifyAdd
+          , _handleWidgetConfig_forceDrag = _boxManipWidgetConfig_isNewElt
         }
       let
         brHandleDragEv = fmap (\x -> (BH_BR, x)) $ _handleWidget_dragged brHandle
