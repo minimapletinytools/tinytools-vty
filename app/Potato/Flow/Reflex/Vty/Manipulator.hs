@@ -16,6 +16,7 @@ import           Potato.Flow.Reflex.Vty.PFWidgetCtx
 import           Potato.Reflex.Vty.Helpers
 import           Potato.Reflex.Vty.Widget
 
+import           Control.Exception
 import           Control.Lens                       (over, _1)
 import           Control.Monad.Fix
 import           Data.Dependent.Sum                 (DSum ((:=>)))
@@ -46,6 +47,11 @@ needUndoFirst :: ManipState -> Bool
 needUndoFirst ManipStart     = False
 needUndoFirst ManipJustStart = error "this should never happen"
 needUndoFirst _              = True
+
+isManipulating :: ManipState -> Bool
+isManipulating ManipJustStart = False
+isManipulating ManipEnd       = False
+isManipulating _              = True
 
 data HandleWidgetConfig t = HandleWidgetConfig {
   _handleWidgetConfig_pfctx       :: PFWidgetCtx t
@@ -172,12 +178,12 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
     boxManip_dmBox = fmap snd boxManip_selectedEv
     boxManip_dlbox = fmap _mBox_box boxManip_dmBox
   boxManip_dynBox <- holdDyn Nothing (fmap Just boxManip_dmBox)
+  boxManip_dlboxDyn <- holdDyn (LBox 0 0) boxManip_dlbox
 
   let
     boxManip :: VtyWidget t m (ManipOutput t)
     boxManip = do
-      brDyn' <- holdDyn (LBox 0 0) boxManip_dlbox
-      let brBeh = ffor2 _manipulatorWidgetConfig_panPos (current brDyn') (\(px, py) (LBox (V2 x y) (V2 w h)) -> (x+px+w, y+py+h))
+      let brBeh = ffor2 _manipulatorWidgetConfig_panPos (current boxManip_dlboxDyn) (\(px, py) (LBox (V2 x y) (V2 w h)) -> (x+px+w, y+py+h))
       brHandle <- holdHandle $ HandleWidgetConfig {
           _handleWidgetConfig_pfctx = _manipulatorWigetConfig_pfctx
           , _handleWidgetConfig_position = brBeh
@@ -189,10 +195,10 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
       let
         brHandleDragEv = fmap (\x -> (BH_BR, x)) $ _handleWidget_dragged brHandle
 
-      vLayoutPad 1 $ debugStream [
+      vLayoutPad 4 $ debugStream [
         never
         --, fmapLabelShow "dragging" $ _manipulatorWidgetConfig_drag
-        , fmapLabelShow "drag" $ _handleWidget_dragged brHandle
+        --, fmapLabelShow "drag" $ _handleWidget_dragged brHandle
         --, fmapLabelShow "modify" modifyEv
         ]
 
@@ -201,29 +207,24 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
         pushfn :: (BoxHandleType, (ManipState, (Int, Int))) -> PushM t (Maybe (ManipState, Either ControllersWithId (LayerPos, SEltLabel)))
         pushfn (bht, (ms, (dx, dy))) = do
           mmbox <- sample . current $ boxManip_dynBox
+
+          -- TODO is it possible to simplify?
+          -- these 2 conditions track whether we just created a new elt or not, wasManip is necessary because if you try to modify and element you just created it is still a new element
+          wasManip <- sample . current $ isManipulatingDyn
           newElt <- sample newEltBeh
           newEltLp <- sample selectionLayerPos
+
           return $ case mmbox of
             Nothing -> Nothing
-            Just MBox {..} -> Just $ (,) ms $ Left $ IM.singleton _mBox_target $ CTagBox :=> (Identity $ CBox {
-                _cBox_deltaBox = DeltaLBox 0 $ V2 dx dy
-              })
-
-
-              -- TODO in the case sampling 'fmap fst _manipulatorWigetConfig_selected' is True (I guess this is just newEltBeh)
-              -- this should Undo first, and then create a new element instead of sending a modify
-              -- make sure timing is correct, since no modifies until dragging, sampling _manipulatorWigetConfig_selected should give correct state
-
-{-
-            Just MBox {..} -> if newElt
+            Just MBox {..} -> if wasManip && newElt
               then
-                assert (ms == True) $ Just $ (,) ms $ Right $
-                  (newEltLp, SEltLabel "<box>" $ SEltBox $ SBox _mBox_box (V2 dx dy) def)
+                assert (ms == ManipStart) $ Just $ (,) Manipulating $ Right $
+                  (newEltLp, SEltLabel "<box>" $ SEltBox $ SBox (LBox (_lBox_ul _mBox_box) (V2 dx dy)) def)
               else
                 Just $ (,) ms $ Left $ IM.singleton _mBox_target $ CTagBox :=> (Identity $ CBox {
                   _cBox_deltaBox = DeltaLBox 0 $ V2 dx dy
                 })
--}
+
       return (push pushfn brHandleDragEv, _handleWidget_didCaptureInput brHandle)
 
 -- TODO DELETE
@@ -261,13 +262,17 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
     <- networkHold (return (never, never)) finalManip
 
   let
+    rawManipEv = switchDyn (fmap fst manipWidget)
     manipulateEv :: Event t (Bool, Either ControllersWithId (LayerPos, SEltLabel))
-    manipulateEv = fmap (over _1 needUndoFirst) $ switchDyn (fmap fst manipWidget)
+    manipulateEv = fmap (over _1 needUndoFirst) $ rawManipEv
     didCaptureMouseEv :: Event t ()
     didCaptureMouseEv = switchDyn (fmap snd manipWidget)
 
+  isManipulatingDyn <- holdDyn False $ fmap isManipulating (fmap fst rawManipEv)
+
   debugStream [
     never
+    , fmapLabelShow "manip" $ manipulateEv
     --, fmapLabelShow "dynManip" $ selectionChangedEv
     --, fmapLabelShow "dynManip" $ selectManip MTagBox
     --, fmapLabelShow "changes" $ _sEltLayerTree_changeView $ _pfo_layers $ _pFWidgetCtx_pfo _manipulatorWigetConfig_pfctx

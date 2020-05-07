@@ -141,7 +141,8 @@ mainPFWidget = mdo
     leftPanel = col $ do
       fixed 5 $ debugStream [
         never
-        , fmapLabelShow "input" inp
+        , fmapLabelShow "undo" $ _canvasWidget_addSEltLabel canvasW
+        --, fmapLabelShow "input" inp
         --, fmapLabelShow "tool" (_toolWidget_tool tools)
         --, fmapLabelShow "canvas size" $ updated . _canvas_box $ _pfo_canvas pfo
         --, fmapLabelShow "render" $ fmap fst3 (_broadPhase_render broadPhase)
