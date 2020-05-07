@@ -11,56 +11,57 @@ import           Relude
 
 
 import           Potato.Flow
-import           Potato.Reflex.Vty.Widget
-import Potato.Flow.Reflex.Vty.CanvasPane
+import           Potato.Flow.Reflex.Vty.CanvasPane
 import           Potato.Flow.Reflex.Vty.PFWidgetCtx
 import           Potato.Reflex.Vty.Helpers
+import           Potato.Reflex.Vty.Widget
 
-import Control.Lens (over, _1)
+import           Control.Lens                       (over, _1)
 import           Control.Monad.Fix
-import           Data.Dependent.Sum        (DSum ((:=>)))
-import qualified Data.IntMap.Strict as IM
-import Data.These
-import Data.Maybe (fromJust)
+import           Data.Dependent.Sum                 (DSum ((:=>)))
+import qualified Data.IntMap.Strict                 as IM
+import           Data.Maybe                         (fromJust)
+import           Data.These
 
-import Reflex.Potato.Helpers
+import qualified Graphics.Vty                       as V
 import           Reflex
 import           Reflex.Network
+import           Reflex.Potato.Helpers
 import           Reflex.Vty
-import qualified Graphics.Vty as V
 
 
 data ManipState = ManipStart | Manipulating | ManipEnd deriving (Show, Eq)
 
 needUndoFirst :: ManipState -> Bool
 needUndoFirst ManipStart = False
-needUndoFirst _ = True
+needUndoFirst _          = True
 
 data HandleWidgetConfig t = HandleWidgetConfig {
-  _handleWidgetConfig_pfctx :: PFWidgetCtx t
-  , _handleWidgetConfig_position :: Behavior t (Int, Int)
-  , _handleWidgetConfig_graphic :: Behavior t Char
-  , _handleWidgetConfig_dragEv :: Event t ((Int,Int), Drag2)
+  _handleWidgetConfig_pfctx             :: PFWidgetCtx t
+  , _handleWidgetConfig_position        :: Behavior t (Int, Int)
+  , _handleWidgetConfig_graphic         :: Behavior t Char
+  , _handleWidgetConfig_dragEv          :: Event t ((Int,Int), Drag2)
 
   -- N.B. very sensitive to timing, this needs to sync up one frame after networkHold
   , _handleWidgetConfig_alreadyDragging :: Behavior t Bool
 }
 
 data HandleWidget t = HandleWidget {
-  _handleWidget_dragged :: Event t (ManipState, (Int, Int))
+  _handleWidget_dragged           :: Event t (ManipState, (Int, Int))
   , _handleWidget_didCaptureInput :: Event t ()
 }
 
 -- TODO this needs to be able to render lines as well (or maybe that's a diff function)
-makeHandle :: forall t m. (Reflex t, MonadHold t m, MonadFix m)
+holdHandle :: forall t m. (Reflex t, MonadHold t m, MonadFix m)
   => HandleWidgetConfig t
   -> VtyWidget t m (HandleWidget t) -- ^ (manipulation state, drag to position)
-makeHandle HandleWidgetConfig {..} = do
+holdHandle HandleWidgetConfig {..} = do
   -- draw image
   tellImages $ ffor
     (ffor3 _handleWidgetConfig_position _handleWidgetConfig_graphic (current . _pFWidgetCtx_attr_manipulator $ _handleWidgetConfig_pfctx) (,,))
     $ \((x,y),graphic,attr) -> [V.translate x y $ V.charFill attr graphic 1 1]
 
+  alreadyDragging <- sample _handleWidgetConfig_alreadyDragging
   -- handle input
   let
     trackMouse ::
@@ -79,7 +80,7 @@ makeHandle HandleWidgetConfig {..} = do
         DragEnd -> if tracking == Manipulating
           then Just (ManipEnd, Just (toX-fromX, toY-fromY))
           else Nothing
-  trackingDyn <- foldDynMaybeM trackMouse (ManipEnd, Nothing) $ fmap snd _handleWidgetConfig_dragEv
+  trackingDyn <- foldDynMaybeM trackMouse (if alreadyDragging then ManipStart else ManipEnd, Nothing) $ fmap snd _handleWidgetConfig_dragEv
   return
     HandleWidget {
       _handleWidget_dragged = fmapMaybe (\(ms, mp) -> mp >>= (\p -> return (ms, p))) $ updated trackingDyn
@@ -96,11 +97,17 @@ data ManipulatorWidgetConfig t = ManipulatorWidgetConfig {
 }
 
 data ManipulatorWidget t = ManipulatorWidget {
-  _manipulatorWidget_modify :: Event t (Bool, ControllersWithId) -- ^ first param is whether we should undo previous action or not
-  , _manipulatorWidget_manipulating :: Dynamic t Bool
+  _manipulatorWidget_modify            :: Event t (Bool, ControllersWithId) -- ^ first param is whether we should undo previous action or not
+  --, _manipulatorWidget_manipulating :: Dynamic t Bool
+  , _manipulatorWidget_didCaptureMouse :: Event t ()
 }
 
 data ManipSelectionType = MSTNone | MSTBox | MSTLine | MSTText | MSTBBox deriving (Show, Eq)
+
+data BoxHandleType = BH_TL | BH_TR | BH_BL | BH_BR | BH_T | BH_B | BH_L | BH_R deriving (Show, Eq, Enum)
+
+-- (modify event, didCaptureMouse)
+type ManipOutput t = (Event t (ManipState, ControllersWithId), Event t ())
 
 holdManipulatorWidget :: forall t m. (Reflex t, MonadHold t m, MonadFix m, Adjustable t m)
   => ManipulatorWidgetConfig t
@@ -116,6 +123,7 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
   -- N.B. very timing dependent
   newEltBeh <- hold False (fmap fst selectionChangedEv)
 
+  -- TODO probably can delete, handles track this themselves
   -- Tracks whether we're manipulating. This is needed so that we don't undo the first manipulation event.
   bManipulating <- return . current
     =<< (holdDyn False $ leftmost [dragEnd $> False, modifyEv $> True])
@@ -136,7 +144,7 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
       selectManip' = select (fanDSum (updated dynManipulator)) mtag
       -- NOTE this completely negates the performance of using select/fan, you need to stick the tuple inside the DSum to do this right
       alignfn (These ns m) = Just (ns, m)
-      alignfn _ = Nothing
+      alignfn _            = Nothing
       r = alignEventWithMaybe alignfn (fmap fst $ selectionChangedEv) selectManip'
 
 
@@ -148,22 +156,41 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
     boxManip_dlbox = fmap _mBox_box boxManip_dmBox
   boxManip_dynBox <- holdDyn Nothing (fmap Just boxManip_dmBox)
   let
-    boxManip :: VtyWidget t m (Event t (ManipState, ControllersWithId))
+
+    boxManip :: VtyWidget t m (ManipOutput t)
     boxManip = do
       brDyn' <- holdDyn (LBox 0 0) boxManip_dlbox
       let brBeh = ffor2 _manipulatorWidgetConfig_panPos (current brDyn') (\(px, py) (LBox (V2 x y) (V2 w h)) -> (x+px+w, y+py+h))
-      makeHandle $ HandleWidgetConfig {
+      brHandle <- holdHandle $ HandleWidgetConfig {
           _handleWidgetConfig_pfctx = _manipulatorWigetConfig_pfctx
           , _handleWidgetConfig_position = brBeh
           , _handleWidgetConfig_graphic = constant '┌'
+          -- TODO only pass on if our cursor type is CSSelecting (but make sure after creating a new elt, our cursor is switched to CSSelecting)
           , _handleWidgetConfig_dragEv = cursorDragStateEv (Just CSBox) Nothing _manipulatorWidgetConfig_drag
           , _handleWidgetConfig_alreadyDragging = newEltBeh
         }
+      let
+        brHandleDragEv = fmap (\x -> (BH_BR, x)) $ _handleWidget_dragged brHandle
 
       debugStream [
         never
+        --, fmapLabelShow "dragging" $ _manipulatorWidgetConfig_drag
+        , fmapLabelShow "drag" $ _handleWidget_dragged brHandle
         --, fmapLabelShow "modify" modifyEv
         ]
+
+{-
+      let
+        pushfn :: (BoxHandleType, (ManipState, (Int, Int))) -> PushM t (Maybe (ManipState, ControllersWithId))
+        pushfn (bht, (ms, (dx, dy))) = do
+          mmbox <- sample . current $ boxManip_dynBox
+          return $ case mmbox of
+            Nothing -> Nothing
+            Just MBox {..} -> Just $ (,) ms $ IM.singleton _mBox_target $ CTagBox :=> (Identity $ CBox {
+                _cBox_deltaBox = DeltaLBox 0 $ V2 dx dy
+              })
+      return (push pushfn brHandleDragEv, _handleWidget_didCaptureInput brHandle)
+-}
 
       -- TODO do this properly
       -- for now we assume brBeh is always the active handle
@@ -180,23 +207,28 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
               })
           return . Just $ (ms, IM.singleton _mBox_target r) where
         pushinputev = attach (current boxManip_dynBox) $ (cursorDragStateEv (Just CSBox) (Just Dragging) _manipulatorWidgetConfig_drag)
-      return $ push pushfn pushinputev
+      return $ (push pushfn pushinputev, _handleWidget_didCaptureInput brHandle)
 
-    finalManip :: Event t (VtyWidget t m (Event t (ManipState, ControllersWithId)))
+
+
+
+    finalManip :: Event t (VtyWidget t m (ManipOutput t))
     finalManip = ffor (updated dynManipSelTypeChange) $ \case
       MSTBox -> boxManip
-      _ -> return never
+      _ -> return (never, never)
     -- TODO the rest of them
 
   -- NOTE the 'networkHold' here doesn't seem to play well with other places where I use 'runWithAdjust'
   -- thus, we use 'dynManipSelTypeChange' above instead to limit the number of times the widget changes (even if nothing actually changes)
   -- CORRECTION, this is probbaly just because dynamics inside manip widgets are getting recreated by networkHold and less related to runWithAdjust conflicts
   -- still better to have fewer network updates like this.
-  manipWidget :: Dynamic t (Event t (ManipState, ControllersWithId))
-    <- networkHold (return never) finalManip
+  manipWidget :: Dynamic t (ManipOutput t)
+    <- networkHold (return (never, never)) finalManip
   let
     modifyEv :: Event t (Bool, ControllersWithId)
-    modifyEv = fmap (over _1 needUndoFirst) $ switchDyn manipWidget
+    modifyEv = fmap (over _1 needUndoFirst) $ switchDyn (fmap fst manipWidget)
+    didCaptureMouseEv :: Event t ()
+    didCaptureMouseEv = switchDyn (fmap snd manipWidget)
 
 
   debugStream [
@@ -206,8 +238,6 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
 
   return
     ManipulatorWidget {
-      -- TODO
       _manipulatorWidget_modify = modifyEv
-      -- TODO
-      , _manipulatorWidget_manipulating = undefined
+      , _manipulatorWidget_didCaptureMouse = didCaptureMouseEv
     }

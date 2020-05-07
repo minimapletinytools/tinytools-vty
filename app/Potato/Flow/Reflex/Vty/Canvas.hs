@@ -54,8 +54,10 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
       V.EvKey (V.KEsc) [] -> Just ()
       _ -> Nothing
   cursor <- holdDyn CSSelecting $ leftmost [fmap tool_cursorState _canvasWidgetConfig_tool, CSSelecting <$ escEv]
-  dragEv :: Event t ((CursorState, (Int,Int)), Drag2) <- drag2AttachOnStart V.BLeft (ffor2 (current cursor)  (current panPos) (,))
+  dragOrigEv :: Event t ((CursorState, (Int,Int)), Drag2) <- drag2AttachOnStart V.BLeft (ffor2 (current cursor)  (current panPos) (,))
   let
+    -- ignore inputs captured by manipulator
+    dragEv = difference dragOrigEv (_manipulatorWidget_didCaptureMouse manipulatorW)
     cursorDragEv c' = cursorDragStateEv (Just c') Nothing dragEv
     --cursorDraggingEv c' = cursorDragStateEv (Just c') (Just Dragging) dragEv
     cursorStartEv c' = cursorDragStateEv (Just c') (Just DragStart) dragEv
@@ -69,15 +71,16 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
   ph0 <- displayHeight >>= sample . current
   let
     panFoldFn ((sx,sy), Drag2 (fromX, fromY) (toX, toY) _ _ _) _ = (sx + toX-fromX, sy + toY-fromY)
-
   -- panPos is position of upper left corner of canvas relative to screen
   panPos <- foldDyn panFoldFn (cx0 - (cw0-pw0)`div`2, cy0 - (ch0-ph0)`div`2) $ cursorDragEv CSPan
 
-  -- ::tools::
+  -- ::new elts::
   let
     boxPushFn ((px,py), Drag2 (fromX, fromY) _ _ _ _) = do
       pos <- return 0
-      return $ (pos, SEltLabel "<box>" $ SEltBox $ SBox (LBox (V2 (fromX-px) (fromY-py)) (V2 1 1)) def)
+      --return $ (pos, SEltLabel "<box>" $ SEltBox $ SBox (LBox (V2 (fromX-px) (fromY-py)) (V2 1 1)) def)
+      -- 0,0 initial size is more correct for immediate manipulation, but kind of annoying as you can end up with 0x0 boxes very easily...
+      return $ (pos, SEltLabel "<box>" $ SEltBox $ SBox (LBox (V2 (fromX-px) (fromY-py)) (V2 0 0)) def)
     newBoxEv = pushAlways boxPushFn $ cursorStartEv CSBox
 
   -- ::draw the canvas::
@@ -110,7 +113,7 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
         , _manipulatorWigetConfig_selected = _selectionManager_selected _canvasWidgetConfig_selectionManager
         , _manipulatorWidgetConfig_panPos = current panPos
         -- TODO this is not correct
-        , _manipulatorWidgetConfig_drag = dragEv
+        , _manipulatorWidgetConfig_drag = dragOrigEv
       }
   manipulatorW <- holdManipulatorWidget manipCfg
 

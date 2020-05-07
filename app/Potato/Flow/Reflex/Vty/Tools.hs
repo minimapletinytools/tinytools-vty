@@ -55,10 +55,14 @@ holdToolsWidget ToolWidgetConfig {..} = row $ do
   textB <- fixed 3 $ textButton bc "T"
 
   let
+    -- TODO this is incorrect, we need our own notion of focus that is different than the pane focus one
+    -- probaby just a single `globalFocus :: Dynamic t Bool` in pfctx will do.
     keyPressEv k = (flip fmapMaybe) (_pFWidgetCtx_ev_input _toolWidgetConfig_pfctx) $ \case
       V.EvKey (V.KChar k') [] | k' == k -> Just ()
       _ -> Nothing
 
+
+  -- TODO remove key press events, see comment above
   return ToolWidget {
     _toolWidget_tool = leftmost
       [TSelect <$ leftmost [selectB, _pFWidgetCtx_ev_cancel _toolWidgetConfig_pfctx, _toolWidgetConfig_setDefault]
