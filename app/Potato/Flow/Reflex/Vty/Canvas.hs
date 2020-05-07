@@ -37,9 +37,11 @@ data CanvasWidgetConfig t = CanvasWidgetConfig {
 }
 
 data CanvasWidget t = CanvasWidget {
-  _canvasWidget_isManipulating      :: Dynamic t Bool
-  , _canvasWidget_addSEltLabel      :: Event t (LayerPos, SEltLabel)
-  , _canvasWidget_manipulatorWidget :: ManipulatorWidget t
+  _canvasWidget_isManipulating :: Dynamic t Bool
+
+
+  , _canvasWidget_addSEltLabel :: Event t (Bool, (LayerPos, SEltLabel))
+  , _canvasWidget_modify       :: Event t (Bool, ControllersWithId)
 }
 
 holdCanvasWidget :: forall t m. (Reflex t, Adjustable t m, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m)
@@ -75,6 +77,7 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
   panPos <- foldDyn panFoldFn (cx0 - (cw0-pw0)`div`2, cy0 - (ch0-ph0)`div`2) $ cursorDragEv CSPan
 
   -- ::new elts::
+  -- TODO move this inside of Manipulator
   let
     boxPushFn ((px,py), Drag2 (fromX, fromY) _ _ _ _) = do
       pos <- return 0
@@ -120,6 +123,8 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
   return CanvasWidget {
       -- TODO
       _canvasWidget_isManipulating = constDyn False
-      , _canvasWidget_addSEltLabel = leftmostwarn "canvas add" [newBoxEv]
-      , _canvasWidget_manipulatorWidget = manipulatorW
+      , _canvasWidget_addSEltLabel = leftmostwarn "canvas add"
+        [fmap (\x -> (False, x)) newBoxEv
+        , _manipulatorWidget_add manipulatorW]
+      , _canvasWidget_modify = _manipulatorWidget_modify manipulatorW
     }

@@ -78,10 +78,10 @@ mainPFWidget = mdo
       _ -> Nothing
 
     pfc = PFConfig {
-        _pfc_addElt     = _canvasWidget_addSEltLabel canvasW
+        _pfc_addElt     = doNewElt
         , _pfc_removeElt  = never
         , _pfc_manipulate = doManipulate
-        , _pfc_undo       = leftmost [undoEv, undoBeforeManipulate]
+        , _pfc_undo       = leftmost [undoEv, undoBeforeManipulate, undoBeforeNewAdd]
         , _pfc_redo       = redoEv
         , _pfc_save = never
         , _pfc_load = never
@@ -131,7 +131,7 @@ mainPFWidget = mdo
   selectionManager <- holdSelectionManager
     SelectionManagerConfig {
       _selectionManagerConfig_pfctx = pfctx
-      , _selectionManagerConfig_newElt_layerPos = _canvasWidget_addSEltLabel canvasW
+      , _selectionManagerConfig_newElt_layerPos = doNewElt
       , _selectionManagerConfig_sEltLayerTree = _pfo_layers pfo
       , _selectionManagerConfig_select = never
     }
@@ -171,12 +171,19 @@ mainPFWidget = mdo
 
   ((layersW, tools, _), canvasW) <- splitHDrag 35 (fill '*') leftPanel rightPanel
 
+  -- prep newAdd event
+  -- MANY FRAMES
+  let
+    undoBeforeNewAdd = fmapMaybe (\x -> if fst x then Just () else Nothing) $ _canvasWidget_addSEltLabel canvasW
+    doNewElt' = fmap snd $ _canvasWidget_addSEltLabel canvasW
+  doNewElt <- sequenceEvents undoBeforeNewAdd doNewElt'
+
+
   -- prep manipulate event
   -- MANY FRAMES via ManipulatorWidget (ok, as undo manipulation currently is 1 frame in potato-flow, and the previous operation to undo is always a manipulate operation)
   let
-    manipulatorW = _canvasWidget_manipulatorWidget canvasW
-    undoBeforeManipulate = fmapMaybe (\x -> if fst x then Just () else Nothing) $ _manipulatorWidget_modify manipulatorW
-    doManipulate' = fmap snd $ _manipulatorWidget_modify manipulatorW
+    undoBeforeManipulate = fmapMaybe (\x -> if fst x then Just () else Nothing) $ _canvasWidget_modify canvasW
+    doManipulate' = fmap snd $ _canvasWidget_modify canvasW
   doManipulate <- sequenceEvents undoBeforeManipulate doManipulate'
 
   -- handle escape events

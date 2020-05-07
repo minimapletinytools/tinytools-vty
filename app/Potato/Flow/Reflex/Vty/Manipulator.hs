@@ -20,13 +20,24 @@ import           Control.Lens                       (over, _1)
 import           Control.Monad.Fix
 import           Data.Dependent.Sum                 (DSum ((:=>)))
 import qualified Data.IntMap.Strict                 as IM
+import qualified Data.List.NonEmpty                 as NE
 import           Data.These
+import           Data.Tuple.Extra
 
 import qualified Graphics.Vty                       as V
 import           Reflex
 import           Reflex.Network
 import           Reflex.Potato.Helpers
 import           Reflex.Vty
+
+
+maybeLeft :: Either a b -> Maybe a
+maybeLeft (Left a) = Just a
+maybeLeft _        = Nothing
+
+maybeRight :: Either a b -> Maybe b
+maybeRight (Right b) = Just b
+maybeRight _         = Nothing
 
 
 data ManipState = ManipJustStart | ManipStart | Manipulating | ManipEnd deriving (Show, Eq)
@@ -82,7 +93,6 @@ holdHandle HandleWidgetConfig {..} = do
           then Just (ManipEnd, Just (toX-fromX, toY-fromY))
           else Nothing
 
-  -- TODO need to attach forceDrag
   trackingDyn <- foldDynMaybeM trackMouse (ManipEnd, Nothing) $ attach _handleWidgetConfig_forceDrag $ fmap snd _handleWidgetConfig_dragEv
 
   debugStream [fmapLabelShow "drag" $ _handleWidgetConfig_dragEv]
@@ -93,27 +103,26 @@ holdHandle HandleWidgetConfig {..} = do
       , _handleWidget_didCaptureInput = updated trackingDyn $> ()
     }
 
-
+data BoxHandleType = BH_TL | BH_TR | BH_BL | BH_BR | BH_T | BH_B | BH_L | BH_R deriving (Show, Eq, Enum)
 
 data ManipulatorWidgetConfig t = ManipulatorWidgetConfig {
   _manipulatorWigetConfig_pfctx :: PFWidgetCtx t
-  , _manipulatorWigetConfig_selected  :: Dynamic t (Bool, Selected)
+  , _manipulatorWigetConfig_selected  :: Dynamic t (Bool, [SuperSEltLabel])
   , _manipulatorWidgetConfig_panPos :: Behavior t (Int, Int)
   , _manipulatorWidgetConfig_drag   :: Event t ((CursorState, (Int,Int)), Drag2)
 }
 
 data ManipulatorWidget t = ManipulatorWidget {
   _manipulatorWidget_modify            :: Event t (Bool, ControllersWithId) -- ^ first param is whether we should undo previous action or not
+  , _manipulatorWidget_add             :: Event t (Bool, (LayerPos, SEltLabel)) -- ^ first param is whether we should undo previous action or not
   --, _manipulatorWidget_manipulating :: Dynamic t Bool
   , _manipulatorWidget_didCaptureMouse :: Event t ()
 }
 
 data ManipSelectionType = MSTNone | MSTBox | MSTLine | MSTText | MSTBBox deriving (Show, Eq)
 
-data BoxHandleType = BH_TL | BH_TR | BH_BL | BH_BR | BH_T | BH_B | BH_L | BH_R deriving (Show, Eq, Enum)
-
 -- (modify event, didCaptureMouse)
-type ManipOutput t = (Event t (ManipState, ControllersWithId), Event t ())
+type ManipOutput t = (Event t (ManipState, Either ControllersWithId (LayerPos, SEltLabel)), Event t ())
 
 holdManipulatorWidget :: forall t m. (Reflex t, Adjustable t m, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m)
   => ManipulatorWidgetConfig t
@@ -124,12 +133,18 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
   -- Tracks whether we're manipulating. This is needed so that we don't undo the first manipulation event.
   let dragEnd = cursorDragStateEv Nothing (Just DragEnd) _manipulatorWidgetConfig_drag
   bManipulating <- return . current
-    =<< (holdDyn False $ leftmost [dragEnd $> False, modifyEv $> True])
+    =<< (holdDyn False $ leftmost [dragEnd $> False, manipulateEv $> True])
 
   let selectionChangedEv = updated _manipulatorWigetConfig_selected
   -- tracks whether an elements was newly created or not
   -- NOTE very timing dependent
   newEltBeh <- hold False (fmap fst selectionChangedEv)
+  -- this is needed to recreate a new element after undoing it
+  selectionLayerPos <- hold (-1)
+    $ fmap (maybe (-1) (\(_,lp,_) -> lp))
+    $ fmap (viaNonEmpty NE.head)
+    $ fmap snd selectionChangedEv
+
   dynManipulator <- toManipulator $ fmap snd selectionChangedEv
   -- see comments on 'manipWidget'
   dynManipSelTypeChange' <- holdDyn MSTNone $ ffor (updated dynManipulator) $ \case
@@ -181,19 +196,34 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
         --, fmapLabelShow "modify" modifyEv
         ]
 
-      -- TODO in the case sampling 'fmap fst _manipulatorWigetConfig_selected' is True (I guess this is just newEltBeh)
-      -- this should Undo first, and then create a new element instead of sending a modify
-      -- make sure timing is correct, since no modifies until dragging, sampling _manipulatorWigetConfig_selected should give correct state
 
       let
-        pushfn :: (BoxHandleType, (ManipState, (Int, Int))) -> PushM t (Maybe (ManipState, ControllersWithId))
+        pushfn :: (BoxHandleType, (ManipState, (Int, Int))) -> PushM t (Maybe (ManipState, Either ControllersWithId (LayerPos, SEltLabel)))
         pushfn (bht, (ms, (dx, dy))) = do
           mmbox <- sample . current $ boxManip_dynBox
+          newElt <- sample newEltBeh
+          newEltLp <- sample selectionLayerPos
           return $ case mmbox of
             Nothing -> Nothing
-            Just MBox {..} -> Just $ (,) ms $ IM.singleton _mBox_target $ CTagBox :=> (Identity $ CBox {
+            Just MBox {..} -> Just $ (,) ms $ Left $ IM.singleton _mBox_target $ CTagBox :=> (Identity $ CBox {
                 _cBox_deltaBox = DeltaLBox 0 $ V2 dx dy
               })
+
+
+              -- TODO in the case sampling 'fmap fst _manipulatorWigetConfig_selected' is True (I guess this is just newEltBeh)
+              -- this should Undo first, and then create a new element instead of sending a modify
+              -- make sure timing is correct, since no modifies until dragging, sampling _manipulatorWigetConfig_selected should give correct state
+
+{-
+            Just MBox {..} -> if newElt
+              then
+                assert (ms == True) $ Just $ (,) ms $ Right $
+                  (newEltLp, SEltLabel "<box>" $ SEltBox $ SBox _mBox_box (V2 dx dy) def)
+              else
+                Just $ (,) ms $ Left $ IM.singleton _mBox_target $ CTagBox :=> (Identity $ CBox {
+                  _cBox_deltaBox = DeltaLBox 0 $ V2 dx dy
+                })
+-}
       return (push pushfn brHandleDragEv, _handleWidget_didCaptureInput brHandle)
 
 -- TODO DELETE
@@ -231,8 +261,8 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
     <- networkHold (return (never, never)) finalManip
 
   let
-    modifyEv :: Event t (Bool, ControllersWithId)
-    modifyEv = fmap (over _1 needUndoFirst) $ switchDyn (fmap fst manipWidget)
+    manipulateEv :: Event t (Bool, Either ControllersWithId (LayerPos, SEltLabel))
+    manipulateEv = fmap (over _1 needUndoFirst) $ switchDyn (fmap fst manipWidget)
     didCaptureMouseEv :: Event t ()
     didCaptureMouseEv = switchDyn (fmap snd manipWidget)
 
@@ -245,6 +275,7 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
 
   return
     ManipulatorWidget {
-      _manipulatorWidget_modify = modifyEv
+      _manipulatorWidget_modify = fmapMaybe (\(b,e) -> maybeLeft e >>= (\l -> return (b,l))) manipulateEv
+      , _manipulatorWidget_add = fmapMaybe (\(b,e) -> maybeRight e >>= (\r -> return (b,r))) manipulateEv
       , _manipulatorWidget_didCaptureMouse = didCaptureMouseEv
     }
