@@ -12,6 +12,7 @@ module Potato.Flow.Reflex.Vty.Manipulator.Handle (
 
 import           Relude
 
+import           Potato.Flow.Reflex.Vty.Manipulator.Types
 import           Potato.Flow.Reflex.Vty.PFWidgetCtx
 import           Potato.Reflex.Vty.Helpers
 import           Potato.Reflex.Vty.Widget
@@ -19,12 +20,12 @@ import           Potato.Reflex.Vty.Widget
 import           Control.Monad.Fix
 import           Data.Tuple.Extra
 
-import qualified Graphics.Vty                       as V
+import qualified Graphics.Vty                             as V
 import           Reflex
 import           Reflex.Vty
 
 
-data ManipState = ManipJustStart | ManipStart | Manipulating | ManipEnd deriving (Show, Eq)
+
 
 needUndoFirst :: ManipState -> Bool
 needUndoFirst ManipStart     = False

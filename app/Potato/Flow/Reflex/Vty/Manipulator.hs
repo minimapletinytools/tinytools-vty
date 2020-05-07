@@ -14,6 +14,7 @@ import           Potato.Flow
 import           Potato.Flow.Reflex.Vty.CanvasPane
 import           Potato.Flow.Reflex.Vty.Manipulator.Box
 import           Potato.Flow.Reflex.Vty.Manipulator.Handle
+import           Potato.Flow.Reflex.Vty.Manipulator.Types
 import           Potato.Flow.Reflex.Vty.PFWidgetCtx
 import           Potato.Reflex.Vty.Helpers
 import           Potato.Reflex.Vty.Widget
@@ -53,11 +54,6 @@ data ManipulatorWidget t = ManipulatorWidget {
   --, _manipulatorWidget_manipulating :: Dynamic t Bool
   , _manipulatorWidget_didCaptureMouse :: Event t ()
 }
-
-data ManipSelectionType = MSTNone | MSTBox | MSTLine | MSTText | MSTBBox deriving (Show, Eq)
-
--- (modify event, didCaptureMouse)
-type ManipOutput t = (Event t (ManipState, Either ControllersWithId (LayerPos, SEltLabel)), Event t ())
 
 holdManipulatorWidget :: forall t m. (Reflex t, Adjustable t m, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m)
   => ManipulatorWidgetConfig t
@@ -157,25 +153,6 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
 
       return (push pushfn brHandleDragEv, _handleWidget_didCaptureInput brHandle)
 
--- TODO DELETE
-{-
-      -- TODO do this properly
-      -- for now we assume brBeh is always the active handle
-      let
-        pushfn :: (Maybe MBox, ((Int,Int), Drag2)) -> PushM t (Maybe (ManipState, ControllersWithId))
-        pushfn (mmbox, (_, Drag2 (fromX, fromY) (toX, toY) _ _ _)) = if isNothing mmbox then return Nothing else do
-          wasManipulating <- sample bManipulating
-          let
-            -- TODO temp, do this properly
-            ms = if not wasManipulating then ManipStart else Manipulating
-            MBox {..} = fromJust mmbox
-            r = CTagBox :=> (Identity $ CBox {
-                _cBox_deltaBox = DeltaLBox 0 $ V2 (toX-fromX) (toY-fromY)
-              })
-          return . Just $ (ms, IM.singleton _mBox_target r) where
-        pushinputev = attach (current boxManip_dynBox) $ (cursorDragStateEv (Just CSBox) (Just Dragging) _manipulatorWidgetConfig_drag)
-      return $ (push pushfn pushinputev, _handleWidget_didCaptureInput brHandle)
--}
 
     finalManip :: Event t (VtyWidget t m (ManipOutput t))
     finalManip = ffor (updated dynManipSelTypeChange) $ \case
