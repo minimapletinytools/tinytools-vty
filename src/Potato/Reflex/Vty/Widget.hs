@@ -25,12 +25,6 @@ module Potato.Reflex.Vty.Widget
 import           Prelude
 
 import           Control.Applicative  (liftA2)
-import           Control.Monad.Fix    (MonadFix)
-import           Data.Set             (Set)
-import qualified Data.Set             as Set
-import           Data.Text            (Text)
-import qualified Data.Text            as T
-import qualified Data.Text.Zipper     as TZ
 import           Graphics.Vty         (Image)
 import qualified Graphics.Vty         as V
 
@@ -42,30 +36,8 @@ import           Reflex.Vty.Widget
 
 
 import           Control.Monad.NodeId
-
-
-
-
-
-import           Control.Applicative  (liftA2)
-import           Control.Monad.Fix    (MonadFix)
 import           Control.Monad.Reader
-import           Control.Monad.Trans  (lift)
-import           Data.Default         (Default (..))
-import           Data.Set             (Set)
-import qualified Data.Set             as Set
-import           Data.Text            (Text)
-import qualified Data.Text            as T
-import qualified Data.Text.Zipper     as TZ
-import           Graphics.Vty         (Image)
-import qualified Graphics.Vty         as V
-import           Reflex
-import           Reflex.Class         ()
-import           Reflex.Host.Class    (MonadReflexCreateTrigger)
 
-import           Reflex.Vty.Host
-
-import           Control.Monad.NodeId
 
 -- new stuff
 
@@ -217,7 +189,7 @@ data MouseTrackingState = Tracking V.Button | NotTracking | WaitingForInput deri
 -- * mouse inputs inside the region have their coordinates translated such
 --   that (0,0) is the top-left corner of the region
 pane2
-  :: forall t m a. (Reflex t, MonadHold t m, Monad m, MonadNodeId m, MonadFix m)
+  :: forall t m a. (Reflex t, MonadHold t m, MonadNodeId m, MonadFix m)
   => DynRegion t
   -> Dynamic t Bool -- ^ Whether the widget should be focused when the parent is.
   -> VtyWidget t m a

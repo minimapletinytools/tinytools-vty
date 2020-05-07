@@ -37,7 +37,7 @@ data ToolWidget t = ToolWidget {
   _toolWidget_tool :: Event t Tool
 }
 
-holdToolsWidget :: forall t m. (Reflex t, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m)
+holdToolsWidget :: forall t m. (PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m)
   => ToolWidgetConfig t
   -> VtyWidget t m (ToolWidget t)
 holdToolsWidget ToolWidgetConfig {..} = row $ do

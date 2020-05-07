@@ -21,7 +21,6 @@ import           Reflex.Vty
 
 
 
-
 data CursorState = CSPan | CSSelecting | CSBox deriving (Eq)
 
 instance Show CursorState where
@@ -29,7 +28,9 @@ instance Show CursorState where
   show CSSelecting = "SELECT"
   show CSBox       = "BOX"
 
+
 -- TODO rename to canvasCursorDragStateEv
+-- TODO probably can delete panPos from the tuple, it's only needed by pan
 -- returns pan position at start of drag and dragging info filtered for cursor/drag state
 cursorDragStateEv :: (Reflex t)
   => Maybe CursorState -- ^ cursor state to select for

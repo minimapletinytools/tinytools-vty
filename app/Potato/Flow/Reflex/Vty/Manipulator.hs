@@ -20,7 +20,6 @@ import           Control.Lens                       (over, _1)
 import           Control.Monad.Fix
 import           Data.Dependent.Sum                 (DSum ((:=>)))
 import qualified Data.IntMap.Strict                 as IM
-import           Data.Maybe                         (fromJust)
 import           Data.These
 
 import qualified Graphics.Vty                       as V
@@ -116,25 +115,21 @@ data BoxHandleType = BH_TL | BH_TR | BH_BL | BH_BR | BH_T | BH_B | BH_L | BH_R d
 -- (modify event, didCaptureMouse)
 type ManipOutput t = (Event t (ManipState, ControllersWithId), Event t ())
 
-holdManipulatorWidget :: forall t m. (Reflex t, Adjustable t m, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m, Monad m)
+holdManipulatorWidget :: forall t m. (Reflex t, Adjustable t m, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m)
   => ManipulatorWidgetConfig t
   -> VtyWidget t m (ManipulatorWidget t)
 holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
-  let
-    --dragStart = cursorDragStateEv Nothing (Just DragStart) _manipulatorWidgetConfig_drag
-    --dragging = cursorDragStateEv Nothing (Just Dragging) _manipulatorWidgetConfig_drag
-    dragEnd = cursorDragStateEv Nothing (Just DragEnd) _manipulatorWidgetConfig_drag
-    selectionChangedEv = updated _manipulatorWigetConfig_selected
-
-  -- tracks whether an elements was newly created or not
-  -- N.B. very timing dependent
-  newEltBeh <- hold False (fmap fst selectionChangedEv)
 
   -- TODO probably can delete, handles track this themselves
   -- Tracks whether we're manipulating. This is needed so that we don't undo the first manipulation event.
+  let dragEnd = cursorDragStateEv Nothing (Just DragEnd) _manipulatorWidgetConfig_drag
   bManipulating <- return . current
     =<< (holdDyn False $ leftmost [dragEnd $> False, modifyEv $> True])
 
+  let selectionChangedEv = updated _manipulatorWigetConfig_selected
+  -- tracks whether an elements was newly created or not
+  -- NOTE very timing dependent
+  newEltBeh <- hold False (fmap fst selectionChangedEv)
   dynManipulator <- toManipulator $ fmap snd selectionChangedEv
   -- see comments on 'manipWidget'
   dynManipSelTypeChange' <- holdDyn MSTNone $ ffor (updated dynManipulator) $ \case
@@ -162,8 +157,8 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
     boxManip_dmBox = fmap snd boxManip_selectedEv
     boxManip_dlbox = fmap _mBox_box boxManip_dmBox
   boxManip_dynBox <- holdDyn Nothing (fmap Just boxManip_dmBox)
-  let
 
+  let
     boxManip :: VtyWidget t m (ManipOutput t)
     boxManip = do
       brDyn' <- holdDyn (LBox 0 0) boxManip_dlbox
@@ -186,6 +181,9 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
         --, fmapLabelShow "modify" modifyEv
         ]
 
+      -- TODO in the case sampling 'fmap fst _manipulatorWigetConfig_selected' is True (I guess this is just newEltBeh)
+      -- this should Undo first, and then create a new element instead of sending a modify
+      -- make sure timing is correct, since no modifies until dragging, sampling _manipulatorWigetConfig_selected should give correct state
 
       let
         pushfn :: (BoxHandleType, (ManipState, (Int, Int))) -> PushM t (Maybe (ManipState, ControllersWithId))
@@ -198,6 +196,7 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
               })
       return (push pushfn brHandleDragEv, _handleWidget_didCaptureInput brHandle)
 
+-- TODO DELETE
 {-
       -- TODO do this properly
       -- for now we assume brBeh is always the active handle
@@ -217,13 +216,12 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
       return $ (push pushfn pushinputev, _handleWidget_didCaptureInput brHandle)
 -}
 
-
-
     finalManip :: Event t (VtyWidget t m (ManipOutput t))
     finalManip = ffor (updated dynManipSelTypeChange) $ \case
       MSTBox -> boxManip
       _ -> return (never, never)
     -- TODO the rest of them
+
 
   -- NOTE the 'networkHold' here doesn't seem to play well with other places where I use 'runWithAdjust'
   -- thus, we use 'dynManipSelTypeChange' above instead to limit the number of times the widget changes (even if nothing actually changes)
@@ -231,12 +229,12 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
   -- still better to have fewer network updates like this.
   manipWidget :: Dynamic t (ManipOutput t)
     <- networkHold (return (never, never)) finalManip
+
   let
     modifyEv :: Event t (Bool, ControllersWithId)
     modifyEv = fmap (over _1 needUndoFirst) $ switchDyn (fmap fst manipWidget)
     didCaptureMouseEv :: Event t ()
     didCaptureMouseEv = switchDyn (fmap snd manipWidget)
-
 
   debugStream [
     never

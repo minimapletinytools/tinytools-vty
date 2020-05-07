@@ -42,7 +42,7 @@ data CanvasWidget t = CanvasWidget {
   , _canvasWidget_manipulatorWidget :: ManipulatorWidget t
 }
 
-holdCanvasWidget :: forall t m. (Reflex t, Adjustable t m, PostBuild t m, NotReady t m, MonadHold t m, MonadFix m, MonadNodeId m)
+holdCanvasWidget :: forall t m. (Reflex t, Adjustable t m, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m)
   => CanvasWidgetConfig t
   -> VtyWidget t m (CanvasWidget t)
 holdCanvasWidget CanvasWidgetConfig {..} = mdo

@@ -26,26 +26,13 @@ module Potato.Reflex.Vty.Helpers (
 
 import           Relude
 
-import           Potato.Flow
-import           Potato.Flow.Testing
 import           Potato.Reflex.Vty.Widget
-import           Reflex.Potato.Helpers
 
-
-import           Control.Applicative
-import           Control.Monad
 import           Control.Monad.Fix
 import           Control.Monad.NodeId
-import           Data.Functor.Misc
-import qualified Data.Map                 as Map
-import           Data.Maybe
 import qualified Data.Text                as T
-import qualified Data.Text.Zipper         as TZ
-import           Data.Time.Clock
 import qualified Graphics.Vty             as V
 import           Reflex
-import           Reflex.Class.Switchable
-import           Reflex.Network
 import           Reflex.Vty
 
 type MonadWidget t m = (Reflex t, MonadHold t m, MonadFix m, NotReady t m, Adjustable t m, PostBuild t m, PerformEvent t m, TriggerEvent t m, MonadNodeId m, MonadIO (Performable m), MonadIO m)
@@ -86,7 +73,7 @@ debugStream evs = do
 countEv :: (Reflex t, MonadHold t m, MonadFix m) => Event t a -> m (Dynamic t Int)
 countEv ev = foldDyn (\_ b -> b+1) 0 ev
 
-vLayoutPad :: (Reflex t, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m, Monad m) => Int -> VtyWidget t m a -> VtyWidget t m a
+vLayoutPad :: (PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m) => Int -> VtyWidget t m a -> VtyWidget t m a
 vLayoutPad n w = col $ do
   fixed 5 $ return ()
   stretch w
