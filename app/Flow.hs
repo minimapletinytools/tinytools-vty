@@ -64,6 +64,7 @@ mainPFWidget = mdo
           V.EvKey (V.KEsc) [] -> Just ()
           _ -> Nothing
         , _pFWidgetCtx_ev_input = inp
+        , _pFWidgetCtx_pfo = pfo
       }
 
   -- potato flow stuff

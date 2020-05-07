@@ -37,13 +37,13 @@ needUndoFirst ManipStart = False
 needUndoFirst _          = True
 
 data HandleWidgetConfig t = HandleWidgetConfig {
-  _handleWidgetConfig_pfctx             :: PFWidgetCtx t
-  , _handleWidgetConfig_position        :: Behavior t (Int, Int)
-  , _handleWidgetConfig_graphic         :: Behavior t Char
-  , _handleWidgetConfig_dragEv          :: Event t ((Int,Int), Drag2)
+  _handleWidgetConfig_pfctx       :: PFWidgetCtx t
+  , _handleWidgetConfig_position  :: Behavior t (Int, Int)
+  , _handleWidgetConfig_graphic   :: Behavior t Char
+  , _handleWidgetConfig_dragEv    :: Event t ((Int,Int), Drag2)
 
   -- N.B. very sensitive to timing, this needs to sync up one frame after networkHold
-  , _handleWidgetConfig_alreadyDragging :: Behavior t Bool
+  , _handleWidgetConfig_forceDrag :: Behavior t Bool
 }
 
 data HandleWidget t = HandleWidget {
@@ -61,26 +61,31 @@ holdHandle HandleWidgetConfig {..} = do
     (ffor3 _handleWidgetConfig_position _handleWidgetConfig_graphic (current . _pFWidgetCtx_attr_manipulator $ _handleWidgetConfig_pfctx) (,,))
     $ \((x,y),graphic,attr) -> [V.translate x y $ V.charFill attr graphic 1 1]
 
-  alreadyDragging <- sample _handleWidgetConfig_alreadyDragging
   -- handle input
   let
     trackMouse ::
-      Drag2
+      (Bool, Drag2)
       -> (ManipState, Maybe (Int, Int))
       -> PushM t (Maybe (ManipState, Maybe (Int, Int)))
-    trackMouse (Drag2 (fromX, fromY) (toX, toY) _ _ dstate) (tracking, _) = do
+    trackMouse (forceDrag, (Drag2 (fromX, fromY) (toX, toY) _ _ dstate)) (tracking, _) = do
       (x,y) <- sample _handleWidgetConfig_position
       return $ case dstate of
         DragStart -> if (fromX, fromY) == (x,y)
           then Just (ManipStart,  Nothing)
           else Nothing
+        Dragging | forceDrag ->
+          Just (ManipStart, Just (toX-fromX, toY-fromY))
         Dragging -> if tracking /= ManipEnd
           then Just (Manipulating, Just (toX-fromX, toY-fromY))
           else Nothing
         DragEnd -> if tracking == Manipulating
           then Just (ManipEnd, Just (toX-fromX, toY-fromY))
           else Nothing
-  trackingDyn <- foldDynMaybeM trackMouse (if alreadyDragging then ManipStart else ManipEnd, Nothing) $ fmap snd _handleWidgetConfig_dragEv
+
+  -- TODO need to attach forceDrag
+  trackingDyn <- foldDynMaybeM trackMouse (ManipEnd, Nothing) $ attach _handleWidgetConfig_forceDrag $ fmap snd _handleWidgetConfig_dragEv
+
+  --text $ fmap show forceDrag
   return
     HandleWidget {
       _handleWidget_dragged = fmapMaybe (\(ms, mp) -> mp >>= (\p -> return (ms, p))) $ updated trackingDyn
@@ -167,7 +172,7 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
           , _handleWidgetConfig_graphic = constant '┌'
           -- TODO only pass on if our cursor type is CSSelecting (but make sure after creating a new elt, our cursor is switched to CSSelecting)
           , _handleWidgetConfig_dragEv = cursorDragStateEv (Just CSBox) Nothing _manipulatorWidgetConfig_drag
-          , _handleWidgetConfig_alreadyDragging = newEltBeh
+          , _handleWidgetConfig_forceDrag = newEltBeh
         }
       let
         brHandleDragEv = fmap (\x -> (BH_BR, x)) $ _handleWidget_dragged brHandle
@@ -175,11 +180,11 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
       debugStream [
         never
         --, fmapLabelShow "dragging" $ _manipulatorWidgetConfig_drag
-        , fmapLabelShow "drag" $ _handleWidget_dragged brHandle
+        --, fmapLabelShow "drag" $ _handleWidget_dragged brHandle
         --, fmapLabelShow "modify" modifyEv
         ]
 
-{-
+
       let
         pushfn :: (BoxHandleType, (ManipState, (Int, Int))) -> PushM t (Maybe (ManipState, ControllersWithId))
         pushfn (bht, (ms, (dx, dy))) = do
@@ -190,8 +195,8 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
                 _cBox_deltaBox = DeltaLBox 0 $ V2 dx dy
               })
       return (push pushfn brHandleDragEv, _handleWidget_didCaptureInput brHandle)
--}
 
+{-
       -- TODO do this properly
       -- for now we assume brBeh is always the active handle
       let
@@ -208,7 +213,7 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
           return . Just $ (ms, IM.singleton _mBox_target r) where
         pushinputev = attach (current boxManip_dynBox) $ (cursorDragStateEv (Just CSBox) (Just Dragging) _manipulatorWidgetConfig_drag)
       return $ (push pushfn pushinputev, _handleWidget_didCaptureInput brHandle)
-
+-}
 
 
 
@@ -233,7 +238,9 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
 
   debugStream [
     never
+    --, fmapLabelShow "dynManip" $ selectionChangedEv
     --, fmapLabelShow "dynManip" $ selectManip MTagBox
+    --, fmapLabelShow "changes" $ _sEltLayerTree_changeView $ _pfo_layers $ _pFWidgetCtx_pfo _manipulatorWigetConfig_pfctx
     ]
 
   return

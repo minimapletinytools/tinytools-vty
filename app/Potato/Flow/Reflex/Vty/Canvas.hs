@@ -102,8 +102,8 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
       --, fmapLabelShow "selection" (updated $ _selectionManager_selected _canvasWidgetConfig_selectionManager)
       --, fmapLabelShow "manip" $ _manipulatorWidget_modify manipulatorW
       ]
-    fixed 1 $ row $ do
-      fixed 15 $ text $ fmap (\x -> "cursor: " <> show x) $ current cursor
+    --fixed 1 $ row $ do
+    --  fixed 15 $ text $ fmap (\x -> "cursor: " <> show x) $ current cursor
 
 
   -- ::manipulators::
