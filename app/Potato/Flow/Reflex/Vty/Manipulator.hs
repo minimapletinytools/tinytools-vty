@@ -12,20 +12,21 @@ import           Relude
 
 import           Potato.Flow
 import           Potato.Flow.Reflex.Vty.CanvasPane
+import           Potato.Flow.Reflex.Vty.Manipulator.Box
 import           Potato.Flow.Reflex.Vty.PFWidgetCtx
 import           Potato.Reflex.Vty.Helpers
 import           Potato.Reflex.Vty.Widget
 
 import           Control.Exception
-import           Control.Lens                       (over, _1)
+import           Control.Lens                           (over, _1)
 import           Control.Monad.Fix
-import           Data.Dependent.Sum                 (DSum ((:=>)))
-import qualified Data.IntMap.Strict                 as IM
-import qualified Data.List.NonEmpty                 as NE
+import           Data.Dependent.Sum                     (DSum ((:=>)))
+import qualified Data.IntMap.Strict                     as IM
+import qualified Data.List.NonEmpty                     as NE
 import           Data.These
 import           Data.Tuple.Extra
 
-import qualified Graphics.Vty                       as V
+import qualified Graphics.Vty                           as V
 import           Reflex
 import           Reflex.Network
 import           Reflex.Potato.Helpers
@@ -109,7 +110,6 @@ holdHandle HandleWidgetConfig {..} = do
       , _handleWidget_didCaptureInput = updated trackingDyn $> ()
     }
 
-data BoxHandleType = BH_TL | BH_TR | BH_BL | BH_BR | BH_T | BH_B | BH_L | BH_R deriving (Show, Eq, Enum)
 
 data ManipulatorWidgetConfig t = ManipulatorWidgetConfig {
   _manipulatorWigetConfig_pfctx :: PFWidgetCtx t
@@ -208,6 +208,7 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
         pushfn (bht, (ms, (dx, dy))) = do
           mmbox <- sample . current $ boxManip_dynBox
 
+          -- TODO pretty sure I can move these into a single dyn outside of boxManip
           -- TODO is it possible to simplify?
           -- these 2 conditions track whether we just created a new elt or not, wasManip is necessary because if you try to modify and element you just created it is still a new element
           wasManip <- sample . current $ isManipulatingDyn
