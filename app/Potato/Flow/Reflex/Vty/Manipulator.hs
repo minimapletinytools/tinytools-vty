@@ -55,7 +55,7 @@ data ManipulatorWidget t = ManipulatorWidget {
   , _manipulatorWidget_didCaptureMouse :: Event t ()
 }
 
-holdManipulatorWidget :: forall t m. (Reflex t, Adjustable t m, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m)
+holdManipulatorWidget :: forall t m. (MonadWidget t m)
   => ManipulatorWidgetConfig t
   -> VtyWidget t m (ManipulatorWidget t)
 holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
@@ -99,63 +99,21 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
       alignfn _            = Nothing
       r = alignEventWithMaybe alignfn (fmap fst $ selectionChangedEv) selectManip'
 
+  boxManip <- makeBoxManipWidget  BoxManipWidgetConfig {
+      _boxManipWidgetConfig_wasLastModifyAdd = wasLastModifyAdd
+      , _boxManipWidgetConfig_isNewElt = newEltBeh
+      , _boxManipWidgetConfig_updated = selectManip MTagBox
+      -- TODO only pass on if our cursor type is CSSelecting (but make sure after creating a new elt, our cursor is switched to CSSelecting)
+      , _boxManipWidgetConfig_drag  = cursorDragStateEv Nothing Nothing _manipulatorWidgetConfig_drag
+      , _boxManipWidgetConfig_panPos = _manipulatorWidgetConfig_panPos
+      , _boxManipWidgetConfig_pfctx = _manipulatorWigetConfig_pfctx
+    }
 
-  -- TODO you should prob split into functions...
-  -- BOX MANIPULATOR
   let
-    boxManip_selectedEv = selectManip MTagBox
-    boxManip_dmBox = fmap snd boxManip_selectedEv
-    boxManip_dlbox = fmap _mBox_box boxManip_dmBox
-  boxManip_dynBox <- holdDyn Nothing (fmap Just boxManip_dmBox)
-  boxManip_dlboxDyn <- holdDyn (LBox 0 0) boxManip_dlbox
-
-  let
-    boxManip :: VtyWidget t m (ManipOutput t)
-    boxManip = do
-      let brBeh = ffor2 _manipulatorWidgetConfig_panPos (current boxManip_dlboxDyn) (\(px, py) (LBox (V2 x y) (V2 w h)) -> (x+px+w, y+py+h))
-      brHandle <- holdHandle $ HandleWidgetConfig {
-          _handleWidgetConfig_pfctx = _manipulatorWigetConfig_pfctx
-          , _handleWidgetConfig_position = brBeh
-          , _handleWidgetConfig_graphic = constant '┌'
-          -- TODO only pass on if our cursor type is CSSelecting (but make sure after creating a new elt, our cursor is switched to CSSelecting)
-          , _handleWidgetConfig_dragEv = cursorDragStateEv Nothing Nothing _manipulatorWidgetConfig_drag
-          , _handleWidgetConfig_forceDrag = newEltBeh
-        }
-      let
-        brHandleDragEv = fmap (\x -> (BH_BR, x)) $ _handleWidget_dragged brHandle
-
-      vLayoutPad 4 $ debugStream [
-        never
-        --, fmapLabelShow "dragging" $ _manipulatorWidgetConfig_drag
-        --, fmapLabelShow "drag" $ _handleWidget_dragged brHandle
-        --, fmapLabelShow "modify" modifyEv
-        ]
-
-
-      let
-        pushfn :: (BoxHandleType, (ManipState, (Int, Int))) -> PushM t (Maybe (ManipState, Either ControllersWithId (LayerPos, SEltLabel)))
-        pushfn (bht, (ms, (dx, dy))) = do
-          mmbox <- sample . current $ boxManip_dynBox
-          mremakelp <- sample wasLastModifyAdd
-
-          return $ case mmbox of
-            Nothing -> Nothing
-            Just MBox {..} -> case mremakelp of
-              Just lp -> assert (ms == ManipStart) $ Just $ (,) Manipulating $ Right $
-                (lp, SEltLabel "<box>" $ SEltBox $ SBox (LBox (_lBox_ul _mBox_box) (V2 dx dy)) def)
-              Nothing -> Just $ (,) ms $ Left $ IM.singleton _mBox_target $ CTagBox :=> (Identity $ CBox {
-                  _cBox_deltaBox = DeltaLBox 0 $ V2 dx dy
-                })
-
-
-      return (push pushfn brHandleDragEv, _handleWidget_didCaptureInput brHandle)
-
-
     finalManip :: Event t (VtyWidget t m (ManipOutput t))
     finalManip = ffor (updated dynManipSelTypeChange) $ \case
       MSTBox -> boxManip
       _ -> return (never, never)
-    -- TODO the rest of them
 
 
   -- NOTE the 'networkHold' here doesn't seem to play well with other places where I use 'runWithAdjust'

@@ -3,6 +3,8 @@
 
 module Potato.Flow.Reflex.Vty.Manipulator.Box (
   BoxHandleType(..)
+  , BoxManipWidgetConfig(..)
+  , makeBoxManipWidget
 ) where
 
 import           Relude
@@ -74,15 +76,14 @@ data BoxManipWidgetConfig t = BoxManipWidgetConfig {
   -- These two are very timing dependent :(
   -- TODO is there some way to do this with toggle dyns or something instead?
   _boxManipWidgetConfig_wasLastModifyAdd :: Behavior t (Maybe Int)
-  , _boxManipWidgetConfig_isNewElt :: Behavior t Bool
+  , _boxManipWidgetConfig_isNewElt       :: Behavior t Bool
 
   -- TODO probably better if you somehow attach above things to this, then use this to create Dynamic that tracks what type of operation we need
   , _boxManipWidgetConfig_updated        :: Event t (Bool, MBox)
 
-  -- TODO prob don't need/want cursor state here
-  , _boxManipWidgetConfig_drag   :: Event t ((CursorState, (Int,Int)), Drag2)
-  , _boxManipWidgetConfig_panPos :: Behavior t (Int, Int)
-  , _boxManipWidgetConfig_pfctx :: PFWidgetCtx t
+  , _boxManipWidgetConfig_drag           :: Event t ((Int,Int), Drag2)
+  , _boxManipWidgetConfig_panPos         :: Behavior t (Int, Int)
+  , _boxManipWidgetConfig_pfctx          :: PFWidgetCtx t
 }
 
 makeBoxManipWidget :: forall t m. (MonadWidget t m)
@@ -106,8 +107,7 @@ makeBoxManipWidget BoxManipWidgetConfig {..} = mdo
           _handleWidgetConfig_pfctx = _boxManipWidgetConfig_pfctx
           , _handleWidgetConfig_position = brBeh
           , _handleWidgetConfig_graphic = constant '┌'
-          -- TODO only pass on if our cursor type is CSSelecting (but make sure after creating a new elt, our cursor is switched to CSSelecting)
-          , _handleWidgetConfig_dragEv = cursorDragStateEv Nothing Nothing _boxManipWidgetConfig_drag
+          , _handleWidgetConfig_dragEv = _boxManipWidgetConfig_drag
           , _handleWidgetConfig_forceDrag = _boxManipWidgetConfig_isNewElt
         }
       let
