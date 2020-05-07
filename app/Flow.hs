@@ -23,7 +23,6 @@ import           Control.Monad.NodeId
 import qualified Data.IntMap.Strict                 as IM
 import           Data.These
 import           Data.Time.Clock
-import           Data.Tuple.Extra
 
 import qualified Graphics.Vty                       as V
 import           Reflex
@@ -64,6 +63,7 @@ mainPFWidget = mdo
         , _pFWidgetCtx_ev_cancel        = fforMaybe inp $ \case
           V.EvKey (V.KEsc) [] -> Just ()
           _ -> Nothing
+        , _pFWidgetCtx_ev_input = inp
       }
 
   -- potato flow stuff
@@ -146,7 +146,12 @@ mainPFWidget = mdo
         --, fmapLabelShow "render" $ fmap fst3 (_broadPhase_render broadPhase)
         --, fmapLabelShow "change" $ fmap (fmap snd) $ _sEltLayerTree_changeView (_pfo_layers pfo)
         ]
-      tools' <- fixed 3 $ holdToolsWidget
+      tools' <- fixed 3 $ holdToolsWidget $  ToolWidgetConfig {
+          _toolWidgetConfig_pfctx = pfctx
+          -- TODO hook up to new elt created I guess
+          , _toolWidgetConfig_setDefault = never
+        }
+
       layers' <- stretch $ holdLayerWidget $ LayerWidgetConfig {
             _layerWidgetConfig_pfctx              = pfctx
             -- TODO fix or delete

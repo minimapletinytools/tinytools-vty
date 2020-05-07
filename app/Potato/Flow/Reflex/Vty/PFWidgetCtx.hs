@@ -20,4 +20,6 @@ data PFWidgetCtx t = PFWidgetCtx {
   _pFWidgetCtx_attr_default       :: Dynamic t V.Attr
   , _pFWidgetCtx_attr_manipulator :: Dynamic t V.Attr
   , _pFWidgetCtx_ev_cancel        :: Event t ()
+  -- global access to input events
+  , _pFWidgetCtx_ev_input         :: Event t VtyEvent
 }
