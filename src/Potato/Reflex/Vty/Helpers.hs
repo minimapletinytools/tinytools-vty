@@ -10,7 +10,8 @@
 {-# OPTIONS_GHC -threaded #-}
 
 module Potato.Reflex.Vty.Helpers (
-  debugFocus
+  MonadWidget
+  , debugFocus
   , debugInput
   , debugSize
   , dragTest
@@ -18,6 +19,7 @@ module Potato.Reflex.Vty.Helpers (
   , debugStream
   , fmapLabelShow
   , countEv
+  , vLayoutPad
   , drag2AttachOnStart
 ) where
 
@@ -45,6 +47,8 @@ import           Reflex
 import           Reflex.Class.Switchable
 import           Reflex.Network
 import           Reflex.Vty
+
+type MonadWidget t m = (Reflex t, MonadHold t m, MonadFix m, NotReady t m, Adjustable t m, PostBuild t m, PerformEvent t m, TriggerEvent t m, MonadNodeId m, MonadIO (Performable m), MonadIO m)
 
 debugFocus :: (Reflex t, Monad m) => VtyWidget t m ()
 debugFocus = do
@@ -81,6 +85,11 @@ debugStream evs = do
 
 countEv :: (Reflex t, MonadHold t m, MonadFix m) => Event t a -> m (Dynamic t Int)
 countEv ev = foldDyn (\_ b -> b+1) 0 ev
+
+vLayoutPad :: (Reflex t, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m, Monad m) => Int -> VtyWidget t m a -> VtyWidget t m a
+vLayoutPad n w = col $ do
+  fixed 5 $ return ()
+  stretch w
 
 {-
 dragAttachOnStart
@@ -132,9 +141,9 @@ drag2AttachOnStart btn beh = do
   let
     foldfn d ma = do
       anew <- case ma of
-        Nothing -> sample beh
+        Nothing                                   -> sample beh
         Just (a, _) | _drag2_state d == DragStart -> sample beh
-        Just (a, _) -> return a
+        Just (a, _)                               -> return a
       return $ Just (anew, d)
   dragBeh <- foldDynM foldfn Nothing dragEv
   return $ fmapMaybe id $ updated dragBeh

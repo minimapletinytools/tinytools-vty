@@ -30,11 +30,12 @@ import           Reflex.Potato.Helpers
 import           Reflex.Vty
 
 
-data ManipState = ManipStart | Manipulating | ManipEnd deriving (Show, Eq)
+data ManipState = ManipJustStart | ManipStart | Manipulating | ManipEnd deriving (Show, Eq)
 
 needUndoFirst :: ManipState -> Bool
-needUndoFirst ManipStart = False
-needUndoFirst _          = True
+needUndoFirst ManipStart     = False
+needUndoFirst ManipJustStart = error "this should never happen"
+needUndoFirst _              = True
 
 data HandleWidgetConfig t = HandleWidgetConfig {
   _handleWidgetConfig_pfctx       :: PFWidgetCtx t
@@ -71,9 +72,9 @@ holdHandle HandleWidgetConfig {..} = do
       (x,y) <- sample _handleWidgetConfig_position
       return $ case dstate of
         DragStart -> if (fromX, fromY) == (x,y)
-          then Just (ManipStart,  Nothing)
+          then Just (ManipJustStart,  Nothing)
           else Nothing
-        Dragging | forceDrag ->
+        Dragging | forceDrag || tracking == ManipJustStart ->
           Just (ManipStart, Just (toX-fromX, toY-fromY))
         Dragging -> if tracking /= ManipEnd
           then Just (Manipulating, Just (toX-fromX, toY-fromY))
@@ -85,7 +86,8 @@ holdHandle HandleWidgetConfig {..} = do
   -- TODO need to attach forceDrag
   trackingDyn <- foldDynMaybeM trackMouse (ManipEnd, Nothing) $ attach _handleWidgetConfig_forceDrag $ fmap snd _handleWidgetConfig_dragEv
 
-  --text $ fmap show forceDrag
+  debugStream [fmapLabelShow "drag" $ _handleWidgetConfig_dragEv]
+
   return
     HandleWidget {
       _handleWidget_dragged = fmapMaybe (\(ms, mp) -> mp >>= (\p -> return (ms, p))) $ updated trackingDyn
@@ -114,7 +116,7 @@ data BoxHandleType = BH_TL | BH_TR | BH_BL | BH_BR | BH_T | BH_B | BH_L | BH_R d
 -- (modify event, didCaptureMouse)
 type ManipOutput t = (Event t (ManipState, ControllersWithId), Event t ())
 
-holdManipulatorWidget :: forall t m. (Reflex t, MonadHold t m, MonadFix m, Adjustable t m)
+holdManipulatorWidget :: forall t m. (Reflex t, Adjustable t m, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m, Monad m)
   => ManipulatorWidgetConfig t
   -> VtyWidget t m (ManipulatorWidget t)
 holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
@@ -171,16 +173,16 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
           , _handleWidgetConfig_position = brBeh
           , _handleWidgetConfig_graphic = constant '┌'
           -- TODO only pass on if our cursor type is CSSelecting (but make sure after creating a new elt, our cursor is switched to CSSelecting)
-          , _handleWidgetConfig_dragEv = cursorDragStateEv (Just CSBox) Nothing _manipulatorWidgetConfig_drag
+          , _handleWidgetConfig_dragEv = cursorDragStateEv Nothing Nothing _manipulatorWidgetConfig_drag
           , _handleWidgetConfig_forceDrag = newEltBeh
         }
       let
         brHandleDragEv = fmap (\x -> (BH_BR, x)) $ _handleWidget_dragged brHandle
 
-      debugStream [
+      vLayoutPad 1 $ debugStream [
         never
         --, fmapLabelShow "dragging" $ _manipulatorWidgetConfig_drag
-        --, fmapLabelShow "drag" $ _handleWidget_dragged brHandle
+        , fmapLabelShow "drag" $ _handleWidget_dragged brHandle
         --, fmapLabelShow "modify" modifyEv
         ]
 
