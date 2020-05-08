@@ -21,8 +21,6 @@ data PFWidgetCtx t = PFWidgetCtx {
   , _pFWidgetCtx_attr_manipulator :: Dynamic t V.Attr
   , _pFWidgetCtx_ev_cancel        :: Event t ()
 
-
-
   -- for debugging or whatever
   , _pFWidgetCtx_ev_input         :: Event t VtyEvent
   , _pFWidgetCtx_pfo              :: PFOutput t

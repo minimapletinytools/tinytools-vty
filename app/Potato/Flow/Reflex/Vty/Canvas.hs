@@ -39,10 +39,12 @@ data CanvasWidgetConfig t = CanvasWidgetConfig {
 }
 
 data CanvasWidget t = CanvasWidget {
-  _canvasWidget_isManipulating :: Dynamic t Bool
+  _canvasWidget_isManipulating      :: Dynamic t Bool
 
-  , _canvasWidget_addSEltLabel :: Event t (Bool, (LayerPos, SEltLabel))
-  , _canvasWidget_modify       :: Event t (Bool, ControllersWithId)
+  , _canvasWidget_addSEltLabel      :: Event t (Bool, (LayerPos, SEltLabel))
+  , _canvasWidget_modify            :: Event t (Bool, ControllersWithId)
+
+  , _canvasWidget_consumingKeyboard :: Behavior t Bool
 }
 
 holdCanvasWidget :: forall t m. (MonadWidget t m)
@@ -164,4 +166,7 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
         [fmap (\x -> (False, x)) newBoxEv
         , _manipulatorWidget_add manipulatorW]
       , _canvasWidget_modify = _manipulatorWidget_modify manipulatorW
+
+      -- TODO
+      , _canvasWidget_consumingKeyboard = constant False
     }

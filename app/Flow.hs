@@ -11,6 +11,7 @@ import           Potato.Flow.Reflex.Vty.Attrs
 import           Potato.Flow.Reflex.Vty.Canvas
 import           Potato.Flow.Reflex.Vty.Layer
 import           Potato.Flow.Reflex.Vty.Manipulator
+import           Potato.Flow.Reflex.Vty.Params
 import           Potato.Flow.Reflex.Vty.PFWidgetCtx
 import           Potato.Flow.Reflex.Vty.Selection
 import           Potato.Flow.Reflex.Vty.Tools
@@ -26,19 +27,6 @@ import qualified Graphics.Vty                       as V
 import           Reflex
 import           Reflex.Potato.Helpers
 import           Reflex.Vty
-
-
-
-
-
-
-data ParamWidget t = ParamWidget {
-
-}
-
-paramWidget :: forall t m. (Reflex t, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m)
- => VtyWidget t m (ParamWidget t)
-paramWidget = return ParamWidget {}
 
 
 flowMain :: IO ()
@@ -121,7 +109,9 @@ mainPFWidget = mdo
             , _layerWidgetConfig_temp_sEltTree    = constDyn []
             , _layerWidgetConfig_selectionManager = selectionManager
           }
-      params' <- fixed 5 $ paramWidget
+      params' <- fixed 5 $ holdParamsWidget $ ParamsWidgetConfig {
+          _paramsWidgetConfig_pfctx = pfctx
+        }
       return (layers', tools', params')
 
     rightPanel = holdCanvasWidget $ CanvasWidgetConfig {
