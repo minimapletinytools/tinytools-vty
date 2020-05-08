@@ -35,6 +35,17 @@ import           Reflex.Vty
 
 data BoxHandleType = BH_TL | BH_TR | BH_BL | BH_BR | BH_T | BH_B | BH_L | BH_R deriving (Show, Eq, Enum)
 
+manipChar :: BoxHandleType -> Char
+manipChar BH_TL = '╝'
+manipChar BH_TR = '╚'
+manipChar BH_BL = '╗'
+manipChar BH_BR = '╔'
+manipChar BH_T  = '═'
+manipChar BH_B  = '═'
+manipChar BH_L  = '║'
+manipChar BH_R  = '║'
+
+
 --let brBeh = ffor2 _manipulatorWidgetConfig_panPos (current boxManip_dlboxDyn) (makeCornerHandlePos bht)
 
 makeCornerHandlePos ::
@@ -46,11 +57,11 @@ makeCornerHandlePos bht (px, py) (LBox (V2 x y) (V2 w h)) = case bht of
   BH_BR -> (r, b)
   BH_TL -> (l, t)
   BH_TR -> (r, t)
-  BH_BL -> (b, l)
+  BH_BL -> (l, b)
   _     -> error "don't use this for non-corner handles"
   where
-    l = x+px
-    t = y+py
+    l = x+px-1
+    t = y+py-1
     r = x+px+w
     b = y+py+h
 
@@ -62,12 +73,12 @@ makeCornerHandlePos bht (px, py) (LBox (V2 x y) (V2 w h)) = case bht of
 makeDeltaBox :: BoxHandleType -> (Int, Int) -> DeltaLBox
 makeDeltaBox bht (dx,dy) = case bht of
   BH_BR -> DeltaLBox 0 $ V2 dx dy
-  BH_TL -> DeltaLBox (V2 dx dy) 0
-  BH_TR -> DeltaLBox (V2 0 dy) (V2 dx 0)
-  BH_BL -> DeltaLBox (V2 dx 0) (V2 0 dy)
-  BH_T  -> DeltaLBox (V2 0 dy) 0
+  BH_TL -> DeltaLBox (V2 dx dy) (V2 (-dx) (-dy))
+  BH_TR -> DeltaLBox (V2 0 dy) (V2 dx (-dy))
+  BH_BL -> DeltaLBox (V2 dx 0) (V2 (-dx) dy)
+  BH_T  -> DeltaLBox (V2 0 dy) (V2 0 (-dy))
   BH_B  -> DeltaLBox 0 (V2 0 dy)
-  BH_L  -> DeltaLBox (V2 dx 0) 0
+  BH_L  -> DeltaLBox (V2 dx 0) (V2 (-dx) 0)
   BH_R  -> DeltaLBox 0 (V2 dx 0)
 
 
@@ -102,16 +113,21 @@ makeBoxManipWidget BoxManipWidgetConfig {..} = mdo
   let
     boxManip :: ManipWidget t m
     boxManip = do
-      let brBeh = ffor2 _boxManipWidgetConfig_panPos (current boxManip_dlboxDyn) (\(px, py) (LBox (V2 x y) (V2 w h)) -> (x+px+w, y+py+h))
-      brHandle <- holdHandle $ HandleWidgetConfig {
-          _handleWidgetConfig_pfctx = _boxManipWidgetConfig_pfctx
-          , _handleWidgetConfig_position = brBeh
-          , _handleWidgetConfig_graphic = constant '┌'
-          , _handleWidgetConfig_dragEv = _boxManipWidgetConfig_drag
-          , _handleWidgetConfig_forceDrag = _boxManipWidgetConfig_isNewElt
-        }
+
       let
-        brHandleDragEv = fmap (\x -> (BH_BR, x)) $ _handleWidget_dragged brHandle
+        handleTypes = [BH_BR, BH_TL, BH_TR, BH_BL]
+      handles <- forM handleTypes $ \bht -> do
+        let handlePosBeh = ffor2 _boxManipWidgetConfig_panPos (current boxManip_dlboxDyn) (makeCornerHandlePos bht)
+        holdHandle $ HandleWidgetConfig {
+            _handleWidgetConfig_pfctx = _boxManipWidgetConfig_pfctx
+            , _handleWidgetConfig_position = handlePosBeh
+            , _handleWidgetConfig_graphic = constant $ manipChar bht
+            , _handleWidgetConfig_dragEv = _boxManipWidgetConfig_drag
+            , _handleWidgetConfig_forceDrag = if bht == BH_BR then _boxManipWidgetConfig_isNewElt else constant False
+          }
+      let
+        handleDragEv = leftmostassert "box handles" $ fmap (\(bht, h) -> fmap (\x -> (bht,x)) $ _handleWidget_dragged h) $ zip handleTypes handles
+        didCaptureInput = leftmostassert "box capture input" $ fmap _handleWidget_didCaptureInput handles
 
       vLayoutPad 4 $ debugStream [
         never
@@ -130,12 +146,12 @@ makeBoxManipWidget BoxManipWidgetConfig {..} = mdo
           return $ case mmbox of
             Nothing -> Nothing
             Just MBox {..} -> case mremakelp of
-              Just lp -> assert (ms == ManipStart) $ Just $ (,) Manipulating $ Right $
+              Just lp -> assert (ms == ManipStart && bht == BH_BR) $ Just $ (,) Manipulating $ Right $
                 (lp, SEltLabel "<box>" $ SEltBox $ SBox (LBox (_lBox_ul _mBox_box) (V2 dx dy)) def)
               Nothing -> Just $ (,) ms $ Left $ IM.singleton _mBox_target $ CTagBox :=> (Identity $ CBox {
-                  _cBox_deltaBox = DeltaLBox 0 $ V2 dx dy
+                  _cBox_deltaBox = makeDeltaBox bht (dx, dy)
                 })
 
-      return (push pushfn brHandleDragEv, _handleWidget_didCaptureInput brHandle)
+      return (push pushfn handleDragEv, didCaptureInput)
 
   return boxManip
