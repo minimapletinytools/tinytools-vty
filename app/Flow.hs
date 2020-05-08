@@ -92,13 +92,14 @@ mainPFWidget = mdo
         never
         , fmapLabelShow "undo" $ _canvasWidget_addSEltLabel canvasW
         --, fmapLabelShow "input" inp
-        --, fmapLabelShow "tool" (_toolWidget_tool tools)
+        --, fmapLabelShow "tool" (_toolWidget_tool toolsW)
         --, fmapLabelShow "canvas size" $ updated . _canvas_box $ _pfo_canvas pfo
         --, fmapLabelShow "render" $ fmap fst3 (_broadPhase_render broadPhase)
         --, fmapLabelShow "change" $ fmap (fmap snd) $ _sEltLayerTree_changeView (_pfo_layers pfo)
         ]
       tools' <- fixed 3 $ holdToolsWidget $  ToolWidgetConfig {
           _toolWidgetConfig_pfctx = pfctx
+          , _toolWidgetConfig_consumingKeyboard = consumingKeyboard
           -- TODO hook up to new elt created I guess
           , _toolWidgetConfig_setDefault = never
         }
@@ -116,12 +117,16 @@ mainPFWidget = mdo
 
     rightPanel = holdCanvasWidget $ CanvasWidgetConfig {
         _canvasWidgetConfig_pfctx = pfctx
-        , _canvasWidgetConfig_tool = (_toolWidget_tool tools)
+        , _canvasWidgetConfig_tool = (_toolWidget_tool toolsW)
         , _canvasWidgetConfig_pfo = pfo
         , _canvasWidgetConfig_selectionManager = selectionManager
       }
 
-  ((layersW, tools, _), canvasW) <- splitHDrag 35 (fill '*') leftPanel rightPanel
+  ((layersW, toolsW, paramsW), canvasW) <- splitHDrag 35 (fill '*') leftPanel rightPanel
+
+  -- prep consuming keyboard behavior
+  let
+    consumingKeyboard = ffor2 (_canvasWidget_consumingKeyboard canvasW) (_paramsWidget_consumingKeyboard paramsW) (||)
 
   -- prep newAdd event
   -- MANY FRAMES

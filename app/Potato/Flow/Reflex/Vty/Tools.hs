@@ -29,13 +29,19 @@ tool_cursorState TBox = CSBox
 tool_cursorState _    = CSSelecting
 
 data ToolWidgetConfig t = ToolWidgetConfig {
-  _toolWidgetConfig_pfctx        :: PFWidgetCtx t
-  , _toolWidgetConfig_setDefault :: Event t ()
+  _toolWidgetConfig_pfctx               :: PFWidgetCtx t
+  , _toolWidgetConfig_setDefault        :: Event t ()
+  , _toolWidgetConfig_consumingKeyboard :: Behavior t Bool
 }
 
 data ToolWidget t = ToolWidget {
   _toolWidget_tool :: Event t Tool
 }
+
+
+onlyIfBeh :: (Reflex t) => Event t a -> Behavior t Bool -> Event t a
+onlyIfBeh ev beh = fmapMaybe (\(b,e) -> if b then Just e else Nothing) $ attach beh ev
+
 
 holdToolsWidget :: forall t m. (PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m)
   => ToolWidgetConfig t
@@ -55,19 +61,31 @@ holdToolsWidget ToolWidgetConfig {..} = row $ do
   textB <- fixed 3 $ textButton bc "T"
 
   let
-    -- TODO this is incorrect, we need our own notion of focus that is different than the pane focus one
-    -- probaby just a single `globalFocus :: Dynamic t Bool` in pfctx will do.
-    keyPressEv k = (flip fmapMaybe) (_pFWidgetCtx_ev_input _toolWidgetConfig_pfctx) $ \case
+    allowKB = fmap not _toolWidgetConfig_consumingKeyboard
+    keyPressEv' k = (flip fmapMaybe) (_pFWidgetCtx_ev_input _toolWidgetConfig_pfctx) $ \case
       V.EvKey (V.KChar k') [] | k' == k -> Just ()
       _ -> Nothing
+    keyPressEv k = onlyIfBeh (keyPressEv' k) allowKB
 
-
-  -- TODO remove key press events, see comment above
   return ToolWidget {
     _toolWidget_tool = leftmost
-      [TSelect <$ leftmost [selectB, _pFWidgetCtx_ev_cancel _toolWidgetConfig_pfctx, _toolWidgetConfig_setDefault]
+      [TSelect <$ leftmost
+        [ selectB
+        , onlyIfBeh (_pFWidgetCtx_ev_cancel _toolWidgetConfig_pfctx) allowKB
+        , _toolWidgetConfig_setDefault
+        , keyPressEv 'v']
       , TPan <$ leftmost [panB, keyPressEv ' ']
       , TBox <$ leftmost [boxB, keyPressEv 'b']
       , TLine <$ leftmost [lineB, keyPressEv 'l']
       , TText <$ leftmost [textB, keyPressEv 't']]
   }
+
+  {-
+      keyPressEv k = flip push (_pFWidgetCtx_ev_input _toolWidgetConfig_pfctx) $ \vtyev -> do
+        consuming <- sample _toolWidgetConfig_consumingKeyboard
+        return $ if not consuming
+          then case vtyev of
+            V.EvKey (V.KChar k') [] | k' == k -> Just ()
+            _                                 -> Nothing
+          else Nothing
+          -}
