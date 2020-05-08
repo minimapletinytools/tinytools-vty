@@ -21,6 +21,8 @@ import           Potato.Reflex.Vty.Widget
 import           Reflex.Potato.Helpers
 
 import           Control.Monad.Fix
+import qualified Data.IntMap.Strict                 as IM
+import           Data.These
 
 import qualified Graphics.Vty                       as V
 import           Reflex
@@ -30,15 +32,14 @@ import           Reflex.Vty
 
 
 data CanvasWidgetConfig t = CanvasWidgetConfig {
-  _canvasWidgetConfig_pfctx                 :: PFWidgetCtx t
-  , _canvasWidgetConfig_tool                :: Event t Tool
-  , _canvasWidgetConfig_renderedCanvas_temp :: Dynamic t RenderedCanvas
-  , _canvasWidgetConfig_selectionManager    :: SelectionManager t
+  _canvasWidgetConfig_pfctx              :: PFWidgetCtx t
+  , _canvasWidgetConfig_tool             :: Event t Tool
+  , _canvasWidgetConfig_selectionManager :: SelectionManager t
+  , _canvasWidgetConfig_pfo              :: PFOutput t
 }
 
 data CanvasWidget t = CanvasWidget {
   _canvasWidget_isManipulating :: Dynamic t Bool
-
 
   , _canvasWidget_addSEltLabel :: Event t (Bool, (LayerPos, SEltLabel))
   , _canvasWidget_modify       :: Event t (Bool, ControllersWithId)
@@ -49,6 +50,42 @@ holdCanvasWidget :: forall t m. (MonadWidget t m)
   -> VtyWidget t m (CanvasWidget t)
 holdCanvasWidget CanvasWidgetConfig {..} = mdo
   inp <- input
+
+  -- ::prep broadphase/canvas::
+  let
+    bpc = BroadPhaseConfig $ fmap (fmap snd) $ _sEltLayerTree_changeView (_pfo_layers _canvasWidgetConfig_pfo)
+    --renderfn :: ([LBox], BPTree, REltIdMap (Maybe SEltLabel)) -> RenderedCanvas -> PushM t RenderedCanvas
+    renderfn (boxes, bpt, cslmap) rc = case boxes of
+      [] -> return rc
+      (b:bs) -> case intersect_LBox (renderedCanvas_box rc) (foldl' union_LBox b bs) of
+        Nothing -> return rc
+        Just aabb -> do
+          slmap <- sample . current . _directory_contents . _sEltLayerTree_directory . _pfo_layers $ _canvasWidgetConfig_pfo
+          let
+            rids = broadPhase_cull aabb bpt
+            seltls = flip fmap rids $ \rid -> case IM.lookup rid cslmap of
+              Nothing -> case IM.lookup rid slmap of
+                Nothing -> error "this should never happen, because broadPhase_cull should only give existing seltls"
+                Just seltl -> seltl
+              Just mseltl -> case mseltl of
+                Nothing -> error "this should never happen, because deleted seltl would have been culled in broadPhase_cull"
+                Just seltl -> seltl
+            newrc = render aabb (map _sEltLabel_sElt seltls) rc
+          return $ newrc
+    --foldCanvasFn :: (These ([LBox], BPTree, REltIdMap (Maybe SEltLabel)) LBox) -> RenderedCanvas -> PushM t RenderedCanvas
+    foldCanvasFn (This x) rc = renderfn x rc
+    foldCanvasFn (That lbx) _ = do
+      bpt <- sample . current $ _broadPhase_bPTree broadPhase
+      -- TODO only redo what's needed
+      let renderBoxes = [lbx]
+      renderfn (renderBoxes, bpt, IM.empty) (emptyRenderedCanvas lbx)
+    foldCanvasFn (These _ _) _ = error "resize and change events should never occur simultaneously"
+  broadPhase <- holdBroadPhase bpc
+
+  -- :: prepare rendered canvas ::
+  renderedCanvas <- foldDynM foldCanvasFn (emptyRenderedCanvas defaultCanvasLBox)
+    $ alignEventWithMaybe Just (_broadPhase_render broadPhase) (updated . _canvas_box $ _pfo_canvas _canvasWidgetConfig_pfo)
+
 
   -- ::cursor::
   let
@@ -68,7 +105,7 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
   -- ::panning::
   -- TODO make this so it doesn't trigger when you start drag off of this panel
   -- you could do this by checking if dragFrom is on the edges
-  LBox (V2 cx0 cy0) (V2 cw0 ch0) <- sample $ current (fmap renderedCanvas_box _canvasWidgetConfig_renderedCanvas_temp)
+  LBox (V2 cx0 cy0) (V2 cw0 ch0) <- sample $ current (fmap renderedCanvas_box renderedCanvas)
   pw0 <- displayWidth >>= sample . current
   ph0 <- displayHeight >>= sample . current
   let
@@ -89,10 +126,10 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
   -- ::draw the canvas::
   -- TODO make this efficient -_-
   let
-    canvasRegion = translate_dynRegion panPos $ dynLBox_to_dynRegion (fmap renderedCanvas_box _canvasWidgetConfig_renderedCanvas_temp)
+    canvasRegion = translate_dynRegion panPos $ dynLBox_to_dynRegion (fmap renderedCanvas_box renderedCanvas)
   fill '░'
   pane canvasRegion (constDyn True) $ do
-    text $ current (fmap renderedCanvasToText _canvasWidgetConfig_renderedCanvas_temp)
+    text $ current (fmap renderedCanvasToText renderedCanvas)
 
   -- ::info pane::
   col $ do

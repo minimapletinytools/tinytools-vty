@@ -20,8 +20,6 @@ import           Potato.Reflex.Vty.Widget
 
 import           Control.Monad.Fix
 import           Control.Monad.NodeId
-import qualified Data.IntMap.Strict                 as IM
-import           Data.These
 import           Data.Time.Clock
 
 import qualified Graphics.Vty                       as V
@@ -90,43 +88,6 @@ mainPFWidget = mdo
       }
   pfo <- holdPF pfc
 
-
-  -- ::prep broadphase/canvas::
-  -- TODO move into Canvas.hs I guess
-  let
-    bpc = BroadPhaseConfig $ fmap (fmap snd) $ _sEltLayerTree_changeView (_pfo_layers pfo)
-    --renderfn :: ([LBox], BPTree, REltIdMap (Maybe SEltLabel)) -> RenderedCanvas -> PushM t RenderedCanvas
-    renderfn (boxes, bpt, cslmap) rc = case boxes of
-      [] -> return rc
-      (b:bs) -> case intersect_LBox (renderedCanvas_box rc) (foldl' union_LBox b bs) of
-        Nothing -> return rc
-        Just aabb -> do
-          slmap <- sample . current . _directory_contents . _sEltLayerTree_directory . _pfo_layers $ pfo
-          let
-            rids = broadPhase_cull aabb bpt
-            seltls = flip fmap rids $ \rid -> case IM.lookup rid cslmap of
-              Nothing -> case IM.lookup rid slmap of
-                Nothing -> error "this should never happen, because broadPhase_cull should only give existing seltls"
-                Just seltl -> seltl
-              Just mseltl -> case mseltl of
-                Nothing -> error "this should never happen, because deleted seltl would have been culled in broadPhase_cull"
-                Just seltl -> seltl
-            newrc = render aabb (map _sEltLabel_sElt seltls) rc
-          return $ newrc
-    --foldCanvasFn :: (These ([LBox], BPTree, REltIdMap (Maybe SEltLabel)) LBox) -> RenderedCanvas -> PushM t RenderedCanvas
-    foldCanvasFn (This x) rc = renderfn x rc
-    foldCanvasFn (That lbx) _ = do
-      bpt <- sample . current $ _broadPhase_bPTree broadPhase
-      -- TODO only redo what's needed
-      let renderBoxes = [lbx]
-      renderfn (renderBoxes, bpt, IM.empty) (emptyRenderedCanvas lbx)
-    foldCanvasFn (These _ _) _ = error "resize and change events should never occur simultaneously"
-  broadPhase <- holdBroadPhase bpc
-  let
-    defaultCanvasLBox = LBox (V2 0 0) (V2 100 50)
-  canvas <- foldDynM foldCanvasFn (emptyRenderedCanvas defaultCanvasLBox)
-    $ alignEventWithMaybe Just (_broadPhase_render broadPhase) (updated . _canvas_box $ _pfo_canvas pfo)
-
   -- ::selection stuff::
   selectionManager <- holdSelectionManager
     SelectionManagerConfig {
@@ -166,7 +127,7 @@ mainPFWidget = mdo
     rightPanel = holdCanvasWidget $ CanvasWidgetConfig {
         _canvasWidgetConfig_pfctx = pfctx
         , _canvasWidgetConfig_tool = (_toolWidget_tool tools)
-        , _canvasWidgetConfig_renderedCanvas_temp = canvas
+        , _canvasWidgetConfig_pfo = pfo
         , _canvasWidgetConfig_selectionManager = selectionManager
       }
 
