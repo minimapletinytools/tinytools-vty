@@ -50,11 +50,11 @@ holdSelectionManager SelectionManagerConfig {..} = do
     newSingle = fmapMaybe (\im -> if IM.size im == 1 then IM.lookupMin im else Nothing)
       $ _sEltLayerTree_changeView _selectionManagerConfig_sEltLayerTree
     selFromVeryNew_alignfn = \case
+      -- we make an unchecked assumption that these two events coincide and refer to the same new element
+      -- TODO add an assert that they are indeed the same elt
       These (lp,sl) (rid,_) -> Just [Just (rid, lp, sl)]
       _ -> Nothing
-    -- we make an unchecked assumption that these two events coincide and refer to the same new element
     -- we do this funny align so we can attach the layer position and ensure the element is actually new and not just modified
-    -- TODO add an assert that they are indeed the same elt
     selFromVeryNew :: Event t ([SuperSEltLabel])
     selFromVeryNew = fmap (fmap fromJust) $ alignEventWithMaybe selFromVeryNew_alignfn _selectionManagerConfig_newElt_layerPos newSingle
 
@@ -82,7 +82,7 @@ holdSelectionManager SelectionManagerConfig {..} = do
     selFromCanvas :: Event t ([SuperSEltLabel])
     selFromCanvas = pushAlways pushSelFromCanvas _selectionManagerConfig_selectByREltId
 
-    -- ::selection doesn't change but contes do change::
+    -- ::selection doesn't change but contents do change::
     selChangesFromModified :: Event t (REltIdMap (Maybe SEltLabel))
     selChangesFromModified = fmap (fmap snd) $ _sEltLayerTree_changeView _selectionManagerConfig_sEltLayerTree
 

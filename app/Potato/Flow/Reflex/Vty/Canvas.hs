@@ -157,7 +157,7 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
     fixed 2 $ debugStream
       [
       never
-      , fmapLabelShow "select" selectEv
+      --, fmapLabelShow "select" selectEv
       --, fmapLabelShow "drag" dragEv
       --, fmapLabelShow "input" inp
       --, fmapLabelShow "cursor" (updated cursor)

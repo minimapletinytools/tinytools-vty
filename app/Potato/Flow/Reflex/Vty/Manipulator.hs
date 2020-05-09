@@ -60,26 +60,28 @@ holdManipulatorWidget :: forall t m. (MonadWidget t m)
   -> VtyWidget t m (ManipulatorWidget t)
 holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
 
+  -- ::track if we are manipulating::
   -- TODO probably can delete, handles track this themselves
   -- Tracks whether we're manipulating. This is needed so that we don't undo the first manipulation event.
-  let dragEnd = cursorDragStateEv Nothing (Just DragEnd) _manipulatorWidgetConfig_drag
-  bManipulating <- return . current
-    =<< (holdDyn False $ leftmost [dragEnd $> False, manipulateEv $> True])
+  --let dragEnd = cursorDragStateEv Nothing (Just DragEnd) _manipulatorWidgetConfig_drag
+  --bManipulating <- return . current
+  --  =<< (holdDyn False $ leftmost [dragEnd $> False, manipulateEv $> True])
 
+  -- ::collected various change events::
   let selectionChangedEv = updated _manipulatorWigetConfig_selected
   -- tracks whether an elements was newly created or not
   -- NOTE very timing dependent
   newEltBeh <- hold False (fmap fst selectionChangedEv)
-  -- this is needed to recreate a new element after undoing it
+  -- LayerPos this is needed to recreate a new element after undoing it
   selectionLayerPos <- hold (-1)
     $ fmap (maybe (-1) (\(_,lp,_) -> lp))
     $ fmap (viaNonEmpty NE.head)
     $ fmap snd selectionChangedEv
-
   let
     wasLastModifyAdd = ffor3 (current isManipulatingDyn) newEltBeh selectionLayerPos (\m n lp -> if m && n then Just lp else Nothing)
 
-
+  -- TODO mov ethis into Selection
+  -- ::convert to Manipulator EventSelector::
   dynManipulator <- toManipulator $ fmap snd selectionChangedEv
   -- see comments on 'manipWidget'
   dynManipSelTypeChange' <- holdDyn MSTNone $ ffor (updated dynManipulator) $ \case
@@ -89,7 +91,6 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
     (MTagBoundingBox :=> _) -> MSTBBox
     _ -> MSTNone
   dynManipSelTypeChange <- holdUniqDyn dynManipSelTypeChange'
-
   let
     selectManip :: MTag a -> Event t (Bool, a)
     selectManip mtag = r where
@@ -99,23 +100,23 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
       alignfn _            = Nothing
       r = alignEventWithMaybe alignfn (fmap fst $ selectionChangedEv) selectManip'
 
+  -- ::create the manipulators::
   boxManip <- makeBoxManipWidget  BoxManipWidgetConfig {
       _boxManipWidgetConfig_wasLastModifyAdd = wasLastModifyAdd
       , _boxManipWidgetConfig_isNewElt = newEltBeh
       , _boxManipWidgetConfig_updated = selectManip MTagBox
-      -- TODO only pass on if our cursor type is CSSelecting (but make sure after creating a new elt, our cursor is switched to CSSelecting)
+      -- TODO this only needs CSSelecting for modify and CSBox for creating new boxes
       , _boxManipWidgetConfig_drag  = cursorDragStateEv Nothing Nothing _manipulatorWidgetConfig_drag
       , _boxManipWidgetConfig_panPos = _manipulatorWidgetConfig_panPos
       , _boxManipWidgetConfig_pfctx = _manipulatorWigetConfig_pfctx
     }
 
+  -- ::networkHold the correct manipulator::
   let
     finalManip :: Event t (VtyWidget t m (ManipOutput t))
     finalManip = ffor (updated dynManipSelTypeChange) $ \case
       MSTBox -> boxManip
       _ -> return (never, never)
-
-
   -- NOTE the 'networkHold' here doesn't seem to play well with other places where I use 'runWithAdjust'
   -- thus, we use 'dynManipSelTypeChange' above instead to limit the number of times the widget changes (even if nothing actually changes)
   -- CORRECTION, this is probbaly just because dynamics inside manip widgets are getting recreated by networkHold and less related to runWithAdjust conflicts
@@ -123,18 +124,19 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
   manipWidget :: Dynamic t (ManipOutput t)
     <- networkHold (return (never, never)) finalManip
 
+  -- ::collect output events::
   let
     rawManipEv = switchDyn (fmap fst manipWidget)
     manipulateEv :: Event t (Bool, Either ControllersWithId (LayerPos, SEltLabel))
     manipulateEv = fmap (over _1 needUndoFirst) $ rawManipEv
     didCaptureMouseEv :: Event t ()
     didCaptureMouseEv = switchDyn (fmap snd manipWidget)
-
   isManipulatingDyn <- holdDyn False $ fmap isManipulating (fmap fst rawManipEv)
 
   debugStream [
     never
-    --, fmapLabelShow "manip" $ manipulateEv
+    , fmapLabelShow "manip" $ manipulateEv
+    , fmapLabelShow "isManip" $ updated isManipulatingDyn
     --, fmapLabelShow "dynManip" $ selectionChangedEv
     --, fmapLabelShow "dynManip" $ selectManip MTagBox
     --, fmapLabelShow "changes" $ _sEltLayerTree_changeView $ _pfo_layers $ _pFWidgetCtx_pfo _manipulatorWigetConfig_pfctx

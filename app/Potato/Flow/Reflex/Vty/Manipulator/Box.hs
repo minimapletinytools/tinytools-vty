@@ -44,7 +44,7 @@ manipChar BH_T  = Just '═'
 manipChar BH_B  = Just '═'
 manipChar BH_L  = Just '║'
 manipChar BH_R  = Just '║'
-manipChar BH_A  = Nothing --Just '$'
+manipChar BH_A  = Just '$'
 
 
 --let brBeh = ffor2 _manipulatorWidgetConfig_panPos (current lBoxDyn) (makeHandleBox bht)
@@ -132,15 +132,16 @@ makeBoxManipWidget BoxManipWidgetConfig {..} = mdo
             , _handleWidgetConfig_forceDrag = if bht == BH_BR then _boxManipWidgetConfig_isNewElt else constant False
           }
       let
-        handleDragEv = leftmostassert "box handles" $ fmap (\(bht, h) -> fmap (\x -> (bht,x)) $ _handleWidget_dragged h) $ zip handleTypes handles
-        didCaptureInput = leftmostassert "box capture input" $ fmap _handleWidget_didCaptureInput handles
+        handleDragEv = leftmost $ fmap (\(bht, h) -> fmap (\x -> (bht,x)) $ _handleWidget_dragged h) $ zip handleTypes handles
+        didCaptureInput = leftmost $ fmap _handleWidget_didCaptureInput handles
 
-      vLayoutPad 4 $ debugStream [
+      vLayoutPad 3 $ text $ fmap show _boxManipWidgetConfig_isNewElt
+      vLayoutPad 4 $ debugStream $ [
         never
         --, fmapLabelShow "dragging" $ _manipulatorWidgetConfig_drag
         --, fmapLabelShow "drag" $ _handleWidget_dragged brHandle
         --, fmapLabelShow "modify" modifyEv
-        ]
+        ] -- <> map (\(x,h) -> fmapLabelShow (show x) (_handleWidget_dragged h)) (zip handleTypes handles)
 
 
       let
@@ -152,6 +153,7 @@ makeBoxManipWidget BoxManipWidgetConfig {..} = mdo
           return $ case mmbox of
             Nothing -> Nothing
             Just MBox {..} -> case mremakelp of
+              -- TODO somewhere along the way, this code path stopped being used :(
               -- TODO lBox_from_canonicalLBox
               Just lp -> assert (ms == ManipStart && bht == BH_BR) $ Just $ (,) Manipulating $ Right $
                 (lp, SEltLabel "<box>" $ SEltBox $ SBox (LBox (_lBox_ul _mBox_box) (V2 dx dy)) def)
