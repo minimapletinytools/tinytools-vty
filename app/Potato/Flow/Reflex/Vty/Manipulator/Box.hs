@@ -120,8 +120,8 @@ makeBoxManipWidget BoxManipWidgetConfig {..} = mdo
         let handlePosBeh = ffor2 _boxManipWidgetConfig_panPos (current boxManip_dlboxDyn) (makeCornerHandlePos bht)
         holdHandle $ HandleWidgetConfig {
             _handleWidgetConfig_pfctx = _boxManipWidgetConfig_pfctx
-            , _handleWidgetConfig_position = handlePosBeh
-            , _handleWidgetConfig_graphic = constant $ manipChar bht
+            , _handleWidgetConfig_box = fmap (\(x,y) -> LBox (V2 x y) (V2 1 1)) handlePosBeh
+            , _handleWidgetConfig_graphic = constant $ Just $ manipChar bht
             , _handleWidgetConfig_dragEv = _boxManipWidgetConfig_drag
             , _handleWidgetConfig_forceDrag = if bht == BH_BR then _boxManipWidgetConfig_isNewElt else constant False
           }

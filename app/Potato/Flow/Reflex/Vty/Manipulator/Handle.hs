@@ -12,6 +12,7 @@ module Potato.Flow.Reflex.Vty.Manipulator.Handle (
 
 import           Relude
 
+import           Potato.Flow
 import           Potato.Flow.Reflex.Vty.Manipulator.Types
 import           Potato.Flow.Reflex.Vty.PFWidgetCtx
 import           Potato.Reflex.Vty.Helpers
@@ -39,8 +40,8 @@ isManipulating _              = True
 
 data HandleWidgetConfig t = HandleWidgetConfig {
   _handleWidgetConfig_pfctx       :: PFWidgetCtx t
-  , _handleWidgetConfig_position  :: Behavior t (Int, Int)
-  , _handleWidgetConfig_graphic   :: Behavior t Char
+  , _handleWidgetConfig_box       :: Behavior t LBox
+  , _handleWidgetConfig_graphic   :: Behavior t (Maybe Char)
   , _handleWidgetConfig_dragEv    :: Event t ((Int,Int), Drag2)
 
   -- N.B. very sensitive to timing, this needs to sync up one frame after networkHold
@@ -59,8 +60,8 @@ holdHandle :: forall t m. (Reflex t, MonadHold t m, MonadFix m)
 holdHandle HandleWidgetConfig {..} = do
   -- draw image
   tellImages $ ffor
-    (ffor3 _handleWidgetConfig_position _handleWidgetConfig_graphic (current . _pFWidgetCtx_attr_manipulator $ _handleWidgetConfig_pfctx) (,,))
-    $ \((x,y),graphic,attr) -> [V.translate x y $ V.charFill attr graphic 1 1]
+    (ffor3 _handleWidgetConfig_box _handleWidgetConfig_graphic (current . _pFWidgetCtx_attr_manipulator $ _handleWidgetConfig_pfctx) (,,))
+    $ \(LBox (V2 x y) (V2 w h),mgraphic,attr) -> maybe [] (\graphic -> [V.translate x y $ V.charFill attr graphic w h]) mgraphic
 
   -- handle input
   let
@@ -69,9 +70,10 @@ holdHandle HandleWidgetConfig {..} = do
       -> (ManipState, Maybe (Int, Int))
       -> PushM t (Maybe (ManipState, Maybe (Int, Int)))
     trackMouse (forceDrag, (Drag2 (fromX, fromY) (toX, toY) _ _ dstate)) (tracking, _) = do
-      (x,y) <- sample _handleWidgetConfig_position
+      box <- sample _handleWidgetConfig_box
       return $ case dstate of
-        DragStart -> if (fromX, fromY) == (x,y)
+        -- TODO
+        DragStart -> if does_LBox_contains_XY box (V2 fromX fromY)
           then Just (ManipJustStart,  Nothing)
           else Nothing
         Dragging | forceDrag || tracking == ManipJustStart ->
