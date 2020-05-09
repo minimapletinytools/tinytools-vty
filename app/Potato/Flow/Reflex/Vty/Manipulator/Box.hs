@@ -47,7 +47,7 @@ manipChar BH_R  = Just '║'
 manipChar BH_A  = Nothing --Just '$'
 
 
---let brBeh = ffor2 _manipulatorWidgetConfig_panPos (current boxManip_dlboxDyn) (makeHandleBox bht)
+--let brBeh = ffor2 _manipulatorWidgetConfig_panPos (current lBoxDyn) (makeHandleBox bht)
 
 makeHandleBox ::
   BoxHandleType
@@ -104,14 +104,17 @@ makeBoxManipWidget :: forall t m. (MonadWidget t m)
   => BoxManipWidgetConfig t
   -> VtyWidget t m (ManipWidget t m)
 makeBoxManipWidget BoxManipWidgetConfig {..} = mdo
-  -- TODO you should prob split into functions...
-  -- BOX MANIPULATOR
   let
     boxManip_selectedEv = _boxManipWidgetConfig_updated
-    boxManip_dmBox = fmap snd boxManip_selectedEv
-    boxManip_dlbox = fmap _mBox_box boxManip_dmBox
-  boxManip_dynBox <- holdDyn Nothing (fmap Just boxManip_dmBox)
-  boxManip_dlboxDyn <- holdDyn (LBox 0 0) boxManip_dlbox
+    mBoxEv = fmap snd boxManip_selectedEv
+    lBoxEv = fmap _mBox_box mBoxEv
+
+
+  -- TODO fmap canonicalLBox_from_lBox
+  mBoxDyn <- holdDyn Nothing (fmap Just mBoxEv)
+  -- TODO make this into a maybe and fmap _mBox_box mBoxDyn
+  lBoxDyn <- holdDyn (LBox 0 0) lBoxEv
+
 
   let
     boxManip :: ManipWidget t m
@@ -120,7 +123,7 @@ makeBoxManipWidget BoxManipWidgetConfig {..} = mdo
       let
         handleTypes = [BH_BR, BH_TL, BH_TR, BH_BL, BH_A]
       handles <- forM handleTypes $ \bht -> do
-        let handleBoxBeh = ffor2 _boxManipWidgetConfig_panPos (current boxManip_dlboxDyn) (makeHandleBox bht)
+        let handleBoxBeh = ffor2 _boxManipWidgetConfig_panPos (current lBoxDyn) (makeHandleBox bht)
         holdHandle $ HandleWidgetConfig {
             _handleWidgetConfig_pfctx = _boxManipWidgetConfig_pfctx
             , _handleWidgetConfig_box = handleBoxBeh
@@ -143,14 +146,16 @@ makeBoxManipWidget BoxManipWidgetConfig {..} = mdo
       let
         pushfn :: (BoxHandleType, (ManipState, (Int, Int))) -> PushM t (Maybe (ManipState, Either ControllersWithId (LayerPos, SEltLabel)))
         pushfn (bht, (ms, (dx, dy))) = do
-          mmbox <- sample . current $ boxManip_dynBox
+          mmbox <- sample . current $ mBoxDyn
           mremakelp <- sample _boxManipWidgetConfig_wasLastModifyAdd
 
           return $ case mmbox of
             Nothing -> Nothing
             Just MBox {..} -> case mremakelp of
+              -- TODO lBox_from_canonicalLBox
               Just lp -> assert (ms == ManipStart && bht == BH_BR) $ Just $ (,) Manipulating $ Right $
                 (lp, SEltLabel "<box>" $ SEltBox $ SBox (LBox (_lBox_ul _mBox_box) (V2 dx dy)) def)
+              -- TODO deltaLBox_via_canonicalLBox
               Nothing -> Just $ (,) ms $ Left $ IM.singleton _mBox_target $ CTagBox :=> (Identity $ CBox {
                   _cBox_deltaBox = makeDeltaBox bht (dx, dy)
                 })
