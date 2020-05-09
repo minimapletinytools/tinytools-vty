@@ -36,6 +36,7 @@ import           Reflex.Vty
 data BoxHandleType = BH_TL | BH_TR | BH_BL | BH_BR | BH_T | BH_B | BH_L | BH_R | BH_A deriving (Show, Eq, Enum)
 
 manipChar :: BoxHandleType -> Maybe Char
+-- TODO Switch these all to something else since corners will flip sides
 manipChar BH_TL = Just '╝'
 manipChar BH_TR = Just '╚'
 manipChar BH_BL = Just '╗'
@@ -61,13 +62,16 @@ makeHandleBox bht (px, py) mlbox = case mlbox of
     BH_TL -> LBox (V2 l t) (V2 1 1)
     BH_TR -> LBox (V2 r t) (V2 1 1)
     BH_BL -> LBox (V2 l b) (V2 1 1)
-    BH_A  -> LBox (V2 (l+1) (t+1)) (V2 w h)
+    BH_A  -> clbox
     _     -> error "not supported yet"
     where
-      l = x+px-1
-      t = y+py-1
-      r = x+px+w
-      b = y+py+h
+      CanonicalLBox _ _ clbox = canonicalLBox_from_lBox $ LBox (V2 (x+px) (y+py)) (V2 w h)
+      nudgex = if w < 0 then 1 else 0
+      nudgey = if h < 0 then 1 else 0
+      l = x+px-1 + nudgex
+      t = y+py-1 + nudgey
+      r = x+px+w - nudgex
+      b = y+py+h - nudgey
 
 
 --Just $ (,) ms $ Left $ IM.singleton _mBox_target $ CTagBox :=> (Identity $ CBox {
@@ -108,7 +112,6 @@ makeBoxManipWidget :: forall t m. (MonadWidget t m)
 makeBoxManipWidget BoxManipWidgetConfig {..} = mdo
   let
     boxManip_selectedEv = _boxManipWidgetConfig_updated
-  -- TODO fmap canonicalLBox_from_lBox
   mBoxDyn <- holdDyn Nothing
      $ fmap Just
      $ fmap snd boxManip_selectedEv
@@ -154,10 +157,8 @@ makeBoxManipWidget BoxManipWidgetConfig {..} = mdo
             Just MBox {..} -> case mremakelp of
               -- TODO somewhere along the way, this code path stopped being used :(
                 -- it's because _boxManipWidgetConfig_wasLastModifyAdd is False for a frame
-              -- TODO lBox_from_canonicalLBox
               Just lp -> assert (ms == ManipStart && bht == BH_BR) $ Just $ (,) Manipulating $ Right $
                 (lp, SEltLabel "<box>" $ SEltBox $ SBox (LBox (_lBox_ul _mBox_box) (V2 dx dy)) def)
-              -- TODO deltaLBox_via_canonicalLBox
               Nothing -> Just $ (,) ms $ Left $ IM.singleton _mBox_target $ CTagBox :=> (Identity $ CBox {
                   _cBox_deltaBox = makeDeltaBox bht (dx, dy)
                 })
