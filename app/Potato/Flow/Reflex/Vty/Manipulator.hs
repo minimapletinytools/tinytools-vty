@@ -134,7 +134,7 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
 
   debugStream [
     never
-    , fmapLabelShow "manip" $ manipulateEv
+    --, fmapLabelShow "manip" $ manipulateEv
     --, fmapLabelShow "dynManip" $ selectionChangedEv
     --, fmapLabelShow "dynManip" $ selectManip MTagBox
     --, fmapLabelShow "changes" $ _sEltLayerTree_changeView $ _pfo_layers $ _pFWidgetCtx_pfo _manipulatorWigetConfig_pfctx

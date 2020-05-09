@@ -85,7 +85,7 @@ holdHandle HandleWidgetConfig {..} = do
 
   trackingDyn <- foldDynMaybeM trackMouse (ManipEnd, Nothing) $ attach _handleWidgetConfig_forceDrag $ fmap snd _handleWidgetConfig_dragEv
 
-  debugStream [fmapLabelShow "drag" $ _handleWidgetConfig_dragEv]
+  --debugStream [fmapLabelShow "drag" $ _handleWidgetConfig_dragEv]
 
   return
     HandleWidget {

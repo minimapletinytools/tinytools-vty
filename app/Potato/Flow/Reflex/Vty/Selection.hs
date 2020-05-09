@@ -14,6 +14,7 @@ import           Reflex.Potato.Helpers
 
 import           Control.Monad.Fix
 import qualified Data.IntMap.Strict                 as IM
+import qualified Data.List                          as L
 import           Data.Maybe
 import           Data.These
 
@@ -27,8 +28,13 @@ data SelectionManagerConfig t = SelectionManagerConfig {
   , _selectionManagerConfig_newElt_layerPos :: Event t (LayerPos, SEltLabel)
   -- connect to _sEltLayerTree_changeView
   , _selectionManagerConfig_sEltLayerTree   :: SEltLayerTree t
+
+
   -- TODO use Dynamic Seq instead maybe
   , _selectionManagerConfig_select          :: Event t [LayerPos]
+  -- connect to _canvasWidget_select
+  -- left is select just one, right is select many (canvas is unaware of ordering)
+  , _selectionManagerConfig_selectByREltId  :: Event t (Either [REltId] [REltId])
 }
 
 data SelectionManager t = SelectionManager {
@@ -40,29 +46,51 @@ holdSelectionManager :: forall t m. (Reflex t, MonadHold t m, MonadFix m)
   -> m (SelectionManager t)
 holdSelectionManager SelectionManagerConfig {..} = do
   let
+    -- ::selection from newly created element::
     newSingle = fmapMaybe (\im -> if IM.size im == 1 then IM.lookupMin im else Nothing)
       $ _sEltLayerTree_changeView _selectionManagerConfig_sEltLayerTree
     selFromVeryNew_alignfn = \case
       These (lp,sl) (rid,_) -> Just [Just (rid, lp, sl)]
       _ -> Nothing
-
     -- we make an unchecked assumption that these two events coincide and refer to the same new element
     -- we do this funny align so we can attach the layer position and ensure the element is actually new and not just modified
+    -- TODO add an assert that they are indeed the same elt
     selFromVeryNew :: Event t ([SuperSEltLabel])
     selFromVeryNew = fmap (fmap fromJust) $ alignEventWithMaybe selFromVeryNew_alignfn _selectionManagerConfig_newElt_layerPos newSingle
+
+    -- ::selection from LayersWidget::
     selFromLayers :: Event t ([SuperSEltLabel])
     selFromLayers = fmap (fmap fromJust) $ sEltLayerTree_tagSuperSEltsByPos _selectionManagerConfig_sEltLayerTree _selectionManagerConfig_select
     -- PARTIAL the above should never fail if layers is working correctly so I would rather it crash for now
     -- non-partial version:
     --selFromLayers = fmapMaybe sequence $ sEltLayerTree_tagSuperSEltsByPos _selectionManagerConfig_sEltLayerTree _selectionManagerConfig_select
 
-    selectedNew = leftmostwarn "SelectionManager - selectedNew"
-      [fmap (\x -> (True,  x)) selFromVeryNew
-      , fmap (\x -> (False, x)) selFromLayers]
+    -- ::selection from CanvasWidget::
+    potatoTotalDyn = _pfo_potato_potatoTotal $ _pFWidgetCtx_pfo _selectionManagerConfig_pfctx
+    pushSelFromCanvas :: Either [REltId] [REltId] -> PushM t [SuperSEltLabel]
+    pushSelFromCanvas erids = do
+      pt <- sample . current $ potatoTotalDyn
+      let
+        -- PARTIAL
+        mapToLp = map (\rid -> (rid, fromJust . _potatoTotal_layerPosMap pt $ rid))
+        lps = case erids of
+          Left rids  -> case mapToLp rids of
+            [] -> []
+            xs -> [L.maximumBy (\(_,lp1) (_,lp2) -> compare lp2 lp1) xs]
+          Right rids -> mapToLp rids
+      return $ map (\(rid,lp) -> (rid, lp, _potatoTotal_sEltLabelMap pt IM.! rid)) lps
+    selFromCanvas :: Event t ([SuperSEltLabel])
+    selFromCanvas = pushAlways pushSelFromCanvas _selectionManagerConfig_selectByREltId
 
-  let
+    -- ::selection doesn't change but contes do change::
     selChangesFromModified :: Event t (REltIdMap (Maybe SEltLabel))
     selChangesFromModified = fmap (fmap snd) $ _sEltLayerTree_changeView _selectionManagerConfig_sEltLayerTree
+
+    -- ::combine everything togethr
+    selectedNew = leftmostwarn "SelectionManager - selectedNew"
+      [fmap (\x -> (True,  x)) selFromVeryNew
+      , fmap (\x -> (False, x)) selFromLayers
+      , fmap (\x -> (False, x)) selFromCanvas]
 
     selectedInputEv :: Event t (These (Bool, [SuperSEltLabel]) (REltIdMap (Maybe SEltLabel)))
     selectedInputEv = alignEventWithMaybe Just selectedNew selChangesFromModified

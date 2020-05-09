@@ -83,6 +83,7 @@ mainPFWidget = mdo
       , _selectionManagerConfig_newElt_layerPos = doNewElt
       , _selectionManagerConfig_sEltLayerTree = _pfo_layers pfo
       , _selectionManagerConfig_select = _layerWidget_select layersW
+      , _selectionManagerConfig_selectByREltId = _canvasWidget_select canvasW
     }
 
   -- main panels
@@ -90,7 +91,7 @@ mainPFWidget = mdo
     leftPanel = col $ do
       fixed 5 $ debugStream [
         never
-        , fmapLabelShow "undo" $ _canvasWidget_addSEltLabel canvasW
+        --, fmapLabelShow "undo" $ _canvasWidget_addSEltLabel canvasW
         --, fmapLabelShow "input" inp
         --, fmapLabelShow "tool" (_toolWidget_tool toolsW)
         --, fmapLabelShow "canvas size" $ updated . _canvas_box $ _pfo_canvas pfo
@@ -127,6 +128,7 @@ mainPFWidget = mdo
   let
     consumingKeyboard = ffor2 (_canvasWidget_consumingKeyboard canvasW) (_paramsWidget_consumingKeyboard paramsW) (||)
 
+  -- TODO place new elt at end of current selection
   -- prep newAdd event
   -- MANY FRAMES
   let
