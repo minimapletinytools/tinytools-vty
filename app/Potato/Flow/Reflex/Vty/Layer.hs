@@ -17,6 +17,7 @@ import           Potato.Reflex.Vty.Helpers
 import           Control.Monad.Fix
 import           Data.Tuple.Extra
 
+import qualified Graphics.Vty                       as V
 import           Reflex
 import           Reflex.Vty
 
@@ -29,7 +30,7 @@ data LayerWidgetConfig t = LayerWidgetConfig {
 }
 
 data LayerWidget t = LayerWidget {
-  _layerWidget_select       :: Event t LayerPos
+  _layerWidget_select       :: Event t [LayerPos]
   , _layerWidget_changeName :: Event t ControllersWithId
 }
 
@@ -39,15 +40,21 @@ holdLayerWidget :: forall t m. (Reflex t, Adjustable t m, PostBuild t m, MonadHo
 holdLayerWidget LayerWidgetConfig {..} = do
   --pw <- displayWidth
   --ph <- displayHeight
-  col $ do
-    fixed 1 $ debugFocus
-    fixed 1 $ text . current . fmap (show . length)$ _layerWidgetConfig_temp_sEltTree
-    --addButton <- fixed 3 $ textButtonStatic def "add"
-    -- note this is only possible because you added PostBuild to Layout
-    stretch $ col $ simpleList _layerWidgetConfig_temp_sEltTree $ \sseltl -> do
-      fixed 1 $ text $ current $ fmap (_sEltLabel_name . thd3) sseltl
+  switchClicks <- col $ mdo
+    --fixed 1 $ text . current . fmap (show . length)$ _layerWidgetConfig_temp_sEltTree
+    fixed 3 $ debugStream [never
+      --, fmapLabelShow "click" $ switchDyn switchClicks'
+      ]
+    -- NOTE this is only possible because you added PostBuild to Layout
+    clicks <- stretch $ col $ simpleList _layerWidgetConfig_temp_sEltTree $ \sseltl -> do
+      fixed 1 $ do
+        text $ current $ fmap (_sEltLabel_name . thd3) sseltl
+        void <$> mouseDown V.BLeft
+    let
+      switchClicks' = fmap (leftmost . zipWith (\i c -> c $> i) [0..]) clicks
+    return switchClicks'
   return LayerWidget {
-    _layerWidget_select = never
+    _layerWidget_select = fmap (:[]) $ switchDyn switchClicks
     , _layerWidget_changeName = never
   }
 

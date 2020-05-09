@@ -82,7 +82,7 @@ mainPFWidget = mdo
       _selectionManagerConfig_pfctx = pfctx
       , _selectionManagerConfig_newElt_layerPos = doNewElt
       , _selectionManagerConfig_sEltLayerTree = _pfo_layers pfo
-      , _selectionManagerConfig_select = never
+      , _selectionManagerConfig_select = _layerWidget_select layersW
     }
 
   -- main panels
@@ -106,8 +106,7 @@ mainPFWidget = mdo
 
       layers' <- stretch $ holdLayerWidget $ LayerWidgetConfig {
             _layerWidgetConfig_pfctx              = pfctx
-            -- TODO fix or delete
-            , _layerWidgetConfig_temp_sEltTree    = constDyn []
+            , _layerWidgetConfig_temp_sEltTree    = fmap potato_simplifyPotatoTotal $ _pfo_potato_potatoTotal pfo
             , _layerWidgetConfig_selectionManager = selectionManager
           }
       params' <- fixed 5 $ holdParamsWidget $ ParamsWidgetConfig {
