@@ -40,7 +40,10 @@ isManipulating _              = True
 
 data HandleWidgetConfig t = HandleWidgetConfig {
   _handleWidgetConfig_pfctx       :: PFWidgetCtx t
-  , _handleWidgetConfig_box       :: Behavior t LBox
+  -- | if this is Nothing, then the handle is effectively disabled
+  -- the reason we need to disable handles is so that Manipulators can handle creating themselves (and thus no handles would exist yet)
+  -- we do it inside of Handle to avoid switching to disable handles and just makes everything easier
+  , _handleWidgetConfig_mbox      :: Behavior t (Maybe LBox) -- ^ if this is Nothing, the handle is effecitvely disabled
   , _handleWidgetConfig_graphic   :: Behavior t (Maybe Char)
   , _handleWidgetConfig_dragEv    :: Event t ((Int,Int), Drag2)
 
@@ -60,8 +63,10 @@ holdHandle :: forall t m. (Reflex t, MonadHold t m, MonadFix m)
 holdHandle HandleWidgetConfig {..} = do
   -- draw image
   tellImages $ ffor
-    (ffor3 _handleWidgetConfig_box _handleWidgetConfig_graphic (current . _pFWidgetCtx_attr_manipulator $ _handleWidgetConfig_pfctx) (,,))
-    $ \(LBox (V2 x y) (V2 w h),mgraphic,attr) -> maybe [] (\graphic -> [V.translate x y $ V.charFill attr graphic w h]) mgraphic
+    (ffor3 _handleWidgetConfig_mbox _handleWidgetConfig_graphic (current . _pFWidgetCtx_attr_manipulator $ _handleWidgetConfig_pfctx) (,,))
+    $ \(mbox,mgraphic,attr) -> case mbox of
+      Nothing -> []
+      Just (LBox (V2 x y) (V2 w h)) -> maybe [] (\graphic -> [V.translate x y $ V.charFill attr graphic w h]) mgraphic
 
   -- handle input
   let
@@ -70,20 +75,22 @@ holdHandle HandleWidgetConfig {..} = do
       -> (ManipState, Maybe (Int, Int))
       -> PushM t (Maybe (ManipState, Maybe (Int, Int)))
     trackMouse (forceDrag, (Drag2 (fromX, fromY) (toX, toY) _ _ dstate)) (tracking, _) = do
-      box <- sample _handleWidgetConfig_box
-      return $ case dstate of
-        -- TODO
-        DragStart -> if does_LBox_contains_XY box (V2 fromX fromY)
-          then Just (ManipJustStart,  Nothing)
-          else Nothing
-        Dragging | forceDrag || tracking == ManipJustStart ->
-          Just (ManipStart, Just (toX-fromX, toY-fromY))
-        Dragging -> if tracking /= ManipEnd
-          then Just (Manipulating, Just (toX-fromX, toY-fromY))
-          else Nothing
-        DragEnd -> if tracking == Manipulating
-          then Just (ManipEnd, Just (toX-fromX, toY-fromY))
-          else Nothing
+      mbox <- sample _handleWidgetConfig_mbox
+      return $ case mbox of
+        Nothing -> Nothing
+        Just box -> case dstate of
+          -- TODO
+          DragStart -> if does_LBox_contains_XY box (V2 fromX fromY)
+            then Just (ManipJustStart,  Nothing)
+            else Nothing
+          Dragging | forceDrag || tracking == ManipJustStart ->
+            Just (ManipStart, Just (toX-fromX, toY-fromY))
+          Dragging -> if tracking /= ManipEnd
+            then Just (Manipulating, Just (toX-fromX, toY-fromY))
+            else Nothing
+          DragEnd -> if tracking == Manipulating
+            then Just (ManipEnd, Just (toX-fromX, toY-fromY))
+            else Nothing
 
   trackingDyn <- foldDynMaybeM trackMouse (ManipEnd, Nothing) $ attach _handleWidgetConfig_forceDrag $ fmap snd _handleWidgetConfig_dragEv
 

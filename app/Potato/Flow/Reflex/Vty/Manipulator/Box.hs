@@ -52,20 +52,22 @@ manipChar BH_A  = Just '$'
 makeHandleBox ::
   BoxHandleType
   -> (Int, Int) -- ^ canvas pan position
-  -> LBox -- ^ box being manipulated
-  -> LBox
-makeHandleBox bht (px, py) (LBox (V2 x y) (V2 w h)) = case bht of
-  BH_BR -> LBox (V2 r b) (V2 1 1)
-  BH_TL -> LBox (V2 l t) (V2 1 1)
-  BH_TR -> LBox (V2 r t) (V2 1 1)
-  BH_BL -> LBox (V2 l b) (V2 1 1)
-  BH_A  -> LBox (V2 (l+1) (t+1)) (V2 w h)
-  _     -> error "not supported yet"
-  where
-    l = x+px-1
-    t = y+py-1
-    r = x+px+w
-    b = y+py+h
+  -> Maybe LBox -- ^ box being manipulated
+  -> Maybe LBox
+makeHandleBox bht (px, py) mlbox = case mlbox of
+  Nothing -> Nothing
+  Just (LBox (V2 x y) (V2 w h)) -> Just $ case bht of
+    BH_BR -> LBox (V2 r b) (V2 1 1)
+    BH_TL -> LBox (V2 l t) (V2 1 1)
+    BH_TR -> LBox (V2 r t) (V2 1 1)
+    BH_BL -> LBox (V2 l b) (V2 1 1)
+    BH_A  -> LBox (V2 (l+1) (t+1)) (V2 w h)
+    _     -> error "not supported yet"
+    where
+      l = x+px-1
+      t = y+py-1
+      r = x+px+w
+      b = y+py+h
 
 
 --Just $ (,) ms $ Left $ IM.singleton _mBox_target $ CTagBox :=> (Identity $ CBox {
@@ -106,14 +108,10 @@ makeBoxManipWidget :: forall t m. (MonadWidget t m)
 makeBoxManipWidget BoxManipWidgetConfig {..} = mdo
   let
     boxManip_selectedEv = _boxManipWidgetConfig_updated
-    mBoxEv = fmap snd boxManip_selectedEv
-    lBoxEv = fmap _mBox_box mBoxEv
-
-
   -- TODO fmap canonicalLBox_from_lBox
-  mBoxDyn <- holdDyn Nothing (fmap Just mBoxEv)
-  -- TODO make this into a maybe and fmap _mBox_box mBoxDyn
-  lBoxDyn <- holdDyn (LBox 0 0) lBoxEv
+  mBoxDyn <- holdDyn Nothing
+     $ fmap Just
+     $ fmap snd boxManip_selectedEv
 
 
   let
@@ -123,10 +121,10 @@ makeBoxManipWidget BoxManipWidgetConfig {..} = mdo
       let
         handleTypes = [BH_BR, BH_TL, BH_TR, BH_BL, BH_A]
       handles <- forM handleTypes $ \bht -> do
-        let handleBoxBeh = ffor2 _boxManipWidgetConfig_panPos (current lBoxDyn) (makeHandleBox bht)
+        let mHandleBoxBeh = ffor2 _boxManipWidgetConfig_panPos (current (_mBox_box <<$>> mBoxDyn)) (makeHandleBox bht)
         holdHandle $ HandleWidgetConfig {
             _handleWidgetConfig_pfctx = _boxManipWidgetConfig_pfctx
-            , _handleWidgetConfig_box = handleBoxBeh
+            , _handleWidgetConfig_mbox = mHandleBoxBeh
             , _handleWidgetConfig_graphic = constant $ manipChar bht
             , _handleWidgetConfig_dragEv = _boxManipWidgetConfig_drag
             , _handleWidgetConfig_forceDrag = if bht == BH_BR then _boxManipWidgetConfig_isNewElt else constant False
@@ -135,7 +133,8 @@ makeBoxManipWidget BoxManipWidgetConfig {..} = mdo
         handleDragEv = leftmost $ fmap (\(bht, h) -> fmap (\x -> (bht,x)) $ _handleWidget_dragged h) $ zip handleTypes handles
         didCaptureInput = leftmost $ fmap _handleWidget_didCaptureInput handles
 
-      vLayoutPad 3 $ text $ fmap show _boxManipWidgetConfig_isNewElt
+      vLayoutPad 3 $ text $ (fmap show _boxManipWidgetConfig_isNewElt <> fmap show _boxManipWidgetConfig_wasLastModifyAdd)
+
       vLayoutPad 4 $ debugStream $ [
         never
         --, fmapLabelShow "dragging" $ _manipulatorWidgetConfig_drag
@@ -154,6 +153,7 @@ makeBoxManipWidget BoxManipWidgetConfig {..} = mdo
             Nothing -> Nothing
             Just MBox {..} -> case mremakelp of
               -- TODO somewhere along the way, this code path stopped being used :(
+                -- it's because _boxManipWidgetConfig_wasLastModifyAdd is False for a frame
               -- TODO lBox_from_canonicalLBox
               Just lp -> assert (ms == ManipStart && bht == BH_BR) $ Just $ (,) Manipulating $ Right $
                 (lp, SEltLabel "<box>" $ SEltBox $ SBox (LBox (_lBox_ul _mBox_box) (V2 dx dy)) def)
