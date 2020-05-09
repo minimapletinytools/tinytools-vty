@@ -33,32 +33,34 @@ import           Reflex.Network
 import           Reflex.Potato.Helpers
 import           Reflex.Vty
 
-data BoxHandleType = BH_TL | BH_TR | BH_BL | BH_BR | BH_T | BH_B | BH_L | BH_R deriving (Show, Eq, Enum)
+data BoxHandleType = BH_TL | BH_TR | BH_BL | BH_BR | BH_T | BH_B | BH_L | BH_R | BH_A deriving (Show, Eq, Enum)
 
-manipChar :: BoxHandleType -> Char
-manipChar BH_TL = '╝'
-manipChar BH_TR = '╚'
-manipChar BH_BL = '╗'
-manipChar BH_BR = '╔'
-manipChar BH_T  = '═'
-manipChar BH_B  = '═'
-manipChar BH_L  = '║'
-manipChar BH_R  = '║'
+manipChar :: BoxHandleType -> Maybe Char
+manipChar BH_TL = Just '╝'
+manipChar BH_TR = Just '╚'
+manipChar BH_BL = Just '╗'
+manipChar BH_BR = Just '╔'
+manipChar BH_T  = Just '═'
+manipChar BH_B  = Just '═'
+manipChar BH_L  = Just '║'
+manipChar BH_R  = Just '║'
+manipChar BH_A  = Nothing --Just '$'
 
 
---let brBeh = ffor2 _manipulatorWidgetConfig_panPos (current boxManip_dlboxDyn) (makeCornerHandlePos bht)
+--let brBeh = ffor2 _manipulatorWidgetConfig_panPos (current boxManip_dlboxDyn) (makeHandleBox bht)
 
-makeCornerHandlePos ::
+makeHandleBox ::
   BoxHandleType
   -> (Int, Int) -- ^ canvas pan position
   -> LBox -- ^ box being manipulated
-  -> (Int, Int)
-makeCornerHandlePos bht (px, py) (LBox (V2 x y) (V2 w h)) = case bht of
-  BH_BR -> (r, b)
-  BH_TL -> (l, t)
-  BH_TR -> (r, t)
-  BH_BL -> (l, b)
-  _     -> error "don't use this for non-corner handles"
+  -> LBox
+makeHandleBox bht (px, py) (LBox (V2 x y) (V2 w h)) = case bht of
+  BH_BR -> LBox (V2 r b) (V2 1 1)
+  BH_TL -> LBox (V2 l t) (V2 1 1)
+  BH_TR -> LBox (V2 r t) (V2 1 1)
+  BH_BL -> LBox (V2 l b) (V2 1 1)
+  BH_A  -> LBox (V2 (l+1) (t+1)) (V2 w h)
+  _     -> error "not supported yet"
   where
     l = x+px-1
     t = y+py-1
@@ -80,6 +82,7 @@ makeDeltaBox bht (dx,dy) = case bht of
   BH_B  -> DeltaLBox 0 (V2 0 dy)
   BH_L  -> DeltaLBox (V2 dx 0) (V2 (-dx) 0)
   BH_R  -> DeltaLBox 0 (V2 dx 0)
+  BH_A  -> DeltaLBox (V2 dx dy) (V2 0 0)
 
 
 data BoxManipWidgetConfig t = BoxManipWidgetConfig {
@@ -115,13 +118,13 @@ makeBoxManipWidget BoxManipWidgetConfig {..} = mdo
     boxManip = do
 
       let
-        handleTypes = [BH_BR, BH_TL, BH_TR, BH_BL]
+        handleTypes = [BH_BR, BH_TL, BH_TR, BH_BL, BH_A]
       handles <- forM handleTypes $ \bht -> do
-        let handlePosBeh = ffor2 _boxManipWidgetConfig_panPos (current boxManip_dlboxDyn) (makeCornerHandlePos bht)
+        let handleBoxBeh = ffor2 _boxManipWidgetConfig_panPos (current boxManip_dlboxDyn) (makeHandleBox bht)
         holdHandle $ HandleWidgetConfig {
             _handleWidgetConfig_pfctx = _boxManipWidgetConfig_pfctx
-            , _handleWidgetConfig_box = fmap (\(x,y) -> LBox (V2 x y) (V2 1 1)) handlePosBeh
-            , _handleWidgetConfig_graphic = constant $ Just $ manipChar bht
+            , _handleWidgetConfig_box = handleBoxBeh
+            , _handleWidgetConfig_graphic = constant $ manipChar bht
             , _handleWidgetConfig_dragEv = _boxManipWidgetConfig_drag
             , _handleWidgetConfig_forceDrag = if bht == BH_BR then _boxManipWidgetConfig_isNewElt else constant False
           }
