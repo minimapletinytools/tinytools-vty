@@ -1,0 +1,130 @@
+::LAYER AND SELECTION TYPES::
+
+-manipulator
+  -CSBoundingBox (always shows)
+    -get rid of MBox, just inherits CSBoundingBox
+      -need to figure out inversion issue still though
+    -does not show for null elements
+  -specific manipulator (per tool)
+    -must manage mouse hirerachy or guarantee that manipulators never overlap
+      -maybe hide manipulators on manipulation? Nah
+  -it would be nice if click once doesn't actually create  the element until
+    -dragging (as it is now)
+    -release (creates a box with default size)
+-canvas select
+  IGNORE-if cursor == CSSelect
+    -OnClick -> cursor = CSSelecting
+      -supresses manipulators
+        -how do I do this?
+    -OnClick/Drag -> select_LBox :: Event t LBox
+    -OnRelease -> cursor = CSSelect
+  -if cursor == CSSelect
+    -OnClick ->
+      -on element -> begin CSBoundingBox translate
+      -off element -> begin LBox selection
+        -OnRelease -> finish LBOx selection -> select_LBox :: Event t LBox
+    -this design matches illustrator behavior
+  -broadPhase_cull :: LBox -> [REltId]
+
+-selection manager
+  -input selection
+    -new element :: Event t (LayerPos, SEltLabel)
+    -layer click  :: Event t [LayerPos]
+    -canvas select :: Event t (REltId)
+  -output
+    -_selectionManager_selected :: Dynamic t (Bool, [SuperSEltLabel])
+        -consumed by Manipulators
+        -consumed by Params
+  -data/methods
+    -Data VisState = Visible | Hidden | Lock | Hidden/Lock
+    -Data VisStateInternal = InheritParent | VisStateInternal VisState
+    -reverse_layerPos :: REltId -> LayerPos
+    -status :: LayerPos -> VisState
+
+
+::UI NOTES::
+-vty
+  DONE/IGNORE-setup reader monad
+    -off pane click events
+    -blink timers
+    -escape key?
+  DONE-maybe some better way to deal with off pane dragging
+    DONE-also need to capture release events that happen off pane
+      -this can happen off screen too, maybe you can capture release events off screen? not sure
+        -if not, you'll have to check for a new click event and see if there was a prior release event
+    DONE-i.e. modify pane implementation to ignore drag events that started off pane
+  -text box that takes return key as confirming a text box and firing off a confirm event, also loses focus?
+  -pop up panes (e.g. to save to file or whatever)
+    -needs to take away focus from panes in the background
+      -we could ad-hoc solves this by having panes always out of focus if the pop up is in focus
+
+-layers
+  -folders
+    -click folder selects all contents
+    -deselect content of folder deselects all parent folders recursively
+  -hidden/locked/contracted
+    -need to keep track of which elts/folders are hidden/locked/contract
+    -need something that updates when layers change
+    -elt is locked/hidden if it's locked/hidden or any of its parents are locked/hidden
+  -rename
+  -multiselect
+    -highlights in canvas
+  -drag and drop
+-manipulators
+  DONE-need custom vty image widgets to draw canvas points
+    -captures mouse down events for dragging per handle
+      -each handle drag event triggers a modify event
+  DONE-do I need to focus when dragging handles?
+    -I think so, so that parents ignore dragging events when dragging handles
+  -cancel event to cancel drags
+  -first time modifies need to undo the creation of elt as well so you don't need to undo twice (once for modify and once for new elt)
+    -make sure layer position of new elt is tracked correctly
+  -text input box exact overlay
+    -if we use built in text input, it unfortunately will create a whitebox that covers other stuff...
+      -maybe you can at least make the box not white D:
+  -sline multi click when creating new one
+    -click same spot to finish?
+    -click drag to move line, what happens if it's an endpoint? corner?
+  -move cursor, you can move/resize via CBoundingBox even if just one thing is selected
+-renderer
+  DONE-hook up BroadPhase renderer
+  -ignore hidden
+-selecting
+  -ignore hidden/locked
+  -click select single
+  -click drag select many (draw bounding box)
+  -selected bounding box
+-params
+
+
+
+::TODO::
+DONE-move TODO into vty
+-move dynManipulator into selection
+-move create new elt into manipulator
+  -fix issue where manipulator still thinks it's in the first elt drag state for clickrelease elts (didn't go through manipulator new elt code)
+    -related issue, wasManipulating never true for newly created elts due to timing issue on isManipulatingDyn, not sure why this was ever working
+-do MBoundingBox manipulator
+  -use same code as MBox, but different behavior based on manipulateImmediately
+-get basic params working
+-you need to do monolithic layers because processing drag events using widgets individually gets way too expensive
+-consider storing visibility/lock states in SEltLabel
+-consider hiding handle during creation drag
+-do render order properly in Canvas
+
+
+
+::VTY CHANGES::
+-MonadNodeId constraint not needed for pane?
+-added PostBuild constraint to Layout
+-added splitH and splitHDrag
+  -maybe do splitHDrag0 and splitVDrag0 for versions that allow initial size
+  -try and combine code, prob not though..
+  -(note splitHDrag is using pane2 right now)
+-added pane2, propose to modify pane to use pane2 implementation
+MERGED-fixed an issue in `drag` where mouse down would trigger on wrong button
+  - `end && btn == btn'  -> Just $ Drag (x,y) (x,y) btn' mods' False`
+-added `Drag2` and `drag2` which can track drag start events
+  -TODO implement splitVDrag with Drag2 as an example
+-add default implementations of HasVtyInput, HasFocus and ImageWriter
+-added
