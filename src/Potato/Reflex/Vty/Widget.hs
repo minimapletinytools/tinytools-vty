@@ -19,7 +19,6 @@ module Potato.Reflex.Vty.Widget
   , DragState(..)
   , Drag2(..)
   , drag2
-  , drag2_start
   , SingleClick
   , singleClick
   , behaviorToggleWidget
@@ -161,11 +160,6 @@ drag2 btn = mdo
     newDrag = attachWithMaybe f (current dragD) inp
   dragD <- holdDyn Nothing $ Just <$> newDrag
   return (fmapMaybe id $ updated dragD)
-
-drag2_start :: (Reflex t) => Event t Drag2 -> Event t Drag2
-drag2_start = ffilter (\x -> _drag2_state x == DragStart)
-
-
 
 -- | Translates and crops an 'Image' so that it is contained by
 -- the given 'Region'.

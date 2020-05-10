@@ -18,10 +18,12 @@ import           Potato.Reflex.Vty.Widget
 
 
 import           Control.Monad.Fix
+import           Data.Align
 import qualified Data.Map                           as M
 import qualified Data.Sequence                      as Seq
 import qualified Data.Text                          as T
 import qualified Data.Text.Zipper                   as TZ
+import           Data.These
 import           Data.Tuple.Extra
 
 import qualified Graphics.Vty                       as V
@@ -97,9 +99,11 @@ layerRow child = do
 -- TODO folder option (need support for indentation, expand/contract folder, and hirerarchical visibility/lock)
 -- TODO visibility/lock input/output
 data LayerElementConfig t = LayerElementConfig {
-  _layerElementConfig_cancel :: Event t () -- ^ this fires when we want to force text input to lose its input focus
+  -- TODO
+  --_layerElementConfig_cancel :: Event t () -- ^ this fires when we want to cancel text input
+  _layerElementConfig_finalize :: Event t () -- ^ this fires when we want to force text input to lose its input focus
   --, _layerElementConfig_consumingMouse :: Behavior t Bool -- ^ why do I need this again?
-  , _layerElementConfig_text :: Dynamic t Text
+  , _layerElementConfig_text   :: Dynamic t Text
 }
 
 data LayerElement t = LayerElement {
@@ -132,7 +136,8 @@ holdLayerElement LayerElementConfig {..} = do
 
     movePressed' <- fixed 1 $ do
       text $ constant (T.singleton moveChar)
-      void <$> mouseDown V.BLeft
+      dragEv <- drag2 V.BLeft
+      return $ void $ ffilter (\x -> _drag2_state x == DragStart) dragEv
 
     fixed 1 $ return ()
     fixed 1 $ return ()
@@ -162,6 +167,8 @@ data LayerWidgetConfig t = LayerWidgetConfig {
 data LayerWidget t = LayerWidget {
   _layerWidget_select              :: Event t [LayerPos]
   , _layerWidget_changeName        :: Event t ControllersWithId
+  -- TODO expand to support multi-move
+  , _layerWidget_move              ::Event t (LayerPos, LayerPos)
   , _layerWidget_consumingKeyboard :: Behavior t Bool
 }
 
@@ -172,19 +179,31 @@ holdLayerWidget LayerWidgetConfig {..} = do
   let
     -- TODO don't listen to global events
     -- instead maybe listen to local events and also listen to lose focus event, or maybe that's a cancel?
+    -- event that finalizes text entry in LayerElts
     finalizeSet :: Event t ()
     finalizeSet = flip fmapMaybe (_pFWidgetCtx_ev_input _layerWidgetConfig_pfctx) $ \case
       V.EvKey (V.KEnter) [] -> Just ()
       V.EvMouseDown _ _ _ _ -> Just ()
       _                     -> Nothing
-
+    -- event tha tcancels text entry in LayerElts as well as cancel mouse drags
+    cancelInput :: Event t ()
+    cancelInput = leftmost [_pFWidgetCtx_ev_cancel _layerWidgetConfig_pfctx]
+    -- tracks if mouse was released anywhere including off pane (needed to cancel mouse drags)
+    -- TODO we can get rid of this if we switch to pane 2
+    mouseRelease :: Event t ()
+    mouseRelease = flip fmapMaybe (_pFWidgetCtx_ev_input _layerWidgetConfig_pfctx) $ \case
+      V.EvMouseUp _ _ _ -> Just ()
+      _                     -> Nothing
 
   --pw <- displayWidth
   --ph <- displayHeight
-  (switchClicks, consuming) <- col $ mdo
+  (clicks, move, consuming) <- col $ mdo
     --fixed 1 $ text . current . fmap (show . length)$ _layerWidgetConfig_temp_sEltTree
     fixed 3 $ debugStream [never
-      --, fmapLabelShow "click" $ switchDyn switchClicks'
+        , fmapLabelShow "move" $ move'
+        , fmapLabelShow "down" $ updated downPos
+        , fmapLabelShow "up" $ releaseOn
+      --, fmapLabelShow "click" $ switchDyn clicks'
       ]
 
     let
@@ -198,21 +217,45 @@ holdLayerWidget LayerWidgetConfig {..} = do
         --text $ current $ fmap (\(rid,lp,seltl) -> show rid <> " " <> _sEltLabel_name seltl) sseltlDyn
         --void <$> mouseDown V.BLeft
         holdLayerElement LayerElementConfig {
-            _layerElementConfig_cancel = finalizeSet
+            _layerElementConfig_finalize = finalizeSet
             , _layerElementConfig_text = fmap (\(rid,lp,seltl) -> show rid <> " " <> _sEltLabel_name seltl) sseltlDyn
           }
+    dummyRelease <- fixed 1 $ mouseUp
+
     let
       lelts = fmap M.toList lelts'
-      -- TODO lol
+      movePress = switchDyn $ fmap (leftmost . fmap (\(i,e) -> _layerElement_onMovePressed e $> i)) lelts
+      releaseOn' = switchDyn $ fmap (leftmost . fmap (\(i,e) -> _layerElement_onRelease e $> i)) lelts
+      releaseOn = leftmost [releaseOn', (fmap length (tag (current lelts) dummyRelease))]
+      clicks' = switchDyn $ fmap (leftmost . fmap (\(i,e) -> _layerElement_onClick e $> i)) lelts
+
+      -- TODO name change stuff
+
+      -- TODO fix this lol
       --leltsonly = fmap  (fmap (\(_,e) -> e)) lelts
       --consuming' = fmap (foldr (\b1 b2 -> ffor2 b1 b2 (||)) (constant False) $ fmap _layerElementConfig_consumingKeyboard) leltsonly
       consuming' = constant False
-      switchClicks' = fmap (leftmost . fmap (\(i,e) -> _layerElement_onClick e $> i)) lelts
 
-    return (switchClicks', consuming')
+      movePosFoldFn :: These Int () -> Int -> Int
+      movePosFoldFn (This lp) _      = lp
+      movePosFoldFn _              _ = -1
+
+    -- track which elt we clicked down on
+    downPos <- foldDyn movePosFoldFn (-1) $ align movePress (leftmost [cancelInput, difference mouseRelease movePress])
+    let
+      move' = flip push releaseOn $ \dst -> do
+        src <- sample . current $ downPos
+        return $ if src == -1
+          then Nothing
+          else Just $ (src, dst)
+    return (clicks', move', consuming')
+
   return LayerWidget {
-    _layerWidget_select = fmap (:[]) $ switchDyn switchClicks
+    -- TODO this is also kind of broken until you switch to pane2
+    _layerWidget_select = fmap (:[]) $ clicks
     , _layerWidget_changeName = never
+    -- TODO this is super broken until you switch to pane2
+    , _layerWidget_move = move
     , _layerWidget_consumingKeyboard = consuming
   }
 

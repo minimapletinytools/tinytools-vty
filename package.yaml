@@ -80,7 +80,7 @@ dependencies:
 - extra
 - lens
 - constraints-extras
-
+- semialign
 - mtl
 - data-default
 
