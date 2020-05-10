@@ -190,7 +190,48 @@ data LayerWidget t = LayerWidget {
 holdLayerWidget :: forall t m. (Reflex t, Adjustable t m, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m)
   => LayerWidgetConfig t
   -> VtyWidget t m (LayerWidget t)
-holdLayerWidget LayerWidgetConfig {..} = do
+holdLayerWidget = holdLayerWidgetOld
+--holdLayerWidget = holdLayerWidgetNothing
+
+-- for testing performance
+holdLayerWidgetNothing :: forall t m. (Reflex t, Adjustable t m, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m)
+  => LayerWidgetConfig t
+  -> VtyWidget t m (LayerWidget t)
+holdLayerWidgetNothing _ = return $ LayerWidget never never never (constant False)
+
+
+-- old version, doesn't do much but doesn't go super slow
+holdLayerWidgetOld :: forall t m. (Reflex t, Adjustable t m, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m)
+  => LayerWidgetConfig t
+  -> VtyWidget t m (LayerWidget t)
+holdLayerWidgetOld LayerWidgetConfig {..} = do
+  --pw <- displayWidth
+  --ph <- displayHeight
+  switchClicks <- col $ mdo
+    --fixed 1 $ text . current . fmap (show . length)$ _layerWidgetConfig_temp_sEltTree
+    fixed 3 $ debugStream [never
+      --, fmapLabelShow "click" $ switchDyn switchClicks'
+      ]
+    -- NOTE this is only possible because you added PostBuild to Layout
+    clicks <- stretch $ col $ simpleList _layerWidgetConfig_temp_sEltTree $ \sseltl -> do
+      fixed 1 $ do
+        text $ current $ fmap (_sEltLabel_name . thd3) sseltl
+        void <$> mouseDown V.BLeft
+    let
+      switchClicks' = fmap (leftmost . zipWith (\i c -> c $> i) [0..]) clicks
+    return switchClicks'
+  return LayerWidget {
+    _layerWidget_select = fmap (:[]) $ switchDyn switchClicks
+    , _layerWidget_changeName = never
+    , _layerWidget_move              = never
+    , _layerWidget_consumingKeyboard = constant False
+  }
+
+
+holdLayerWidgetNew :: forall t m. (Reflex t, Adjustable t m, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m)
+  => LayerWidgetConfig t
+  -> VtyWidget t m (LayerWidget t)
+holdLayerWidgetNew LayerWidgetConfig {..} = do
   let
     -- TODO don't listen to global events
     -- instead maybe listen to local events and also listen to lose focus event, or maybe that's a cancel?
