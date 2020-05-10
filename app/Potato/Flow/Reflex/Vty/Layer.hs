@@ -19,6 +19,8 @@ import           Potato.Reflex.Vty.Widget
 
 import           Control.Monad.Fix
 import           Data.Align
+import           Data.Dependent.Sum                 (DSum ((:=>)))
+import qualified Data.IntMap.Strict                 as IM
 import qualified Data.Map                           as M
 import qualified Data.Sequence                      as Seq
 import qualified Data.Text                          as T
@@ -99,18 +101,21 @@ layerRow child = do
 -- TODO folder option (need support for indentation, expand/contract folder, and hirerarchical visibility/lock)
 -- TODO visibility/lock input/output
 data LayerElementConfig t = LayerElementConfig {
+  _layerElementConfig_rEltId     :: REltId -- ^ just for convenience
   -- TODO
   --_layerElementConfig_cancel :: Event t () -- ^ this fires when we want to cancel text input
-  _layerElementConfig_finalize :: Event t () -- ^ this fires when we want to force text input to lose its input focus
+  , _layerElementConfig_finalize :: Event t () -- ^ this fires when we want to force text input to lose its input focus
   --, _layerElementConfig_consumingMouse :: Behavior t Bool -- ^ why do I need this again?
-  , _layerElementConfig_text   :: Dynamic t Text
+  -- dynamic is prob not necessary, I think this whole widget gets recreated anytime there are changes...
+  , _layerElementConfig_text     :: Dynamic t Text
 }
 
 data LayerElement t = LayerElement {
-  _layerElement_onMovePressed             :: Event t () -- ^ fires when mouse is pressed over the move icon
+  _layerElement_rEltId                    :: REltId -- ^ just for convenience
+  , _layerElement_onMovePressed           :: Event t () -- ^ fires when mouse is pressed over the move icon
   , _layerElement_onClick                 :: Event t () -- ^ fires when mouse is pressed and released anywhere over this element without moving anywhere else
   , _layerElement_onRelease               :: Event t () -- ^ fires when mouse is released anywhere over the element
-  , _layerElement_text                    :: Behavior t Text
+  , _layerElement_text                    :: Event t (Text, Text) -- ^ fires when _layerElementConfig_finalize fires IF there were any changes to the text
   , _layerElementConfig_consumingKeyboard :: Behavior t Bool
 }
 
@@ -122,6 +127,7 @@ holdLayerElement LayerElementConfig {..} = do
   text0 <- sample . current $ _layerElementConfig_text
 
   let
+    -- pretty sure updated _layerElementConfig_text is not necessary, see comments in LayerElementConfig
     modifyLayerTextEv = fmap (\t -> const (TZ.fromText t)) $ updated _layerElementConfig_text
     layerTextInputCfg = TextInputConfig {
         _textInputConfig_initialValue = TZ.fromText text0
@@ -133,25 +139,34 @@ holdLayerElement LayerElementConfig {..} = do
   click <- singleClick V.BLeft
   mouseUp <- mouseUp
   (movePressed, textInput) <- layerRow $ do
-
     movePressed' <- fixed 1 $ do
       text $ constant (T.singleton moveChar)
       dragEv <- drag2 V.BLeft
       return $ void $ ffilter (\x -> _drag2_state x == DragStart) dragEv
-
-    fixed 1 $ return ()
-    fixed 1 $ return ()
+    --fixed 1 $ return ()
+    --fixed 1 $ return ()
+    fixed 2 $ text (constant (show _layerElementConfig_rEltId))
     -- TODO need to create a pane that only passes mouse input if focused to allow click twice to edit text
     -- or make a textInput field that requires 2 clicks to enter edit mode (and listens to cancel events to lose "focus")
     text' <- stretch $ textInput layerTextInputCfg
     return (movePressed', current $ _textInput_value text')
 
+  let
+    textChangeEv = flip push _layerElementConfig_finalize $ \_ -> do
+      prevText <- sample . current $ _layerElementConfig_text
+      newText <- sample textInput
+      return $ if prevText /= newText
+        then Just (prevText, newText)
+        else Nothing
+
+
   return
     LayerElement {
-      _layerElement_onMovePressed = movePressed
+      _layerElement_rEltId = _layerElementConfig_rEltId
+      , _layerElement_onMovePressed = movePressed
       , _layerElement_onClick = void click
       , _layerElement_onRelease = void mouseUp
-      , _layerElement_text                    = textInput
+      , _layerElement_text                    = textChangeEv
       -- TODO true when "focused"
       , _layerElementConfig_consumingKeyboard = constant False
     }
@@ -197,7 +212,7 @@ holdLayerWidget LayerWidgetConfig {..} = do
 
   --pw <- displayWidth
   --ph <- displayHeight
-  (clicks, move, consuming) <- col $ mdo
+  (clicks, move, rename, consuming) <- col $ mdo
     --fixed 1 $ text . current . fmap (show . length)$ _layerWidgetConfig_temp_sEltTree
     fixed 3 $ debugStream [never
         , fmapLabelShow "move" $ move'
@@ -213,12 +228,14 @@ holdLayerWidget LayerWidgetConfig {..} = do
         $ fmap toList _layerWidgetConfig_temp_sEltTree
 
     lelts' <- stretch $ col $ list layermap $ \sseltlDyn -> do
+      -- gets recreated each time sseltlDyn changes so safe to sample here
+      -- TODO this is broken, always 0 for some reason, makes no sense
+      rid <- sample . current $ fmap (\(rid,_,_) -> rid) sseltlDyn
       fixed 1 $ do
-        --text $ current $ fmap (\(rid,lp,seltl) -> show rid <> " " <> _sEltLabel_name seltl) sseltlDyn
-        --void <$> mouseDown V.BLeft
         holdLayerElement LayerElementConfig {
-            _layerElementConfig_finalize = finalizeSet
-            , _layerElementConfig_text = fmap (\(rid,lp,seltl) -> show rid <> " " <> _sEltLabel_name seltl) sseltlDyn
+            _layerElementConfig_rEltId = rid
+            , _layerElementConfig_finalize = finalizeSet
+            , _layerElementConfig_text = fmap (\(_,_,seltl) ->_sEltLabel_name seltl) sseltlDyn
           }
     dummyRelease <- fixed 1 $ mouseUp
 
@@ -228,8 +245,6 @@ holdLayerWidget LayerWidgetConfig {..} = do
       releaseOn' = switchDyn $ fmap (leftmost . fmap (\(i,e) -> _layerElement_onRelease e $> i)) lelts
       releaseOn = leftmost [releaseOn', (fmap length (tag (current lelts) dummyRelease))]
       clicks' = switchDyn $ fmap (leftmost . fmap (\(i,e) -> _layerElement_onClick e $> i)) lelts
-
-      -- TODO name change stuff
 
       -- TODO fix this lol
       --leltsonly = fmap  (fmap (\(_,e) -> e)) lelts
@@ -248,12 +263,20 @@ holdLayerWidget LayerWidgetConfig {..} = do
         return $ if src == -1
           then Nothing
           else Just $ (src, dst)
-    return (clicks', move', consuming')
+
+    let
+      textChange' = switchDyn $ fmap (leftmost . fmap (\(i,e) -> fmap (\t -> (i,_layerElement_rEltId e,t)) (_layerElement_text e))) lelts
+      nameChangeFn :: (LayerPos, REltId, (Text, Text)) -> ControllersWithId
+      nameChangeFn (lp, rid, dt) = IM.singleton rid $ CTagRename :=> Identity (CRename dt)
+      rename' = fmap nameChangeFn textChange'
+
+    return (clicks', move', rename', consuming')
 
   return LayerWidget {
     -- TODO this is also kind of broken until you switch to pane2
     _layerWidget_select = fmap (:[]) $ clicks
-    , _layerWidget_changeName = never
+    -- TODO THIS DOES NOT WORK RIGHT NOW, REltId IS SET INCORRECTLY
+    , _layerWidget_changeName = rename
     -- TODO this is super broken until you switch to pane2
     , _layerWidget_move = move
     , _layerWidget_consumingKeyboard = consuming
