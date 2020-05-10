@@ -20,6 +20,9 @@ module Potato.Reflex.Vty.Widget
   , Drag2(..)
   , drag2
   , drag2_start
+  , SingleClick
+  , singleClick
+  , behaviorToggleWidget
   ) where
 
 import           Prelude
@@ -117,7 +120,7 @@ splitHDrag splitter0 wS wA wB = mdo
 
 data DragState = DragStart | Dragging | DragEnd deriving (Eq, Ord, Show)
 
--- | Information about a drag operation
+-- | Same as 'Drag' but able to track drag start case
 data Drag2 = Drag2
   { _drag2_from      :: (Int, Int) -- ^ Where the drag began
   , _drag2_to        :: (Int, Int) -- ^ Where the mouse currently is
@@ -127,7 +130,7 @@ data Drag2 = Drag2
   }
   deriving (Eq, Ord, Show)
 
--- | Converts raw vty mouse drag events into an event stream of 'Drag's
+-- | Same as 'drag' but returns 'Drag2' which tracks drag start events
 drag2
   :: (Reflex t, MonadFix m, MonadHold t m)
   => V.Button
@@ -181,13 +184,7 @@ withinImage (Region left top width height)
 -- * 'WaitingForInput' means state will be set on next 'EvMouseDown' event
 data MouseTrackingState = Tracking V.Button | NotTracking | WaitingForInput deriving (Show, Eq)
 
--- | Low-level widget combinator that runs a child 'VtyWidget' within
--- a given region and context. This widget filters and modifies the input
--- that the child widget receives such that:
--- * unfocused widgets receive no key events
--- * mouse inputs outside the region are ignored
--- * mouse inputs inside the region have their coordinates translated such
---   that (0,0) is the top-left corner of the region
+-- | same as pane except mouse drags that start off pane aren't reported and mouse drags that end off pane are reported
 pane2
   :: forall t m a. (Reflex t, MonadHold t m, MonadNodeId m, MonadFix m)
   => DynRegion t
@@ -240,3 +237,36 @@ pane2 dr foc child = VtyWidget $ do
   let images' = liftA2 (\r is -> map (withinImage r) is) reg images
   tellImages images'
   return result
+
+-- currently only works for a SINGLE POINT
+-- TODO integrate with pane2 so it reports clicks that happen on pane.
+data SingleClick = SingleClick
+  { _singleClick_button      :: V.Button
+  , _singleClick_coordinates :: (Int, Int) -- ^ coordinates of down click
+  , _singleClick_modifiers   :: [V.Modifier]
+  , _singleClick_didDragOff  :: Bool
+  }
+  deriving (Eq, Ord, Show)
+
+singleClick :: (Reflex t, MonadHold t m, MonadFix m) => V.Button -> VtyWidget t m (Event t SingleClick)
+singleClick btn = do
+  let
+    -- TODO implement for pane2 instead
+    withinBounds (Drag2 (fromX, fromY) (toX, toY) _ _ _) = fromX == toX && fromY == toY
+  dragEv <- drag2 btn
+  didDragOffDyn <- foldDyn (const . withinBounds) False dragEv
+  return $ flip push dragEv $ \d@(Drag2 (fromX, fromY) (toX, toY) _ mods _) -> do
+    didDragOff <- sample . current $ didDragOffDyn
+    return $ if withinBounds d
+      then Just $ SingleClick btn (fromX, fromY) mods didDragOff
+      else Nothing
+
+
+behaviorToggleWidget :: (Reflex t, MonadNodeId m) => Behavior t Bool -> VtyWidget t m a -> VtyWidget t m a -> VtyWidget t m (Behavior t a)
+behaviorToggleWidget toggle wa wb = VtyWidget $ do
+  ctx <- lift ask
+  (a, bas) <- lift . lift $ runVtyWidget ctx wa
+  (b, bbs) <- lift . lift $ runVtyWidget ctx wa
+  tellImages $ ffor2 toggle bas (\t xs -> if t then xs else [])
+  tellImages $ ffor2 toggle bbs (\t xs -> if not t then xs else [])
+  return $ fmap (\t -> if t then a else b) toggle

@@ -78,6 +78,7 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
     $ fmap (viaNonEmpty NE.head)
     $ fmap snd selectionChangedEv
   let
+    -- TODO this is broken
     wasLastModifyAdd = ffor3 (current isManipulatingDyn) newEltBeh selectionLayerPos (\m n lp -> if m && n then Just lp else Nothing)
 
   -- TODO mov ethis into Selection

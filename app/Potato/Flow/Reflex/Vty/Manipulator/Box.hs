@@ -116,11 +116,9 @@ makeBoxManipWidget BoxManipWidgetConfig {..} = mdo
      $ fmap Just
      $ fmap snd boxManip_selectedEv
 
-
   let
     boxManip :: ManipWidget t m
     boxManip = do
-
       let
         handleTypes = [BH_BR, BH_TL, BH_TR, BH_BL, BH_A]
       handles <- forM handleTypes $ \bht -> do
