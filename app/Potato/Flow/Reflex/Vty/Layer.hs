@@ -104,6 +104,7 @@ data LEltState = LEltState {
   , _lEltState_label         :: Text
   , _lEltState_layerPosition :: Maybe Int -- ^ Nothing if layer position is not known yet
   , _lEltState_selected      :: Bool
+
   , _lEltState_rEltId        :: Int -- ^ this is for debugging
 } deriving (Eq, Show)
 
@@ -130,8 +131,20 @@ holdLayerWidget LayerWidgetConfig {..} = do
     changesEv :: Event t (REltIdMap (Maybe SEltLabel))
     changesEv = fmap (fmap snd) $ _sEltLayerTree_changeView (_pfo_layers _pFWidgetCtx_pfo)
 
-    lEltStateMapDyn_foldfn :: REltIdMap (Maybe SEltLabel) -> REltIdMap LEltState -> REltIdMap LEltState
-    lEltStateMapDyn_foldfn seltlmap old_leltsmap = new_leltsmap where
+    selectedEv :: Event t ([(REltId, LayerPos)])
+    selectedEv = updated
+      $ fmap (fmap (\(rid,lp,_) -> (rid,lp)))
+      $ fmap snd
+      $ _selectionManager_selected _layerWidgetConfig_selectionManager
+
+    deselectAll :: REltIdMap LEltState -> REltIdMap LEltState
+    deselectAll = IM.map (\lelts -> lelts { _lEltState_selected = False } )
+    -- TODO selected element should expand folder of its parents
+    lEltStateMapDyn_foldfn_selected :: [(REltId, LayerPos)] -> REltIdMap LEltState -> REltIdMap LEltState
+    lEltStateMapDyn_foldfn_selected ridlps old_leltsmap =
+      foldr (\(rid,_) accm -> IM.adjust (\lelts -> lelts { _lEltState_selected = True }) rid accm) (deselectAll old_leltsmap) ridlps
+    lEltStateMapDyn_foldfn_changes :: REltIdMap (Maybe SEltLabel) -> REltIdMap LEltState -> REltIdMap LEltState
+    lEltStateMapDyn_foldfn_changes seltlmap old_leltsmap = new_leltsmap where
       only1_map_fn :: REltId -> Maybe SEltLabel -> LEltState
       only1_map_fn _ Nothing = error "expect deleted element to be  present in original map"
       -- TODO properly handle folders and whatever else needs to be added here
@@ -141,9 +154,16 @@ holdLayerWidget LayerWidgetConfig {..} = do
       combineFn rid _ lelts       = Just lelts
       new_leltsmap = IM.mergeWithKey combineFn (IM.mapWithKey only1_map_fn) id seltlmap old_leltsmap
 
+    lEltStateMapDyn_foldfn :: These [(REltId, LayerPos)] (REltIdMap (Maybe SEltLabel)) -> REltIdMap LEltState -> REltIdMap LEltState
+    lEltStateMapDyn_foldfn (This lps) = lEltStateMapDyn_foldfn_selected lps
+    lEltStateMapDyn_foldfn (That seltlmap) = lEltStateMapDyn_foldfn_changes seltlmap
+    lEltStateMapDyn_foldfn (These lps seltlmap) = lEltStateMapDyn_foldfn_selected lps . lEltStateMapDyn_foldfn_changes seltlmap
+
+
+  -- TODO figure out how to do proper deserialization of this on load (main issue is that rEltIds need to be rematched based on layer position in the LEltState)
   -- TODO Consider switching this to use Incremental/mergeIntIncremental
   lEltStateMapDyn' :: Dynamic t (REltIdMap LEltState)
-    <- foldDyn lEltStateMapDyn_foldfn IM.empty changesEv
+    <- foldDyn lEltStateMapDyn_foldfn IM.empty (align selectedEv changesEv)
   lEltStateMapDyn <- holdUniqDyn lEltStateMapDyn'
 
   let
@@ -153,6 +173,7 @@ holdLayerWidget LayerWidgetConfig {..} = do
     -- TODO rather than remaking this for every change, we should only do this if there are topology changes, and do per element updates otherwise
     lEltStateList :: Dynamic t (Seq LEltState)
     lEltStateList = ffor2 lEltStateMapDyn layerREltIdsDyn $ \leltsmap rids -> Seq.mapWithIndex (lEltStateList_mapfn leltsmap) rids
+
 
     -- TODO folder contraction
     lEltStateContractedList :: Dynamic t (Seq LEltState)
@@ -171,18 +192,19 @@ holdLayerWidget LayerWidgetConfig {..} = do
     prepLayersDyn :: Dynamic t (Seq (Int, LEltState))
     prepLayersDyn = fmap prepLayers_mapfn lEltStateContractedList
 
-    -- TODO fix ATTR
     makeImage :: Int -> (Int, LEltState) -> V.Image
-    makeImage width (ident, LEltState {..}) = V.text' lg_default . T.pack . L.take width
-      $ replicate ident ' '
-      -- <> [moveChar]
-      <> if' _lEltState_isFolderStart (if' _lEltState_contracted [expandChar] [closeChar]) []
-      <> if' _lEltState_hidden [hiddenChar] [visibleChar]
-      <> if' _lEltState_locked [lockedChar] [unlockedChar]
-      <> " "
-      <> show _lEltState_rEltId
-      <> " "
-      <> T.unpack _lEltState_label
+    makeImage width (ident, LEltState {..}) = r where
+      attr = if _lEltState_selected then lg_layer_selected else lg_default
+      r = V.text' attr . T.pack . L.take width
+        $ replicate ident ' '
+        -- <> [moveChar]
+        <> if' _lEltState_isFolderStart (if' _lEltState_contracted [expandChar] [closeChar]) []
+        <> if' _lEltState_hidden [hiddenChar] [visibleChar]
+        <> if' _lEltState_locked [lockedChar] [unlockedChar]
+        <> " "
+        <> show _lEltState_rEltId
+        <> " "
+        <> T.unpack _lEltState_label
 
     -- TODO thisseems to be cropping by one from the bottom
     -- I guess you can solvethis easily just by adding a certain padding allowance...
@@ -234,6 +256,7 @@ holdLayerWidget LayerWidgetConfig {..} = do
 
   debugStream [
     never
+    --, fmapLabelShow "selected" $ selectedEv
     --, fmapLabelShow "click" $ click
     --, fmapLabelShow "input" $ inp
     ]

@@ -99,6 +99,7 @@
 
 
 ::TODO::
+-figure out how you want to handle vty attributes
 -add keyboard manipulation to manipulators
 DONE-move TODO into vty
 -move dynManipulator into selection
