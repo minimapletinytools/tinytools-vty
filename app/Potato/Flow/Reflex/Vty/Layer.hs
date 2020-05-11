@@ -420,6 +420,7 @@ data LEltState = LEltState {
   , _lEltState_label         :: Text
   , _lEltState_layerPosition :: Maybe Int -- ^ Nothing if layer position is not known yet
   , _lEltState_selected      :: Bool
+  , _lEltState_rEltId        :: Int -- ^ this is for debugging
 } deriving (Eq, Show)
 
 
@@ -447,14 +448,14 @@ holdLayerWidgetNEW LayerWidgetConfig {..} = do
 
     lEltStateMapDyn_foldfn :: REltIdMap (Maybe SEltLabel) -> REltIdMap LEltState -> REltIdMap LEltState
     lEltStateMapDyn_foldfn seltlmap old_leltsmap = new_leltsmap where
-      only1_map_fn :: Maybe SEltLabel -> LEltState
-      only1_map_fn Nothing = error "expect deleted element to be  present in original map"
+      only1_map_fn :: REltId -> Maybe SEltLabel -> LEltState
+      only1_map_fn _ Nothing = error "expect deleted element to be  present in original map"
       -- TODO properly handle folders and whatever else needs to be added here
-      only1_map_fn (Just (SEltLabel label _)) = LEltState False False False False False label Nothing False
+      only1_map_fn rid (Just (SEltLabel label _)) = LEltState False False False False False label Nothing False rid
       combineFn :: REltId -> Maybe SEltLabel -> LEltState -> Maybe LEltState
       combineFn rid Nothing lelts = Nothing
       combineFn rid _ lelts       = Just lelts
-      new_leltsmap = IM.mergeWithKey combineFn (IM.map only1_map_fn) id seltlmap old_leltsmap
+      new_leltsmap = IM.mergeWithKey combineFn (IM.mapWithKey only1_map_fn) id seltlmap old_leltsmap
 
   -- TODO Consider switching this to use Incremental/mergeIntIncremental
   lEltStateMapDyn' :: Dynamic t (REltIdMap LEltState)
@@ -495,7 +496,7 @@ holdLayerWidgetNEW LayerWidgetConfig {..} = do
       <> if' _lEltState_hidden [hiddenChar] [visibleChar]
       <> if' _lEltState_locked [lockedChar] [unlockedChar]
       <> " "
-      <> show (fromJust _lEltState_layerPosition)
+      <> show _lEltState_rEltId
       <> " "
       <> T.unpack _lEltState_label
 
@@ -522,10 +523,26 @@ holdLayerWidgetNEW LayerWidgetConfig {..} = do
   tellImages images
 
   -- input stuff
-  click <- singleClick V.BLeft
-  --let
-    --selectEv_fmapfn :: ([(Int, LEltState)], )
-    --selecattach (current prepLayersDyn) click
+  click <- singleClick V.BLeft >>= return . fmap _singleClick_coordinates . ffilter (\x -> not $ _singleClick_didDragOff x)
+  --click <- mouseDown V.BLeft >>= return . fmap _mouseDown_coordinates
+  let
+    selectEv_pushfn :: (Int, Int) -> PushM t (Maybe LayerPos)
+    selectEv_pushfn (x',y') = do
+      pl <- sample . current $ prepLayersDyn
+      scrollPos <- sample . current $ lineIndexDyn
+      let
+        y = y' - padTop
+        mselected = Seq.lookup y pl
+      return $ case mselected of
+        Nothing -> Nothing
+        Just (ident, LEltState {..}) -> r where
+          -- TODO ignore clicks on buttons
+          x = x' - ident
+          -- TODO assert here to make sure it's not a Nothing
+          r = _lEltState_layerPosition
+
+    -- TODO shift select by adding to current selection
+    selectEv = fmap (:[]) $ push selectEv_pushfn click
 
   -- TODO buttons at the bottom
   -- TODO you probably want to put panes or something idk...
@@ -533,11 +550,12 @@ holdLayerWidgetNEW LayerWidgetConfig {..} = do
 
   debugStream [
     never
-      --, fmapLabelShow "input" $ inp
+    --, fmapLabelShow "click" $ click
+    --, fmapLabelShow "input" $ inp
     ]
 
   return LayerWidget {
-    _layerWidget_select = never
+    _layerWidget_select = selectEv
     , _layerWidget_changeName = never
     , _layerWidget_move = never
     , _layerWidget_consumingKeyboard = constant False

@@ -19,7 +19,7 @@ module Potato.Reflex.Vty.Widget
   , DragState(..)
   , Drag2(..)
   , drag2
-  , SingleClick
+  , SingleClick(..)
   , singleClick
   , behaviorToggleWidget
   ) where
@@ -248,11 +248,11 @@ singleClick btn = do
     -- TODO implement for pane2 instead
     withinBounds (Drag2 (fromX, fromY) (toX, toY) _ _ _) = fromX == toX && fromY == toY
   dragEv <- drag2 btn
-  didDragOffDyn <- foldDyn (const . withinBounds) False dragEv
+  didStayOnDyn <- foldDyn (const . withinBounds) False dragEv
   return $ flip push dragEv $ \d@(Drag2 (fromX, fromY) (toX, toY) _ mods _) -> do
-    didDragOff <- sample . current $ didDragOffDyn
+    didStayOn <- sample . current $ didStayOnDyn
     return $ if withinBounds d
-      then Just $ SingleClick btn (fromX, fromY) mods didDragOff
+      then Just $ SingleClick btn (fromX, fromY) mods (not didStayOn)
       else Nothing
 
 
