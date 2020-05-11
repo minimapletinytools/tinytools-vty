@@ -433,7 +433,7 @@ holdLayerWidgetNEW LayerWidgetConfig {..} = do
   inp <- input
   let
     padTop = 0
-    padBottom = 0
+    padBottom = 3
 
     regionDyn = ffor2 regionWidthDyn regionHeightDyn (,)
     PFWidgetCtx {..} = _layerWidgetConfig_pfctx
@@ -486,6 +486,7 @@ holdLayerWidgetNEW LayerWidgetConfig {..} = do
     prepLayersDyn :: Dynamic t (Seq (Int, LEltState))
     prepLayersDyn = fmap prepLayers_mapfn lEltStateContractedList
 
+    -- TODO fix ATTR
     makeImage :: Int -> (Int, LEltState) -> V.Image
     makeImage width (ident, LEltState {..}) = V.text' lg_default . T.pack . L.take width
       $ replicate ident ' '
@@ -498,9 +499,12 @@ holdLayerWidgetNEW LayerWidgetConfig {..} = do
       <> " "
       <> T.unpack _lEltState_label
 
+    -- TODO thisseems to be cropping by one from the bottom
+    -- I guess you can solvethis easily just by adding a certain padding allowance...
+    maxScroll :: Behavior t Int
+    maxScroll = current $ ffor2 lEltStateList regionDyn $ \leltss (_,h) -> max 0 (Seq.length leltss - h - padBottom)
 
 
-    -- TODO do proper bounds on scroll (should not be ale to scroll past bottom)
     -- sadly, mouse scroll events are kind of broken, so you need to do some in between event before you can scroll in the other direction
     requestedScroll :: Event t Int
     requestedScroll = ffor scrollEv $ \case
@@ -509,12 +513,12 @@ holdLayerWidgetNEW LayerWidgetConfig {..} = do
     updateLine maxN delta ix = min (max 0 (ix + delta)) maxN
   lineIndexDyn :: Dynamic t Int
     <- foldDyn (\(maxN, delta) ix -> updateLine (maxN - 1) delta ix) 0 $
-      attach (fmap ((+1) . Seq.length) $ current lEltStateList) requestedScroll
+      attach maxScroll requestedScroll
 
   let
     images :: Behavior t [V.Image]
     images = current $ fmap ((:[]) . V.vertCat) $ ffor3 regionDyn lineIndexDyn prepLayersDyn $ \(w,h) li pl ->
-      map (makeImage w) . L.take (max 0 (h-padBottom)) . L.drop li $ toList pl
+      map (makeImage w) . L.take (max 0 (h - padBottom)) . L.drop li $ toList pl
   tellImages images
 
   -- input stuff
@@ -522,6 +526,10 @@ holdLayerWidgetNEW LayerWidgetConfig {..} = do
   --let
     --selectEv_fmapfn :: ([(Int, LEltState)], )
     --selecattach (current prepLayersDyn) click
+
+  -- TODO buttons at the bottom
+  -- TODO you probably want to put panes or something idk...
+  -- actually fixed takes a dynamic..
 
   debugStream [
     never

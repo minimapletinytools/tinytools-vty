@@ -75,7 +75,7 @@ countEv ev = foldDyn (\_ b -> b+1) 0 ev
 
 vLayoutPad :: (PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m) => Int -> VtyWidget t m a -> VtyWidget t m a
 vLayoutPad n w = col $ do
-  fixed 5 $ return ()
+  fixed (constDyn n) $ return ()
   stretch w
 
 {-
