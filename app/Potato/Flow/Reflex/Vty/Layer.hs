@@ -11,6 +11,7 @@ module Potato.Flow.Reflex.Vty.Layer (
 import           Relude
 
 import           Potato.Flow
+import           Potato.Flow.Reflex.Vty.Attrs
 import           Potato.Flow.Reflex.Vty.PFWidgetCtx
 import           Potato.Flow.Reflex.Vty.Selection
 import           Potato.Reflex.Vty.Helpers
@@ -21,7 +22,9 @@ import           Control.Monad.Fix
 import           Data.Align
 import           Data.Dependent.Sum                 (DSum ((:=>)))
 import qualified Data.IntMap.Strict                 as IM
+import qualified Data.List                          as L
 import qualified Data.Map                           as M
+import           Data.Maybe                         (fromJust)
 import qualified Data.Sequence                      as Seq
 import qualified Data.Text                          as T
 import qualified Data.Text.Zipper                   as TZ
@@ -190,7 +193,8 @@ data LayerWidget t = LayerWidget {
 holdLayerWidget :: forall t m. (Reflex t, Adjustable t m, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m)
   => LayerWidgetConfig t
   -> VtyWidget t m (LayerWidget t)
-holdLayerWidget = holdLayerWidgetOld
+holdLayerWidget = holdLayerWidgetNEW
+--holdLayerWidget = holdLayerWidgetOld
 --holdLayerWidget = holdLayerWidgetNothing
 
 -- for testing performance
@@ -228,6 +232,7 @@ holdLayerWidgetOld LayerWidgetConfig {..} = do
   }
 
 
+-- this version has serious performance issues, probably due to all the mouse events being listened to
 holdLayerWidgetNew :: forall t m. (Reflex t, Adjustable t m, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m)
   => LayerWidgetConfig t
   -> VtyWidget t m (LayerWidget t)
@@ -395,3 +400,136 @@ label (rid, lp, SEltLabel name _) _ = mdo
       V.EvKey k _ -> Just ()
       _ -> Nothing
 -}
+
+
+
+
+
+{-# INLINE if' #-}
+if' :: Bool -> a -> a -> a
+if' True  x _ = x
+if' False _ y = y
+
+
+data LEltState = LEltState {
+  _lEltState_hidden          :: Bool
+  , _lEltState_locked        :: Bool
+  , _lEltState_contracted    :: Bool -- ^ only applies to folders
+  , _lEltState_isFolderStart :: Bool
+  , _lEltState_isFolderEnd   :: Bool
+  , _lEltState_label         :: Text
+  , _lEltState_layerPosition :: Maybe Int -- ^ Nothing if layer position is not known yet
+  , _lEltState_selected      :: Bool
+} deriving (Eq, Show)
+
+
+holdLayerWidgetNEW :: forall t m. (Reflex t, Adjustable t m, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m)
+  => LayerWidgetConfig t
+  -> VtyWidget t m (LayerWidget t)
+holdLayerWidgetNEW LayerWidgetConfig {..} = do
+  regionWidthDyn <- displayWidth
+  regionHeightDyn <- displayHeight
+  scrollEv <- mouseScroll
+  inp <- input
+  let
+    padTop = 0
+    padBottom = 0
+
+    regionDyn = ffor2 regionWidthDyn regionHeightDyn (,)
+    PFWidgetCtx {..} = _layerWidgetConfig_pfctx
+
+    layerREltIdsDyn :: Dynamic t (Seq REltId)
+    layerREltIdsDyn = _sEltLayerTree_view (_pfo_layers _pFWidgetCtx_pfo)
+
+    -- TODO unify with the one in Canvas
+    changesEv :: Event t (REltIdMap (Maybe SEltLabel))
+    changesEv = fmap (fmap snd) $ _sEltLayerTree_changeView (_pfo_layers _pFWidgetCtx_pfo)
+
+    lEltStateMapDyn_foldfn :: REltIdMap (Maybe SEltLabel) -> REltIdMap LEltState -> REltIdMap LEltState
+    lEltStateMapDyn_foldfn seltlmap old_leltsmap = new_leltsmap where
+      only1_map_fn :: Maybe SEltLabel -> LEltState
+      only1_map_fn Nothing = error "expect deleted element to be  present in original map"
+      -- TODO properly handle folders and whatever else needs to be added here
+      only1_map_fn (Just (SEltLabel label _)) = LEltState False False False False False label Nothing False
+      combineFn :: REltId -> Maybe SEltLabel -> LEltState -> Maybe LEltState
+      combineFn rid Nothing lelts = Nothing
+      combineFn rid _ lelts       = Just lelts
+      new_leltsmap = IM.mergeWithKey combineFn (IM.map only1_map_fn) id seltlmap old_leltsmap
+
+  -- TODO Consider switching this to use Incremental/mergeIntIncremental
+  lEltStateMapDyn' :: Dynamic t (REltIdMap LEltState)
+    <- foldDyn lEltStateMapDyn_foldfn IM.empty changesEv
+  lEltStateMapDyn <- holdUniqDyn lEltStateMapDyn'
+
+  let
+    lEltStateList_mapfn leltsmap lp rid = case IM.lookup rid leltsmap of
+      Nothing -> error $ "expected to find " <> show rid <> " in lEltStateMapDyn"
+      Just lelts -> lelts { _lEltState_layerPosition = Just lp }
+    -- TODO rather than remaking this for every change, we should only do this if there are topology changes, and do per element updates otherwise
+    lEltStateList :: Dynamic t (Seq LEltState)
+    lEltStateList = ffor2 lEltStateMapDyn layerREltIdsDyn $ \leltsmap rids -> Seq.mapWithIndex (lEltStateList_mapfn leltsmap) rids
+
+    -- TODO folder contraction
+    lEltStateContractedList :: Dynamic t (Seq LEltState)
+    lEltStateContractedList = lEltStateList
+
+    -- TODO change this to Seq
+    prepLayers_mapfn :: Seq LEltState -> [(Int, LEltState)] -- first Int is indentation level
+    prepLayers_mapfn leltss = r where
+      prepLayers_foldfn :: (Int, Int, [(Int, LEltState)]) -> Int -> LEltState -> (Int, Int, [(Int, LEltState)])
+      prepLayers_foldfn (ident, contr, acc) _ lelts = r where
+        -- TODO folders
+        newident = ident
+        newcontr = contr
+        r = (newident, newcontr, acc++[(newident,lelts)])
+      (_,_,r) = Seq.foldlWithIndex prepLayers_foldfn (0, 0, []) leltss
+    prepLayersDyn :: Dynamic t [(Int, LEltState)]
+    prepLayersDyn = fmap prepLayers_mapfn lEltStateContractedList
+
+    makeImage :: Int -> (Int, LEltState) -> V.Image
+    makeImage width (ident, LEltState {..}) = V.text' lg_default . T.pack . L.take width
+      $ replicate ident ' '
+      -- <> [moveChar]
+      <> if' _lEltState_isFolderStart (if' _lEltState_contracted [expandChar] [closeChar]) []
+      <> if' _lEltState_hidden [hiddenChar] [visibleChar]
+      <> if' _lEltState_locked [lockedChar] [unlockedChar]
+      <> " "
+      <> show (fromJust _lEltState_layerPosition)
+      <> " "
+      <> T.unpack _lEltState_label
+
+
+
+    -- sadly, mouse scroll events are kind of broken, so you need to do some in between event before you can scroll in the other direction
+    requestedScroll :: Event t Int
+    requestedScroll = ffor scrollEv $ \case
+      ScrollDirection_Up -> (-1)
+      ScrollDirection_Down -> 1
+    updateLine maxN delta ix = min (max 0 (ix + delta)) maxN
+  lineIndexDyn :: Dynamic t Int
+    <- foldDyn (\(maxN, delta) ix -> updateLine (maxN - 1) delta ix) 0 $
+      attach (fmap ((+1) . Seq.length) $ current lEltStateList) requestedScroll
+
+  let
+    images :: Behavior t [V.Image]
+    images = current $ fmap ((:[]) . V.vertCat) $ ffor3 regionDyn lineIndexDyn prepLayersDyn $ \(w,h) li pl ->
+      map (makeImage w) . L.take (max 0 (h-padBottom)) . L.drop li $ pl
+  tellImages images
+
+  -- input stuff
+  click <- singleClick V.BLeft
+  --let
+    --selectEv_fmapfn :: ([(Int, LEltState)], )
+    --selecattach (current prepLayersDyn) click
+
+  debugStream [
+    never
+      --, fmapLabelShow "input" $ inp
+    ]
+
+  return LayerWidget {
+    _layerWidget_select = never
+    , _layerWidget_changeName = never
+    , _layerWidget_move = never
+    , _layerWidget_consumingKeyboard = constant False
+  }

@@ -99,6 +99,7 @@
 
 
 ::TODO::
+-add keyboard manipulation to manipulators
 DONE-move TODO into vty
 -move dynManipulator into selection
 -move create new elt into manipulator
