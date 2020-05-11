@@ -474,16 +474,16 @@ holdLayerWidgetNEW LayerWidgetConfig {..} = do
     lEltStateContractedList = lEltStateList
 
     -- TODO change this to Seq
-    prepLayers_mapfn :: Seq LEltState -> [(Int, LEltState)] -- first Int is indentation level
+    prepLayers_mapfn :: Seq LEltState -> Seq (Int, LEltState) -- first Int is indentation level
     prepLayers_mapfn leltss = r where
-      prepLayers_foldfn :: (Int, Int, [(Int, LEltState)]) -> Int -> LEltState -> (Int, Int, [(Int, LEltState)])
+      prepLayers_foldfn :: (Int, Int, Seq (Int, LEltState)) -> Int -> LEltState -> (Int, Int, Seq (Int, LEltState))
       prepLayers_foldfn (ident, contr, acc) _ lelts = r where
         -- TODO folders
         newident = ident
         newcontr = contr
-        r = (newident, newcontr, acc++[(newident,lelts)])
-      (_,_,r) = Seq.foldlWithIndex prepLayers_foldfn (0, 0, []) leltss
-    prepLayersDyn :: Dynamic t [(Int, LEltState)]
+        r = (newident, newcontr, acc Seq.|> (newident,lelts))
+      (_,_,r) = Seq.foldlWithIndex prepLayers_foldfn (0, 0, Seq.empty) leltss
+    prepLayersDyn :: Dynamic t (Seq (Int, LEltState))
     prepLayersDyn = fmap prepLayers_mapfn lEltStateContractedList
 
     makeImage :: Int -> (Int, LEltState) -> V.Image
@@ -500,6 +500,7 @@ holdLayerWidgetNEW LayerWidgetConfig {..} = do
 
 
 
+    -- TODO do proper bounds on scroll (should not be ale to scroll past bottom)
     -- sadly, mouse scroll events are kind of broken, so you need to do some in between event before you can scroll in the other direction
     requestedScroll :: Event t Int
     requestedScroll = ffor scrollEv $ \case
@@ -513,7 +514,7 @@ holdLayerWidgetNEW LayerWidgetConfig {..} = do
   let
     images :: Behavior t [V.Image]
     images = current $ fmap ((:[]) . V.vertCat) $ ffor3 regionDyn lineIndexDyn prepLayersDyn $ \(w,h) li pl ->
-      map (makeImage w) . L.take (max 0 (h-padBottom)) . L.drop li $ pl
+      map (makeImage w) . L.take (max 0 (h-padBottom)) . L.drop li $ toList pl
   tellImages images
 
   -- input stuff
