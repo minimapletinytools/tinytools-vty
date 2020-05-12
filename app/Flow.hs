@@ -109,7 +109,7 @@ mainPFWidget = mdo
         --, fmapLabelShow "render" $ fmap fst3 (_broadPhase_render broadPhase)
         --, fmapLabelShow "change" $ fmap (fmap snd) $ _sEltLayerTree_changeView (_pfo_layers pfo)
         ]
-      tools' <- fixed 3 $ holdToolsWidget $  ToolWidgetConfig {
+      tools' <- fixed 10 $ holdToolsWidget $  ToolWidgetConfig {
           _toolWidgetConfig_pfctx = pfctx
           , _toolWidgetConfig_consumingKeyboard = consumingKeyboard
           -- TODO hook up to new elt created I guess

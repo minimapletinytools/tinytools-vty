@@ -14,6 +14,7 @@ import           Relude
 import           Potato.Flow.Reflex.Vty.Attrs
 import           Potato.Flow.Reflex.Vty.CanvasPane
 import           Potato.Flow.Reflex.Vty.PFWidgetCtx
+import           Potato.Reflex.Vty.Helpers
 
 import           Control.Monad.Fix
 import           Control.Monad.NodeId
@@ -46,12 +47,12 @@ radioList buttonsDyn activeDyn = do
     buttons :: Dynamic t [((Int,Int,Int), Text, Bool)]
     buttons = ffor2 buttons' activeDyn $ fn where
       fn bs actives' = r where
-        actives = sort actives'
-        ifoldlfn (output, []) _ _ = (output, [])
-        ifoldlfn (output, a:as) i (l,t) = if i == a
+        actives = reverse $ sort actives'
+        ifoldrfn _ (l,t) (output, []) = ((l,t,False):output, [])
+        ifoldrfn i (l,t) (output, a:as) = if i == a
           then ((l,t,True):output, as)
-          else ((l,t,False):output, as)
-        (r,_) = L.ifoldl ifoldlfn ([],actives) bs
+          else ((l,t,False):output, a:as)
+        (r,_) = L.ifoldr ifoldrfn ([],actives) bs
     makeImage :: ((Int,Int,Int), Text, Bool) -> V.Image
     makeImage ((x,y,_), t, selected) = V.translate x y $ V.text' attr c where
       attr = lg_default --if selected then lg_layer_selected else lg_default
@@ -63,7 +64,7 @@ radioList buttonsDyn activeDyn = do
 
 
 
-data Tool = TSelect | TPan | TBox | TLine | TText deriving (Eq, Show)
+data Tool = TSelect | TPan | TBox | TLine | TText deriving (Eq, Show, Enum)
 
 tool_cursorState :: Tool -> CursorState
 tool_cursorState TPan = CSPan
@@ -88,22 +89,15 @@ onlyIfBeh ev beh = fmapMaybe (\(b,e) -> if b then Just e else Nothing) $ attach 
 holdToolsWidget :: forall t m. (PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m)
   => ToolWidgetConfig t
   -> VtyWidget t m (ToolWidget t)
-holdToolsWidget ToolWidgetConfig {..} = row $ do
+holdToolsWidget ToolWidgetConfig {..} = mdo
 
+  radioEvs <- radioList (constDyn ["s","╬","□","/","T"]) (fmap ((:[]) . fromEnum) dynTool)
   let
-    -- TODO active tool should use a different style, but that means every button needs its own config...
-    -- or make your own button method
-    bc = ButtonConfig (pure singleBoxStyle) (pure thickBoxStyle)
-    --bc = ButtonConfig (pure roundedBoxStyle) (pure roundedBoxStyle)
-
-  -- TODO tool highlighting based on dynTool
-  selectB <- fixed 3 $ textButton bc "s"
-  panB <- fixed 3 $ textButton bc "╬"
-  boxB <- fixed 3 $ textButton bc "□"
-  lineB <- fixed 3 $ textButton bc "/"
-  textB <- fixed 3 $ textButton bc "T"
-
-  --fixed 100 $ radioList (constDyn ["s","╬","□","/","T"]) (constDyn [])
+    selectB = void $ ffilter (==0) radioEvs
+    panB = void $ ffilter (==1) radioEvs
+    boxB = void $ ffilter (==2) radioEvs
+    lineB = void $ ffilter (==3) radioEvs
+    textB = void $ ffilter (==4) radioEvs
 
   let
     allowKB = fmap not _toolWidgetConfig_consumingKeyboard
@@ -111,6 +105,13 @@ holdToolsWidget ToolWidgetConfig {..} = row $ do
       V.EvKey (V.KChar k') [] | k' == k -> Just ()
       _ -> Nothing
     keyPressEv k = onlyIfBeh (keyPressEv' k) allowKB
+
+  vLayoutPad 4 $ debugStream [
+    never
+    , fmapLabelShow "radio" $ radioEvs
+    , fmapLabelShow "selected" $ fmap ((:[]) . fromEnum) (updated dynTool)
+    ]
+
 
   dynTool <- holdDyn TSelect $ leftmost
     [TSelect <$ leftmost
