@@ -84,6 +84,7 @@ dependencies:
 - mtl
 - data-default
 - aeson
+- ilist
 
 
 

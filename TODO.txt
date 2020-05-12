@@ -101,22 +101,23 @@
 ::TODO::
 -manipulator refactor
   -rearchitect
-    -selection manager shows mainpulator type
+    -selection manager shows manipulator type
     -tool choice shows manipulator type
       -unselects all
       -using tool unselects the tool
+  -cancel event to cancel manipulator drags 
   -add keyboard manipulation to manipulators
   -move dynManipulator into selection
   -move create new elt into manipulator
-    -fix issue where manipulator still thinks it's in the first elt drag state for clickrelease elts (didn't go through manipulator new elt code)
+    -fix issue where manipulator still thinks it's in the first elt drag state for click release elts (didn't go through manipulator new elt code)
       -related issue, wasManipulating never true for newly created elts due to timing issue on isManipulatingDyn, not sure why this was ever working
   -do MBoundingBox manipulator
     -use same code as MBox, but different behavior based on manipulateImmediately
 -tool highlighting
+-do proper implementation of shift select in selectionmanager
 
 -load file D: lots of work to do
--splitHDrag resizing is broken
--do proper implementation of shift select in selectionmanager
+DONE-splitHDrag resizing is broken
 -I want it so selected elements get a soft highlight in the background D:
   -this requires changing canvas render implementation
   -maybe for now you can do annoying blink overlay D:
