@@ -122,8 +122,9 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
   let
     selectPushFn :: ((Int,Int),Drag2) -> PushM t (Maybe (Either [REltId] [REltId]))
     selectPushFn ((sx,sy), drag) = case drag of
-      Drag2 (fromX, fromY) (toX, toY) _ _ _ -> do
+      Drag2 (fromX, fromY) (toX, toY) _ mods _ -> do
         let
+          shiftClick = isJust $ find (==V.MShift) mods
           boxSize = V2 (toX-fromX) (toY-fromY)
           selectBox = LBox (V2 (fromX-sx) (fromY-sy)) boxSize
           selectType = if boxSize == 0 then Left else Right

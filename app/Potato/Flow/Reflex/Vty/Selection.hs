@@ -30,6 +30,7 @@ data SelectionManagerConfig t = SelectionManagerConfig {
   , _selectionManagerConfig_sEltLayerTree   :: SEltLayerTree t
 
 
+  -- TODO change both these events to except Bool parameter of whether to add to selection or not. See code in Layer
   -- TODO use Dynamic Seq instead maybe
   , _selectionManagerConfig_select          :: Event t [LayerPos]
   -- connect to _canvasWidget_select

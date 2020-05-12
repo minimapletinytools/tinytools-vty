@@ -81,7 +81,7 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
     -- TODO this is broken
     wasLastModifyAdd = ffor3 (current isManipulatingDyn) newEltBeh selectionLayerPos (\m n lp -> if m && n then Just lp else Nothing)
 
-  -- TODO mov ethis into Selection
+  -- TODO move this into Selection
   -- ::convert to Manipulator EventSelector::
   dynManipulator <- toManipulator $ fmap snd selectionChangedEv
   -- see comments on 'manipWidget'
