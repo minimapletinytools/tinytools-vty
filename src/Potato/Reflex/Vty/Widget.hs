@@ -93,8 +93,8 @@ splitHDrag splitter0 wS wA wB = mdo
   dragE <- drag V.BLeft
   splitterCheckpoint <- holdDyn splitter0 $ leftmost [fst <$> ffilter snd dragSplitter, resizeSplitter]
   splitterPos <- holdDyn splitter0 $ leftmost [fst <$> dragSplitter, resizeSplitter]
-  splitterFrac <- holdDyn (integralFractionalDivide splitter0 w0) $ ffor (attach (current dh) (fst <$> dragSplitter)) $ \(h, x) ->
-    fromIntegral x / (max 1 (fromIntegral h))
+  splitterFrac <- holdDyn (integralFractionalDivide splitter0 w0) $ ffor (attach (current dw) (fst <$> dragSplitter)) $ \(w, x) ->
+    fromIntegral x / (max 1 (fromIntegral w))
   let dragSplitter = fforMaybe (attach (current splitterCheckpoint) dragE) $
         \(splitterX, Drag (fromX, _) (toX, _) _ _ end) ->
           if splitterX == fromX then Just (toX, end) else Nothing
@@ -102,7 +102,7 @@ splitHDrag splitter0 wS wA wB = mdo
       regS = DynRegion splitterPos 0 1 dh
       regB = DynRegion (splitterPos + 1) 0 (dw - splitterPos - 1) dh
       resizeSplitter = ffor (attach (current splitterFrac) (updated dw)) $
-        \(frac, h) -> round (frac * fromIntegral h)
+        \(frac, w) -> round (frac * fromIntegral w)
   focA <- holdDyn True $ leftmost
     [ True <$ mA
     , False <$ mB
