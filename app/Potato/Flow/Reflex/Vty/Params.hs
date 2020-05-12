@@ -36,12 +36,12 @@ data ParamsWidget t = ParamsWidget {
 holdParamsWidget :: forall t m. (PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m)
   => ParamsWidgetConfig t
   -> VtyWidget t m (ParamsWidget t)
-holdParamsWidget ParamsWidgetConfig {..} = row $ do
+holdParamsWidget ParamsWidgetConfig {..} = do
   --let
   --  selected :: Dynamic t [SuperSEltLabel]
   --  selected = fmap snd $ _selectionManager_selected _paramsWidgetConfig_selectionManager
 
-
+  fill '#'
 
   return ParamsWidget {
     -- TODO

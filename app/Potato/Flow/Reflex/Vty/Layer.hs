@@ -154,7 +154,8 @@ data LEltState = LEltState {
 holdLayerWidget :: forall t m. (Reflex t, Adjustable t m, PostBuild t m, NotReady t m,  MonadHold t m, MonadFix m, MonadNodeId m)
   => LayerWidgetConfig t
   -> VtyWidget t m (LayerWidget t)
-holdLayerWidget _ = return $ LayerWidget never never never (constant False)
+--holdLayerWidget _ = return $ LayerWidget never never never (constant False)
+holdLayerWidget = holdLayerWidget'
 
 
 holdLayerWidget' :: forall t m. (Reflex t, Adjustable t m, PostBuild t m, NotReady t m,  MonadHold t m, MonadFix m, MonadNodeId m)
@@ -174,7 +175,8 @@ holdLayerWidget' LayerWidgetConfig {..} = do
     finalizeSet :: Event t ()
     finalizeSet = flip fmapMaybe inp $ \case
       V.EvKey (V.KEnter) [] -> Just ()
-      V.EvMouseDown _ _ _ _ -> Just ()
+      -- TODO this should not capture scroll events
+      -- V.EvMouseDown _ _ _ _ -> Just ()
       _                     -> Nothing
 
     loseFocus = fmapMaybe (\x -> if not x then Just () else Nothing) $ updated focusDyn
@@ -190,7 +192,7 @@ holdLayerWidget' LayerWidgetConfig {..} = do
       _                     -> Nothing
 
     padTop = 0
-    padBottom = 3
+    padBottom = 0
     regionDyn = ffor2 regionWidthDyn regionHeightDyn (,)
 
 
@@ -264,15 +266,16 @@ holdLayerWidget' LayerWidgetConfig {..} = do
     -- TODO this seems to be cropping by one too much from the bottom
     -- I guess you can solvethis easily just by adding a certain padding allowance...
     maxScroll :: Behavior t Int
-    maxScroll = current $ ffor2 lEltStateList regionDyn $ \leltss (_,h) -> max 0 (Seq.length leltss - h - padBottom)
+    maxScroll = current $ ffor2 lEltStateList regionDyn $ \leltss (_,h) -> max 0 (Seq.length leltss - h + padBottom)
     -- sadly, mouse scroll events are kind of broken, so you need to do some in between event before you can scroll in the other direction
     requestedScroll :: Event t Int
     requestedScroll = ffor scrollEv $ \case
       ScrollDirection_Up -> (-1)
       ScrollDirection_Down -> 1
     updateLine maxN delta ix = min (max 0 (ix + delta)) maxN
+  -- TODO this doesn't pick up on latest maxScroll changes, not a big deal
   lineIndexDyn :: Dynamic t Int
-    <- foldDyn (\(maxN, delta) ix -> updateLine (maxN - 1) delta ix) 0 $
+    <- foldDyn (\(maxN, delta) ix -> updateLine maxN delta ix) 0 $
       attach maxScroll requestedScroll
 
   -- ::actually draw images::
@@ -303,14 +306,13 @@ holdLayerWidget' LayerWidgetConfig {..} = do
   click <- singleClick V.BLeft >>= return . ffilter (\x -> not $ _singleClick_didDragOff x)
   --click <- mouseDown V.BLeft >>= return . fmap _mouseDown_coordinates
   let
-    -- TODO this is not handling scroll position right
     -- return value is (layer position, indentation, relative (x,y) of click, LEltState)
     layerMouse_pushfn :: (Int, Int) -> PushM t (Maybe (LayerPos, Int, (Int,Int), LEltState))
     layerMouse_pushfn (x',y') = do
       pl <- sample . current $ prepLayersDyn
       scrollPos <- sample . current $ lineIndexDyn
       let
-        y = y' - padTop
+        y = y' - padTop + scrollPos
         mselected = Seq.lookup y pl
       return $ case mselected of
         Nothing -> Nothing
@@ -359,9 +361,8 @@ holdLayerWidget' LayerWidgetConfig {..} = do
     labelWidgetDynFoldFn (Left _) _ = return (return never)
     labelWidgetDynFoldFn (Right (ident, (x,y_orig), LEltState{..})) _ = return $ do
 
-      scroll_orig <- sample . current $ lineIndexDyn
       let
-        yDyn = fmap (\scroll ->  y_orig + (scroll-scroll_orig)) lineIndexDyn
+        yDyn = fmap (\scroll ->  y_orig  - scroll) lineIndexDyn
         -- convert relevant input
         labelInput = fforMaybe (attach (current yDyn) inp) $ \(y,mm) -> case mm of
           V.EvMouseDown x y btn' mods -> if x > 2
@@ -392,12 +393,20 @@ holdLayerWidget' LayerWidgetConfig {..} = do
   -- TODO you probably want to put panes or something idk...
   -- actually fixed takes a dynamic..
 
+  vLayoutPad 5 $ debugStreamBeh [
+      ""
+      --, fmapLabelShow "scroll" maxScroll
+      --, fmapLabelShow "line" (current lineIndexDyn)
+      --, fmapLabelShow "region" (current regionDyn)
+    ]
+
   vLayoutPad 20 $ debugStream [
     never
     --, fmapLabelShow "changeNameEv" $ changeNameEv
     --, fmapLabelShow "changes" $ changesEv
     --, fmapLabelShow "selected" $ selectedEv
     --, fmapLabelShow "click" $ click
+    --, fmapLabelShow "lineIndex" $ updated lineIndexDyn
     --, fmapLabelShow "input" $ inp
     ]
 
