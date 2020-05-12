@@ -228,12 +228,14 @@ holdLayerWidget LayerWidgetConfig {..} = do
       map (makeImage w) . L.take (max 0 (h - padBottom)) . L.drop li $ toList pl
   tellImages images
 
+  selectedDyn <- holdDyn [] selectedEv
+
   -- input stuff
-  click <- singleClick V.BLeft >>= return . fmap _singleClick_coordinates . ffilter (\x -> not $ _singleClick_didDragOff x)
+  click <- singleClick V.BLeft >>= return . ffilter (\x -> not $ _singleClick_didDragOff x)
   --click <- mouseDown V.BLeft >>= return . fmap _mouseDown_coordinates
   let
-    selectEv_pushfn :: (Int, Int) -> PushM t (Maybe LayerPos)
-    selectEv_pushfn (x',y') = do
+    layerMouse_pushfn :: (Int, Int) -> PushM t (Maybe (LayerPos, Int))
+    layerMouse_pushfn (x',y') = do
       pl <- sample . current $ prepLayersDyn
       scrollPos <- sample . current $ lineIndexDyn
       let
@@ -245,10 +247,30 @@ holdLayerWidget LayerWidgetConfig {..} = do
           -- TODO ignore clicks on buttons
           x = x' - ident
           -- TODO assert here to make sure it's not a Nothing
-          r = _lEltState_layerPosition
+          r = case _lEltState_layerPosition of
+            Nothing -> error "expected layer position to be set"
+            Just lp -> Just (lp, x)
+
+    selectEv_pushfn :: SingleClick -> PushM t (Maybe [LayerPos])
+    selectEv_pushfn SingleClick {..} =  do
+      let
+        pos = _singleClick_coordinates
+        shiftClick = isJust $ find (==V.MShift) _singleClick_modifiers
+
+      layerMouse_pushfn pos >>= \case
+        Nothing -> return Nothing
+        Just (lp, x) -> if not shiftClick
+          then return $ Just [lp]
+          else do
+            currentSelection <- sample . current $ selectedDyn >>= return . map snd
+            let
+              (found,newSelection') = foldl' (\(found',xs) x -> if x == lp then (True, xs) else (found', x:xs)) (False,[]) currentSelection
+              newSelection = if found then newSelection' else lp:newSelection'
+            return $ Just newSelection
+
 
     -- TODO shift select by adding to current selection
-    selectEv = fmap (:[]) $ push selectEv_pushfn click
+    selectEv = push selectEv_pushfn click
 
   -- TODO buttons at the bottom
   -- TODO you probably want to put panes or something idk...

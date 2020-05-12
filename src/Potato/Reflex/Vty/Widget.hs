@@ -249,9 +249,9 @@ singleClick btn = do
     withinBounds (Drag2 (fromX, fromY) (toX, toY) _ _ _) = fromX == toX && fromY == toY
   dragEv <- drag2 btn
   didStayOnDyn <- foldDyn (const . withinBounds) False dragEv
-  return $ flip push dragEv $ \d@(Drag2 (fromX, fromY) (toX, toY) _ mods _) -> do
+  return $ flip push dragEv $ \d@(Drag2 (fromX, fromY) (toX, toY) _ mods ds) -> do
     didStayOn <- sample . current $ didStayOnDyn
-    return $ if withinBounds d
+    return $ if ds == DragEnd && withinBounds d
       then Just $ SingleClick btn (fromX, fromY) mods (not didStayOn)
       else Nothing
 
