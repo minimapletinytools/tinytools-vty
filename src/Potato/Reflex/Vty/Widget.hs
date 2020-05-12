@@ -74,6 +74,8 @@ splitH sizeFunD focD wA wB = do
   rb <- pane regB (snd <$> focD) wB
   return (ra,rb)
 
+integralFractionalDivide :: (Integral a, Fractional b) => a -> a -> b
+integralFractionalDivide n d = fromIntegral n / fromIntegral d
 
 -- | A split of the available space into two parts with a draggable separator.
 -- Starts with half the space allocated to each, and the first pane has focus.
@@ -87,10 +89,11 @@ splitHDrag :: (Reflex t, MonadFix m, MonadHold t m, MonadNodeId m)
 splitHDrag splitter0 wS wA wB = mdo
   dh <- displayHeight
   dw <- displayWidth
+  w0 <- sample . current $ dw
   dragE <- drag V.BLeft
   splitterCheckpoint <- holdDyn splitter0 $ leftmost [fst <$> ffilter snd dragSplitter, resizeSplitter]
   splitterPos <- holdDyn splitter0 $ leftmost [fst <$> dragSplitter, resizeSplitter]
-  splitterFrac <- holdDyn ((1::Double) / 2) $ ffor (attach (current dh) (fst <$> dragSplitter)) $ \(h, x) ->
+  splitterFrac <- holdDyn (integralFractionalDivide splitter0 w0) $ ffor (attach (current dh) (fst <$> dragSplitter)) $ \(h, x) ->
     fromIntegral x / (max 1 (fromIntegral h))
   let dragSplitter = fforMaybe (attach (current splitterCheckpoint) dragE) $
         \(splitterX, Drag (fromX, _) (toX, _) _ _ end) ->
