@@ -99,6 +99,7 @@
 
 
 ::TODO::
+-splitHDrag resizing is broken 
 -do proper implementation of shift select in selectionmanager
 -I want it so selected elements get a soft highlight in the background D:
   -this requires changing canvas render implementation

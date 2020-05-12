@@ -101,6 +101,7 @@ layerEltTextInput i cfg = mdo
     ]
   click <- mouseDown V.BLeft
   let cursorAttrs = ffor f $ \x -> if x then cursorAttributes else V.defAttr
+  -- TODO consider deleting multi-line support here..
   let rows = (\w s c -> displayLines w V.defAttr c s)
         <$> dw
         <*> (mapZipper <$> _textInputConfig_display cfg <*> v)
@@ -159,21 +160,23 @@ holdLayerWidget LayerWidgetConfig {..} = do
   regionHeightDyn <- displayHeight
   scrollEv <- mouseScroll
   inp <- input
+  focusDyn <- focus
 
   let
     PFWidgetCtx {..} = _layerWidgetConfig_pfctx
 
-    -- TODO don't listen to global events
-    -- instead maybe listen to local events and also listen to lose focus event, or maybe that's a cancel?
     -- event that finalizes text entry in LayerElts
     finalizeSet :: Event t ()
-    finalizeSet = flip fmapMaybe (_pFWidgetCtx_ev_input) $ \case
+    finalizeSet = flip fmapMaybe inp $ \case
       V.EvKey (V.KEnter) [] -> Just ()
       V.EvMouseDown _ _ _ _ -> Just ()
       _                     -> Nothing
+
+    loseFocus = fmapMaybe (\x -> if not x then Just () else Nothing) $ updated focusDyn
     -- event tha tcancels text entry in LayerElts as well as cancel mouse drags
     cancelInput :: Event t ()
-    cancelInput = leftmost [_pFWidgetCtx_ev_cancel]
+    cancelInput = leftmost [_pFWidgetCtx_ev_cancel, loseFocus]
+
     -- tracks if mouse was released anywhere including off pane (needed to cancel mouse drags)
     -- TODO we can get rid of this if we switch to pane 2
     mouseRelease :: Event t ()
@@ -295,7 +298,9 @@ holdLayerWidget LayerWidgetConfig {..} = do
   click <- singleClick V.BLeft >>= return . ffilter (\x -> not $ _singleClick_didDragOff x)
   --click <- mouseDown V.BLeft >>= return . fmap _mouseDown_coordinates
   let
-    layerMouse_pushfn :: (Int, Int) -> PushM t (Maybe (LayerPos, (Int,Int), LEltState))
+    -- TODO this is not handling scroll position right
+    -- return value is (layer position, indentation, relative (x,y) of click, LEltState)
+    layerMouse_pushfn :: (Int, Int) -> PushM t (Maybe (LayerPos, Int, (Int,Int), LEltState))
     layerMouse_pushfn (x',y') = do
       pl <- sample . current $ prepLayersDyn
       scrollPos <- sample . current $ lineIndexDyn
@@ -309,20 +314,20 @@ holdLayerWidget LayerWidgetConfig {..} = do
           x = x' - ident
           r = case _lEltState_layerPosition of
             Nothing -> error "expected layer position to be set"
-            Just lp -> Just (lp, (x,y), lelts)
+            Just lp -> Just (lp, ident, (x,y), lelts)
 
     -- ::click event for renaming::
-    clickOnSelected_pushfn :: SingleClick -> PushM t (Maybe ((Int,Int), LEltState))
+    clickOnSelected_pushfn :: SingleClick -> PushM t (Maybe (Int, (Int,Int), LEltState))
     clickOnSelected_pushfn SingleClick {..} =  do
       let
         pos = _singleClick_coordinates
         nomods = null _singleClick_modifiers
       layerMouse_pushfn pos >>= \case
         Nothing -> return Nothing
-        Just (_, (x,y), lelts@LEltState {..}) -> if nomods && _lEltState_selected && x > 2
-          then return $ Just ((x,y), lelts)
+        Just (_, ident, (x,y), lelts@LEltState {..}) -> if nomods && _lEltState_selected && x > 2
+          then return $ Just (ident, (x,y), lelts)
           else return Nothing
-    clickOnSelectedEv :: Event t ((Int,Int), LEltState)
+    clickOnSelectedEv :: Event t (Int, (Int,Int), LEltState)
     clickOnSelectedEv = push clickOnSelected_pushfn click
 
     -- ::selecting::
@@ -333,7 +338,7 @@ holdLayerWidget LayerWidgetConfig {..} = do
         shiftClick = isJust $ find (==V.MShift) _singleClick_modifiers
       layerMouse_pushfn pos >>= \case
         Nothing -> return Nothing
-        Just (lp, (x,_), _) -> if not shiftClick
+        Just (lp, _, (x,_), _) -> if not shiftClick
           then return $ Just [lp]
           else do
             currentSelection <- sample . current $ selectedDyn >>= return . map snd
@@ -345,25 +350,31 @@ holdLayerWidget LayerWidgetConfig {..} = do
 
 
   let
-    labelWidgetDynFoldFn :: Either () ((Int,Int), LEltState) -> VtyWidget t m (Event t (ControllersWithId)) -> PushM t (VtyWidget t m (Event t (ControllersWithId)))
+    labelWidgetDynFoldFn :: Either () (Int, (Int,Int), LEltState) -> VtyWidget t m (Event t (ControllersWithId)) -> PushM t (VtyWidget t m (Event t (ControllersWithId)))
     labelWidgetDynFoldFn (Left _) _ = return (return never)
-    labelWidgetDynFoldFn (Right ((x,y), LEltState{..})) _ = return $ do
+    labelWidgetDynFoldFn (Right (ident, (x,y_orig), LEltState{..})) _ = return $ do
+
+      scroll_orig <- sample . current $ lineIndexDyn
       let
+        yDyn = fmap (\scroll ->  y_orig + (scroll-scroll_orig)) lineIndexDyn
         -- convert relevant input
-        labelInput = fforMaybe inp $ \case
+        labelInput = fforMaybe (attach (current yDyn) inp) $ \(y,mm) -> case mm of
           V.EvMouseDown x y btn' mods -> if x > 2
             then Just $ V.EvMouseDown (x-3) y btn' mods
             else Nothing
           V.EvKey k mods -> Just $ V.EvKey k mods
           _ -> Nothing
-      -- TODO need to create a pane to position layerEltTextInput (or do manual positioning)
-      t <- layerEltTextInput labelInput $ TextInputConfig (fromText _lEltState_label) never 0 (constDyn id)
+        paneRegionDyn = DynRegion (constDyn (ident+5)) yDyn (fmap (subtract ident) regionWidthDyn) 1
+      t <- pane paneRegionDyn (constDyn False) $ do
+        fill ' '
+        layerEltTextInput labelInput $ TextInputConfig (fromText _lEltState_label) never 0 (constDyn id)
       return $ flip push finalizeSet $ \_ -> do
         newText <- sample . current $ _textInput_value t
         return $ if _lEltState_label /= newText
           then Just $ IM.singleton _lEltState_rEltId $ CTagRename :=> Identity (CRename (_lEltState_label, newText))
           else Nothing
 
+  -- TODO this is soft breaking with tab character... (prob just disable tab navigation everywhere..)
   -- TODO finalizeSet needs to ignore cases where click on the textinput (maybe can ignore this using difference or see comments for finalizeSet)
   labelWidgetDyn :: Dynamic t (VtyWidget t m (Event t (ControllersWithId)))
     <- foldDynM labelWidgetDynFoldFn (return never)
@@ -378,8 +389,8 @@ holdLayerWidget LayerWidgetConfig {..} = do
 
   vLayoutPad 20 $ debugStream [
     never
-    , fmapLabelShow "changeNameEv" $ changeNameEv
-    , fmapLabelShow "changes" $ changesEv
+    --, fmapLabelShow "changeNameEv" $ changeNameEv
+    --, fmapLabelShow "changes" $ changesEv
     --, fmapLabelShow "selected" $ selectedEv
     --, fmapLabelShow "click" $ click
     --, fmapLabelShow "input" $ inp
