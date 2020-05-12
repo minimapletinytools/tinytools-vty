@@ -16,6 +16,7 @@ module Potato.Reflex.Vty.Helpers (
   , debugSize
   , dragTest
   , richTextConfig_simpleForeColorAttr
+  , debugStreamBeh
   , debugStream
   , fmapLabelShow
   , countEv
@@ -62,13 +63,17 @@ dragTest = do
 richTextConfig_simpleForeColorAttr :: (Reflex t) => RichTextConfig t
 richTextConfig_simpleForeColorAttr = RichTextConfig $ constant (V.defAttr { V.attrForeColor = V.SetTo V.yellow})
 
-fmapLabelShow :: (Reflex t, Show a) => Text -> Event t a -> Event t Text
+fmapLabelShow :: (Functor f, Show a) => Text -> f a -> f Text
 fmapLabelShow t = fmap (\x -> t <> ": " <> show x)
 
+-- TODO rename to debugStreamEv
 debugStream :: (Reflex t, MonadHold t m) => [Event t Text] -> VtyWidget t m ()
 debugStream evs = do
   t <- holdDyn "" $ mergeWith (\a b -> a <> "\n" <> b) evs
   richText richTextConfig_simpleForeColorAttr (current t)
+
+debugStreamBeh :: (Reflex t, MonadHold t m) => [Behavior t Text] -> VtyWidget t m ()
+debugStreamBeh behs = text $ foldr (liftA2 (\t1 t2 -> t1 <> " " <> t2)) "" behs
 
 countEv :: (Reflex t, MonadHold t m, MonadFix m) => Event t a -> m (Dynamic t Int)
 countEv ev = foldDyn (\_ b -> b+1) 0 ev
