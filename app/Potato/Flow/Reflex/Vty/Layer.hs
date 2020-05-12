@@ -151,11 +151,16 @@ data LEltState = LEltState {
   , _lEltState_rEltId        :: Int -- ^ this is for debugging (ok apparantly, I need this to do renaming, just be mindful when serializing/deserializing this)
 } deriving (Eq, Show)
 
-
 holdLayerWidget :: forall t m. (Reflex t, Adjustable t m, PostBuild t m, NotReady t m,  MonadHold t m, MonadFix m, MonadNodeId m)
   => LayerWidgetConfig t
   -> VtyWidget t m (LayerWidget t)
-holdLayerWidget LayerWidgetConfig {..} = do
+holdLayerWidget _ = return $ LayerWidget never never never (constant False)
+
+
+holdLayerWidget' :: forall t m. (Reflex t, Adjustable t m, PostBuild t m, NotReady t m,  MonadHold t m, MonadFix m, MonadNodeId m)
+  => LayerWidgetConfig t
+  -> VtyWidget t m (LayerWidget t)
+holdLayerWidget' LayerWidgetConfig {..} = do
   regionWidthDyn <- displayWidth
   regionHeightDyn <- displayHeight
   scrollEv <- mouseScroll

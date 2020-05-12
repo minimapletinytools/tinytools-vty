@@ -21,6 +21,7 @@ import           Potato.Reflex.Vty.Widget
 
 import           Control.Monad.Fix
 import           Control.Monad.NodeId
+import qualified Data.Aeson                         as Aeson
 import           Data.Time.Clock
 
 import qualified Graphics.Vty                       as V
@@ -41,6 +42,7 @@ mainPFWidget = mdo
   tickEv <- tickLossy 1 currentTime
   ticks <- foldDyn (+) (0 :: Int) (fmap (const 1) tickEv)
   inp <- input
+  postBuildEv <- getPostBuild
 
   let
     pfctx = PFWidgetCtx {
@@ -62,6 +64,9 @@ mainPFWidget = mdo
     redoEv = fforMaybe inp $ \case
       V.EvKey (V.KChar 'y') [V.MCtrl] -> Just ()
       _ -> Nothing
+    saveEv = fforMaybe inp $ \case
+      V.EvKey (V.KChar 's') [V.MCtrl] -> Just ()
+      _ -> Nothing
 
     pfc = PFConfig {
         _pfc_addElt     = doNewElt
@@ -69,12 +74,19 @@ mainPFWidget = mdo
         , _pfc_manipulate = leftmost [doManipulate, _layerWidget_changeName layersW]
         , _pfc_undo       = leftmost [undoEv, undoBeforeManipulate, undoBeforeNewAdd]
         , _pfc_redo       = redoEv
-        , _pfc_save = never
-        , _pfc_load = never
+        , _pfc_save = saveEv
+        , _pfc_load = never --fmapMaybe id loadFileEv
         , _pfc_resizeCanvas = never
         , _pfc_addFolder = never
       }
   pfo <- holdPF pfc
+
+  -- ::save/load file potato::
+  performEvent_ $ ffor (_pfo_saved pfo) $ \spf -> do
+    liftIO $ Aeson.encodeFile "potato.flow" spf
+
+  --loadFileEv <- performEvent $ ffor postBuildEv $ \_ -> do
+  --  liftIO $ Aeson.decodeFileStrict "potato.flow"
 
   -- ::selection stuff::
   selectionManager <- holdSelectionManager

@@ -83,6 +83,7 @@ dependencies:
 - semialign
 - mtl
 - data-default
+- aeson
 
 
 
