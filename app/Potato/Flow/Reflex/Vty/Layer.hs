@@ -27,6 +27,7 @@ import qualified Data.Map                           as M
 import           Data.Maybe                         (fromJust)
 import qualified Data.Sequence                      as Seq
 import qualified Data.Text                          as T
+import           Data.Text.Zipper
 import qualified Data.Text.Zipper                   as TZ
 import           Data.These
 import           Data.Tuple.Extra
@@ -72,11 +73,50 @@ updateTextZipperForLayers _ _ ev = case ev of
   V.EvKey V.KEnd []               -> TZ.end
   _                               -> id
 
-
 {-# INLINE if' #-}
 if' :: Bool -> a -> a -> a
 if' True  x _ = x
 if' False _ y = y
+
+
+-- | same as textInput but specialized for layers
+layerEltTextInput
+  :: (Reflex t, MonadHold t m, MonadFix m)
+  => Event t VtyEvent -- ^ input events filtered and modified for layers
+  -> TextInputConfig t
+  -> VtyWidget t m (TextInput t)
+layerEltTextInput i cfg = mdo
+  let
+    f = constDyn True
+  dh <- displayHeight
+  dw <- displayWidth
+  v <- foldDyn ($) (_textInputConfig_initialValue cfg) $ mergeWith (.)
+    [ uncurry (updateTextZipper (_textInputConfig_tabWidth cfg)) <$> attach (current dh) i
+    , _textInputConfig_modify cfg
+    , let displayInfo = (,) <$> current rows <*> scrollTop
+      in ffor (attach displayInfo click) $ \((dl, st), MouseDown _ (mx, my) _) ->
+        goToDisplayLinePosition mx (st + my) dl
+    ]
+  click <- mouseDown V.BLeft
+  let cursorAttrs = ffor f $ \x -> if x then cursorAttributes else V.defAttr
+  let rows = (\w s c -> displayLines w V.defAttr c s)
+        <$> dw
+        <*> (mapZipper <$> _textInputConfig_display cfg <*> v)
+        <*> cursorAttrs
+      img = images . _displayLines_spans <$> rows
+  y <- holdUniqDyn $ _displayLines_cursorY <$> rows
+  let newScrollTop :: Int -> (Int, Int) -> Int
+      newScrollTop st (h, cursorY)
+        | cursorY < st = cursorY
+        | cursorY >= st + h = cursorY - h + 1
+        | otherwise = st
+  let hy = attachWith newScrollTop scrollTop $ updated $ zipDyn dh y
+  scrollTop <- hold 0 hy
+  tellImages $ (\imgs st -> (:[]) . V.vertCat $ drop st imgs) <$> current img <*> scrollTop
+  return $ TextInput
+    { _textInput_value = value <$> v
+    , _textInput_lines = length . _displayLines_spans <$> rows
+    }
 
 
 
@@ -117,12 +157,32 @@ holdLayerWidget LayerWidgetConfig {..} = do
   regionHeightDyn <- displayHeight
   scrollEv <- mouseScroll
   inp <- input
+
   let
+    PFWidgetCtx {..} = _layerWidgetConfig_pfctx
+
+    -- TODO don't listen to global events
+    -- instead maybe listen to local events and also listen to lose focus event, or maybe that's a cancel?
+    -- event that finalizes text entry in LayerElts
+    finalizeSet :: Event t ()
+    finalizeSet = flip fmapMaybe (_pFWidgetCtx_ev_input) $ \case
+      V.EvKey (V.KEnter) [] -> Just ()
+      V.EvMouseDown _ _ _ _ -> Just ()
+      _                     -> Nothing
+    -- event tha tcancels text entry in LayerElts as well as cancel mouse drags
+    cancelInput :: Event t ()
+    cancelInput = leftmost [_pFWidgetCtx_ev_cancel]
+    -- tracks if mouse was released anywhere including off pane (needed to cancel mouse drags)
+    -- TODO we can get rid of this if we switch to pane 2
+    mouseRelease :: Event t ()
+    mouseRelease = flip fmapMaybe (_pFWidgetCtx_ev_input) $ \case
+      V.EvMouseUp _ _ _ -> Just ()
+      _                     -> Nothing
+
     padTop = 0
     padBottom = 3
-
     regionDyn = ffor2 regionWidthDyn regionHeightDyn (,)
-    PFWidgetCtx {..} = _layerWidgetConfig_pfctx
+
 
     layerREltIdsDyn :: Dynamic t (Seq REltId)
     layerREltIdsDyn = _sEltLayerTree_view (_pfo_layers _pFWidgetCtx_pfo)
@@ -174,12 +234,10 @@ holdLayerWidget LayerWidgetConfig {..} = do
     lEltStateList :: Dynamic t (Seq LEltState)
     lEltStateList = ffor2 lEltStateMapDyn layerREltIdsDyn $ \leltsmap rids -> Seq.mapWithIndex (lEltStateList_mapfn leltsmap) rids
 
-
     -- TODO folder contraction
     lEltStateContractedList :: Dynamic t (Seq LEltState)
     lEltStateContractedList = lEltStateList
 
-    -- TODO change this to Seq
     prepLayers_mapfn :: Seq LEltState -> Seq (Int, LEltState) -- first Int is indentation level
     prepLayers_mapfn leltss = r where
       prepLayers_foldfn :: (Int, Int, Seq (Int, LEltState)) -> Int -> LEltState -> (Int, Int, Seq (Int, LEltState))
@@ -192,6 +250,23 @@ holdLayerWidget LayerWidgetConfig {..} = do
     prepLayersDyn :: Dynamic t (Seq (Int, LEltState))
     prepLayersDyn = fmap prepLayers_mapfn lEltStateContractedList
 
+    -- ::scrolling::
+    -- TODO this seems to be cropping by one too much from the bottom
+    -- I guess you can solvethis easily just by adding a certain padding allowance...
+    maxScroll :: Behavior t Int
+    maxScroll = current $ ffor2 lEltStateList regionDyn $ \leltss (_,h) -> max 0 (Seq.length leltss - h - padBottom)
+    -- sadly, mouse scroll events are kind of broken, so you need to do some in between event before you can scroll in the other direction
+    requestedScroll :: Event t Int
+    requestedScroll = ffor scrollEv $ \case
+      ScrollDirection_Up -> (-1)
+      ScrollDirection_Down -> 1
+    updateLine maxN delta ix = min (max 0 (ix + delta)) maxN
+  lineIndexDyn :: Dynamic t Int
+    <- foldDyn (\(maxN, delta) ix -> updateLine (maxN - 1) delta ix) 0 $
+      attach maxScroll requestedScroll
+
+  -- ::actually draw images::
+  let
     makeImage :: Int -> (Int, LEltState) -> V.Image
     makeImage width (ident, LEltState {..}) = r where
       attr = if _lEltState_selected then lg_layer_selected else lg_default
@@ -204,33 +279,22 @@ holdLayerWidget LayerWidgetConfig {..} = do
         <> " "
         <> show _lEltState_rEltId
         <> " "
+        -- TODO render text zipper here instead
         <> T.unpack _lEltState_label
-
-    -- TODO thisseems to be cropping by one from the bottom
-    -- I guess you can solvethis easily just by adding a certain padding allowance...
-    maxScroll :: Behavior t Int
-    maxScroll = current $ ffor2 lEltStateList regionDyn $ \leltss (_,h) -> max 0 (Seq.length leltss - h - padBottom)
-
-
-    -- sadly, mouse scroll events are kind of broken, so you need to do some in between event before you can scroll in the other direction
-    requestedScroll :: Event t Int
-    requestedScroll = ffor scrollEv $ \case
-      ScrollDirection_Up -> (-1)
-      ScrollDirection_Down -> 1
-    updateLine maxN delta ix = min (max 0 (ix + delta)) maxN
-  lineIndexDyn :: Dynamic t Int
-    <- foldDyn (\(maxN, delta) ix -> updateLine (maxN - 1) delta ix) 0 $
-      attach maxScroll requestedScroll
-
-  let
     images :: Behavior t [V.Image]
     images = current $ fmap ((:[]) . V.vertCat) $ ffor3 regionDyn lineIndexDyn prepLayersDyn $ \(w,h) li pl ->
       map (makeImage w) . L.take (max 0 (h - padBottom)) . L.drop li $ toList pl
   tellImages images
 
+  -- ::input stuff::
   selectedDyn <- holdDyn [] selectedEv
 
-  -- input stuff
+  -- TODO if a single element is selected and we click it again we enter modify mode (with cursor at the end)
+    -- you want to do a switch on click/prepLayersDyn (and also attach selectedDyn to check if only 1 thing is selected)
+      -- if click on such an element, create VtyWidget to modify it
+  -- if finalize event, we fire a changeEv
+  -- if we cancel, we remove the vtyWidget and don't pass on the changeEv
+
   click <- singleClick V.BLeft >>= return . ffilter (\x -> not $ _singleClick_didDragOff x)
   --click <- mouseDown V.BLeft >>= return . fmap _mouseDown_coordinates
   let
