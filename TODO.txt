@@ -99,6 +99,21 @@
 
 
 ::TODO::
+-manipulator refactor
+  -rearchitect
+    -selection manager shows mainpulator type
+    -tool choice shows manipulator type
+      -unselects all
+      -using tool unselects the tool
+  -add keyboard manipulation to manipulators
+  -move dynManipulator into selection
+  -move create new elt into manipulator
+    -fix issue where manipulator still thinks it's in the first elt drag state for clickrelease elts (didn't go through manipulator new elt code)
+      -related issue, wasManipulating never true for newly created elts due to timing issue on isManipulatingDyn, not sure why this was ever working
+  -do MBoundingBox manipulator
+    -use same code as MBox, but different behavior based on manipulateImmediately
+-tool highlighting
+
 -load file D: lots of work to do
 -splitHDrag resizing is broken
 -do proper implementation of shift select in selectionmanager
@@ -106,14 +121,7 @@
   -this requires changing canvas render implementation
   -maybe for now you can do annoying blink overlay D:
 -figure out how you want to handle vty attributes
--add keyboard manipulation to manipulators
 DONE-move TODO into vty
--move dynManipulator into selection
--move create new elt into manipulator
-  -fix issue where manipulator still thinks it's in the first elt drag state for clickrelease elts (didn't go through manipulator new elt code)
-    -related issue, wasManipulating never true for newly created elts due to timing issue on isManipulatingDyn, not sure why this was ever working
--do MBoundingBox manipulator
-  -use same code as MBox, but different behavior based on manipulateImmediately
 -get basic params working
 -you need to do monolithic layers because processing drag events using widgets individually gets way too expensive
 -consider storing visibility/lock states in SEltLabel

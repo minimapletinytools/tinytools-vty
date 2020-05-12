@@ -107,8 +107,6 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
     cursorEndEv c' = cursorDragStateEv (Just c') (Just DragEnd) dragEv
 
   -- ::panning::
-  -- TODO make this so it doesn't trigger when you start drag off of this panel
-  -- you could do this by checking if dragFrom is on the edges
   LBox (V2 cx0 cy0) (V2 cw0 ch0) <- sample $ current (fmap renderedCanvas_box renderedCanvas)
   pw0 <- displayWidth >>= sample . current
   ph0 <- displayHeight >>= sample . current
@@ -119,6 +117,8 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
 
   -- ::selecting::
   -- TODO draw a select box I guess
+  -- TODO go straight into CBoundingBox move on single select
+    -- unless <some modifier> is held, in which case do normal selecting
   let
     selectPushFn :: ((Int,Int),Drag2) -> PushM t (Maybe (Either [REltId] [REltId]))
     selectPushFn ((sx,sy), drag) = case drag of
@@ -146,7 +146,6 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
     newBoxEv = pushAlways boxPushFn $ cursorStartEv CSBox
 
   -- ::draw the canvas::
-  -- TODO make this efficient -_-
   let
     canvasRegion = translate_dynRegion panPos $ dynLBox_to_dynRegion (fmap renderedCanvas_box renderedCanvas)
   fill '░'

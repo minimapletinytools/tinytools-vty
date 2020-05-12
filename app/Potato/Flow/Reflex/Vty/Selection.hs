@@ -39,6 +39,7 @@ data SelectionManagerConfig t = SelectionManagerConfig {
 }
 
 data SelectionManager t = SelectionManager {
+  -- TODO remove the bool, canvas should track new elements itself I think
   _selectionManager_selected :: Dynamic t (Bool, [SuperSEltLabel]) -- (selection via newly created (but not pasted) only true for one frame where element was created, list of selected elements)
 }
 
@@ -47,6 +48,8 @@ holdSelectionManager :: forall t m. (Reflex t, MonadHold t m, MonadFix m)
   -> m (SelectionManager t)
 holdSelectionManager SelectionManagerConfig {..} = do
   let
+
+
     -- ::selection from newly created element::
     newSingle = fmapMaybe (\im -> if IM.size im == 1 then IM.lookupMin im else Nothing)
       $ _sEltLayerTree_changeView _selectionManagerConfig_sEltLayerTree
