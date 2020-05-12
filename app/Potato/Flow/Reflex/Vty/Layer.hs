@@ -34,6 +34,8 @@ import           Data.Tuple.Extra
 
 import qualified Graphics.Vty                       as V
 import           Reflex
+import           Reflex.Network
+import           Reflex.Potato.Helpers
 import           Reflex.Vty
 
 moveChar :: Char
@@ -91,7 +93,7 @@ layerEltTextInput i cfg = mdo
   dh <- displayHeight
   dw <- displayWidth
   v <- foldDyn ($) (_textInputConfig_initialValue cfg) $ mergeWith (.)
-    [ uncurry (updateTextZipper (_textInputConfig_tabWidth cfg)) <$> attach (current dh) i
+    [ uncurry (updateTextZipperForLayers (_textInputConfig_tabWidth cfg)) <$> attach (current dh) i
     , _textInputConfig_modify cfg
     , let displayInfo = (,) <$> current rows <*> scrollTop
       in ffor (attach displayInfo click) $ \((dl, st), MouseDown _ (mx, my) _) ->
@@ -145,11 +147,11 @@ data LEltState = LEltState {
   , _lEltState_layerPosition :: Maybe Int -- ^ Nothing if layer position is not known yet
   , _lEltState_selected      :: Bool
 
-  , _lEltState_rEltId        :: Int -- ^ this is for debugging
+  , _lEltState_rEltId        :: Int -- ^ this is for debugging (ok apparantly, I need this to do renaming, just be mindful when serializing/deserializing this)
 } deriving (Eq, Show)
 
 
-holdLayerWidget :: forall t m. (Reflex t, Adjustable t m, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m)
+holdLayerWidget :: forall t m. (Reflex t, Adjustable t m, PostBuild t m, NotReady t m,  MonadHold t m, MonadFix m, MonadNodeId m)
   => LayerWidgetConfig t
   -> VtyWidget t m (LayerWidget t)
 holdLayerWidget LayerWidgetConfig {..} = do
@@ -211,7 +213,7 @@ holdLayerWidget LayerWidgetConfig {..} = do
       only1_map_fn rid (Just (SEltLabel label _)) = LEltState False False False False False label Nothing False rid
       combineFn :: REltId -> Maybe SEltLabel -> LEltState -> Maybe LEltState
       combineFn rid Nothing lelts = Nothing
-      combineFn rid _ lelts       = Just lelts
+      combineFn rid (Just (SEltLabel sname _)) lelts       = Just $ lelts { _lEltState_label = sname }
       new_leltsmap = IM.mergeWithKey combineFn (IM.mapWithKey only1_map_fn) id seltlmap old_leltsmap
 
     lEltStateMapDyn_foldfn :: These [(REltId, LayerPos)] (REltIdMap (Maybe SEltLabel)) -> REltIdMap LEltState -> REltIdMap LEltState
@@ -289,16 +291,11 @@ holdLayerWidget LayerWidgetConfig {..} = do
   -- ::input stuff::
   selectedDyn <- holdDyn [] selectedEv
 
-  -- TODO if a single element is selected and we click it again we enter modify mode (with cursor at the end)
-    -- you want to do a switch on click/prepLayersDyn (and also attach selectedDyn to check if only 1 thing is selected)
-      -- if click on such an element, create VtyWidget to modify it
-  -- if finalize event, we fire a changeEv
-  -- if we cancel, we remove the vtyWidget and don't pass on the changeEv
 
   click <- singleClick V.BLeft >>= return . ffilter (\x -> not $ _singleClick_didDragOff x)
   --click <- mouseDown V.BLeft >>= return . fmap _mouseDown_coordinates
   let
-    layerMouse_pushfn :: (Int, Int) -> PushM t (Maybe (LayerPos, Int))
+    layerMouse_pushfn :: (Int, Int) -> PushM t (Maybe (LayerPos, (Int,Int), LEltState))
     layerMouse_pushfn (x',y') = do
       pl <- sample . current $ prepLayersDyn
       scrollPos <- sample . current $ lineIndexDyn
@@ -307,23 +304,36 @@ holdLayerWidget LayerWidgetConfig {..} = do
         mselected = Seq.lookup y pl
       return $ case mselected of
         Nothing -> Nothing
-        Just (ident, LEltState {..}) -> r where
+        Just (ident, lelts@LEltState {..}) -> r where
           -- TODO ignore clicks on buttons
           x = x' - ident
-          -- TODO assert here to make sure it's not a Nothing
           r = case _lEltState_layerPosition of
             Nothing -> error "expected layer position to be set"
-            Just lp -> Just (lp, x)
+            Just lp -> Just (lp, (x,y), lelts)
 
+    -- ::click event for renaming::
+    clickOnSelected_pushfn :: SingleClick -> PushM t (Maybe ((Int,Int), LEltState))
+    clickOnSelected_pushfn SingleClick {..} =  do
+      let
+        pos = _singleClick_coordinates
+        nomods = null _singleClick_modifiers
+      layerMouse_pushfn pos >>= \case
+        Nothing -> return Nothing
+        Just (_, (x,y), lelts@LEltState {..}) -> if nomods && _lEltState_selected && x > 2
+          then return $ Just ((x,y), lelts)
+          else return Nothing
+    clickOnSelectedEv :: Event t ((Int,Int), LEltState)
+    clickOnSelectedEv = push clickOnSelected_pushfn click
+
+    -- ::selecting::
     selectEv_pushfn :: SingleClick -> PushM t (Maybe [LayerPos])
     selectEv_pushfn SingleClick {..} =  do
       let
         pos = _singleClick_coordinates
         shiftClick = isJust $ find (==V.MShift) _singleClick_modifiers
-
       layerMouse_pushfn pos >>= \case
         Nothing -> return Nothing
-        Just (lp, x) -> if not shiftClick
+        Just (lp, (x,_), _) -> if not shiftClick
           then return $ Just [lp]
           else do
             currentSelection <- sample . current $ selectedDyn >>= return . map snd
@@ -331,17 +341,45 @@ holdLayerWidget LayerWidgetConfig {..} = do
               (found,newSelection') = foldl' (\(found',xs) x -> if x == lp then (True, xs) else (found', x:xs)) (False,[]) currentSelection
               newSelection = if found then newSelection' else lp:newSelection'
             return $ Just newSelection
+    selectEv = push selectEv_pushfn (difference click clickOnSelectedEv)
 
 
-    -- TODO shift select by adding to current selection
-    selectEv = push selectEv_pushfn click
+  let
+    labelWidgetDynFoldFn :: Either () ((Int,Int), LEltState) -> VtyWidget t m (Event t (ControllersWithId)) -> PushM t (VtyWidget t m (Event t (ControllersWithId)))
+    labelWidgetDynFoldFn (Left _) _ = return (return never)
+    labelWidgetDynFoldFn (Right ((x,y), LEltState{..})) _ = return $ do
+      let
+        -- convert relevant input
+        labelInput = fforMaybe inp $ \case
+          V.EvMouseDown x y btn' mods -> if x > 2
+            then Just $ V.EvMouseDown (x-3) y btn' mods
+            else Nothing
+          V.EvKey k mods -> Just $ V.EvKey k mods
+          _ -> Nothing
+      -- TODO need to create a pane to position layerEltTextInput (or do manual positioning)
+      t <- layerEltTextInput labelInput $ TextInputConfig (fromText _lEltState_label) never 0 (constDyn id)
+      return $ flip push finalizeSet $ \_ -> do
+        newText <- sample . current $ _textInput_value t
+        return $ if _lEltState_label /= newText
+          then Just $ IM.singleton _lEltState_rEltId $ CTagRename :=> Identity (CRename (_lEltState_label, newText))
+          else Nothing
+
+  -- TODO finalizeSet needs to ignore cases where click on the textinput (maybe can ignore this using difference or see comments for finalizeSet)
+  labelWidgetDyn :: Dynamic t (VtyWidget t m (Event t (ControllersWithId)))
+    <- foldDynM labelWidgetDynFoldFn (return never)
+      (alignEitherWarn "labelWidgetDyn input" (leftmostwarn "labelWidgetDyn cancel" [cancelInput, finalizeSet]) clickOnSelectedEv)
+  changeNameEv <- networkView labelWidgetDyn >>= switchHold never
+
+
 
   -- TODO buttons at the bottom
   -- TODO you probably want to put panes or something idk...
   -- actually fixed takes a dynamic..
 
-  debugStream [
+  vLayoutPad 20 $ debugStream [
     never
+    , fmapLabelShow "changeNameEv" $ changeNameEv
+    , fmapLabelShow "changes" $ changesEv
     --, fmapLabelShow "selected" $ selectedEv
     --, fmapLabelShow "click" $ click
     --, fmapLabelShow "input" $ inp
@@ -349,7 +387,7 @@ holdLayerWidget LayerWidgetConfig {..} = do
 
   return LayerWidget {
     _layerWidget_select = selectEv
-    , _layerWidget_changeName = never
+    , _layerWidget_changeName = changeNameEv
     , _layerWidget_move = never
     , _layerWidget_consumingKeyboard = constant False
   }
