@@ -23,14 +23,11 @@ import           Data.Align
 import           Data.Dependent.Sum                 (DSum ((:=>)))
 import qualified Data.IntMap.Strict                 as IM
 import qualified Data.List                          as L
-import qualified Data.Map                           as M
-import           Data.Maybe                         (fromJust)
 import qualified Data.Sequence                      as Seq
 import qualified Data.Text                          as T
 import           Data.Text.Zipper
 import qualified Data.Text.Zipper                   as TZ
 import           Data.These
-import           Data.Tuple.Extra
 
 import qualified Graphics.Vty                       as V
 import           Reflex
@@ -38,8 +35,8 @@ import           Reflex.Network
 import           Reflex.Potato.Helpers
 import           Reflex.Vty
 
-moveChar :: Char
-moveChar = '≡'
+--moveChar :: Char
+--moveChar = '≡'
 hiddenChar :: Char
 hiddenChar = '-'
 visibleChar :: Char
@@ -151,7 +148,7 @@ data LEltState = LEltState {
   , _lEltState_rEltId        :: Int -- ^ this is for debugging (ok apparantly, I need this to do renaming, just be mindful when serializing/deserializing this)
 } deriving (Eq, Show)
 
-holdLayerWidget :: forall t m. (Reflex t, Adjustable t m, PostBuild t m, NotReady t m,  MonadHold t m, MonadFix m, MonadNodeId m)
+holdLayerWidget :: forall t m. (Adjustable t m, PostBuild t m, NotReady t m,  MonadHold t m, MonadFix m, MonadNodeId m)
   => LayerWidgetConfig t
   -> VtyWidget t m (LayerWidget t)
 --holdLayerWidget _ = return $ LayerWidget never never never (constant False)
@@ -176,7 +173,7 @@ holdLayerWidget' LayerWidgetConfig {..} = do
     finalizeSet = flip fmapMaybe inp $ \case
       V.EvKey (V.KEnter) [] -> Just ()
       -- TODO this should not capture scroll events
-      -- V.EvMouseDown _ _ _ _ -> Just ()
+      V.EvMouseDown _ _ _ _ -> Just ()
       _                     -> Nothing
 
     loseFocus = fmapMaybe (\x -> if not x then Just () else Nothing) $ updated focusDyn
@@ -222,8 +219,8 @@ holdLayerWidget' LayerWidgetConfig {..} = do
       -- TODO properly handle folders and whatever else needs to be added here
       only1_map_fn rid (Just (SEltLabel label _)) = LEltState False False False False False label Nothing False rid
       combineFn :: REltId -> Maybe SEltLabel -> LEltState -> Maybe LEltState
-      combineFn rid Nothing lelts = Nothing
-      combineFn rid (Just (SEltLabel sname _)) lelts       = Just $ lelts { _lEltState_label = sname }
+      combineFn _ Nothing _ = Nothing
+      combineFn _ (Just (SEltLabel sname _)) lelts       = Just $ lelts { _lEltState_label = sname }
       new_leltsmap = IM.mergeWithKey combineFn (IM.mapWithKey only1_map_fn) id seltlmap old_leltsmap
 
     lEltStateMapDyn_foldfn :: These [(REltId, LayerPos)] (REltIdMap (Maybe SEltLabel)) -> REltIdMap LEltState -> REltIdMap LEltState
@@ -253,11 +250,10 @@ holdLayerWidget' LayerWidgetConfig {..} = do
     prepLayers_mapfn :: Seq LEltState -> Seq (Int, LEltState) -- first Int is indentation level
     prepLayers_mapfn leltss = r where
       prepLayers_foldfn :: (Int, Int, Seq (Int, LEltState)) -> Int -> LEltState -> (Int, Int, Seq (Int, LEltState))
-      prepLayers_foldfn (ident, contr, acc) _ lelts = r where
+      prepLayers_foldfn (ident, contr, acc) _ lelts = (newident, newcontr, acc Seq.|> (newident,lelts)) where
         -- TODO folders
         newident = ident
         newcontr = contr
-        r = (newident, newcontr, acc Seq.|> (newident,lelts))
       (_,_,r) = Seq.foldlWithIndex prepLayers_foldfn (0, 0, Seq.empty) leltss
     prepLayersDyn :: Dynamic t (Seq (Int, LEltState))
     prepLayersDyn = fmap prepLayers_mapfn lEltStateContractedList
@@ -280,8 +276,8 @@ holdLayerWidget' LayerWidgetConfig {..} = do
 
   -- ::actually draw images::
   let
-    makeImage :: Int -> (Int, LEltState) -> V.Image
-    makeImage width (ident, LEltState {..}) = r where
+    makeLayerImage :: Int -> (Int, LEltState) -> V.Image
+    makeLayerImage width (ident, LEltState {..}) = r where
       attr = if _lEltState_selected then lg_layer_selected else lg_default
       r = V.text' attr . T.pack . L.take width
         $ replicate ident ' '
@@ -294,10 +290,10 @@ holdLayerWidget' LayerWidgetConfig {..} = do
         <> " "
         -- TODO render text zipper here instead
         <> T.unpack _lEltState_label
-    images :: Behavior t [V.Image]
-    images = current $ fmap ((:[]) . V.vertCat) $ ffor3 regionDyn lineIndexDyn prepLayersDyn $ \(w,h) li pl ->
-      map (makeImage w) . L.take (max 0 (h - padBottom)) . L.drop li $ toList pl
-  tellImages images
+    layerImages :: Behavior t [V.Image]
+    layerImages = current $ fmap ((:[]) . V.vertCat) $ ffor3 regionDyn lineIndexDyn prepLayersDyn $ \(w,h) li pl ->
+      map (makeLayerImage w) . L.take (max 0 (h - padBottom)) . L.drop li $ toList pl
+  tellImages layerImages
 
   -- ::input stuff::
   selectedDyn <- holdDyn [] selectedEv
@@ -317,7 +313,6 @@ holdLayerWidget' LayerWidgetConfig {..} = do
       return $ case mselected of
         Nothing -> Nothing
         Just (ident, lelts@LEltState {..}) -> r where
-          -- TODO ignore clicks on buttons
           x = x' - ident
           r = case _lEltState_layerPosition of
             Nothing -> error "expected layer position to be set"
@@ -346,11 +341,12 @@ holdLayerWidget' LayerWidgetConfig {..} = do
       layerMouse_pushfn pos >>= \case
         Nothing -> return Nothing
         Just (lp, _, (x,_), _) -> if not shiftClick
+          -- TODO ignore clicks on buttons
           then return $ Just [lp]
           else do
             currentSelection <- sample . current $ selectedDyn >>= return . map snd
             let
-              (found,newSelection') = foldl' (\(found',xs) x -> if x == lp then (True, xs) else (found', x:xs)) (False,[]) currentSelection
+              (found,newSelection') = foldl' (\(found',ss) s -> if s == lp then (True, ss) else (found', s:ss)) (False,[]) currentSelection
               newSelection = if found then newSelection' else lp:newSelection'
             return $ Just newSelection
     selectEv = push selectEv_pushfn (difference click clickOnSelectedEv)
@@ -359,8 +355,7 @@ holdLayerWidget' LayerWidgetConfig {..} = do
   let
     labelWidgetDynFoldFn :: Either () (Int, (Int,Int), LEltState) -> VtyWidget t m (Event t (ControllersWithId)) -> PushM t (VtyWidget t m (Event t (ControllersWithId)))
     labelWidgetDynFoldFn (Left _) _ = return (return never)
-    labelWidgetDynFoldFn (Right (ident, (x,y_orig), LEltState{..})) _ = return $ do
-
+    labelWidgetDynFoldFn (Right (ident, (_,y_orig), LEltState{..})) _ = return $ do
       let
         yDyn = fmap (\scroll ->  y_orig  - scroll) lineIndexDyn
         -- convert relevant input
@@ -388,19 +383,11 @@ holdLayerWidget' LayerWidgetConfig {..} = do
   changeNameEv <- networkView labelWidgetDyn >>= switchHold never
 
 
-
   -- TODO buttons at the bottom
   -- TODO you probably want to put panes or something idk...
   -- actually fixed takes a dynamic..
 
-  vLayoutPad 5 $ debugStreamBeh [
-      ""
-      --, fmapLabelShow "scroll" maxScroll
-      --, fmapLabelShow "line" (current lineIndexDyn)
-      --, fmapLabelShow "region" (current regionDyn)
-    ]
-
-  vLayoutPad 20 $ debugStream [
+  vLayoutPad 10 $ debugStream [
     never
     --, fmapLabelShow "changeNameEv" $ changeNameEv
     --, fmapLabelShow "changes" $ changesEv

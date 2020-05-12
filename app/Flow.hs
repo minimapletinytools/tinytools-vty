@@ -10,7 +10,6 @@ import           Potato.Flow
 import           Potato.Flow.Reflex.Vty.Attrs
 import           Potato.Flow.Reflex.Vty.Canvas
 import           Potato.Flow.Reflex.Vty.Layer
-import           Potato.Flow.Reflex.Vty.Manipulator
 import           Potato.Flow.Reflex.Vty.Params
 import           Potato.Flow.Reflex.Vty.PFWidgetCtx
 import           Potato.Flow.Reflex.Vty.Selection
