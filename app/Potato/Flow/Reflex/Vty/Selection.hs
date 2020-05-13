@@ -21,6 +21,8 @@ import           Data.Tuple.Extra
 
 import           Reflex
 
+disjointUnion :: (Eq a) => [a] -> [a] -> [a]
+disjointUnion a b = L.union a b L.\\ L.intersect a b
 
 
 data SelectionManagerConfig t = SelectionManagerConfig {
@@ -35,7 +37,7 @@ data SelectionManagerConfig t = SelectionManagerConfig {
 
   -- connect to _canvasWidget_select
   -- left is select just one, right is select many (canvas is unaware of ordering)
-  , _selectionManagerConfig_selectByREltId  :: Event t (Either [REltId] [REltId])
+  , _selectionManagerConfig_selectByREltId  :: Event t (Bool, Either [REltId] [REltId])
 }
 
 data SelectionManager t = SelectionManager {
@@ -62,40 +64,40 @@ holdSelectionManager SelectionManagerConfig {..} = mdo
     selFromVeryNew :: Event t ([SuperSEltLabel])
     selFromVeryNew = fmap (fmap fromJust) $ alignEventWithMaybe selFromVeryNew_alignfn _selectionManagerConfig_newElt_layerPos newSingle
 
+    -- ::selection by layer position or REltId helpers::
+    selection_pushfn :: (Bool, [LayerPos]) -> PushM t [LayerPos]
+    selection_pushfn (addToSelection,lps) = if not addToSelection
+      then return lps
+      else do
+        currentSelection <- sample . current $ fmap (fmap snd3 . snd) selected
+        return $ disjointUnion lps currentSelection
+
+    layerPosEvToSuperSEltLabelEv :: Event t [LayerPos] -> Event t [SuperSEltLabel]
+    -- PARTIAL the above should never fail if layers is working correctly so I would rather it crash for now
+    -- non-partial version:
+    --fmapMaybe sequence $ sEltLayerTree_tagSuperSEltsByPos _selectionManagerConfig_sEltLayerTree _selectionManagerConfig_select
+    layerPosEvToSuperSEltLabelEv = fmap (fmap fromJust) . sEltLayerTree_tagSuperSEltsByPos _selectionManagerConfig_sEltLayerTree
 
     -- ::selection from LayersWidget::
     selFromLayers :: Event t [SuperSEltLabel]
-    selFromLayers = r where
-      newSelLps_pushfn :: (Bool, LayerPos) -> PushM t [LayerPos]
-      newSelLps_pushfn (addToSelection,lp) = if not addToSelection
-        then return [lp]
-        else do
-          currentSelection <- sample . current $ fmap (fmap snd3 . snd) selected
-          let (found,newSelection') = foldl' (\(found',ss) s -> if s == lp then (True, ss) else (found', s:ss)) (False,[]) currentSelection
-          return $ if found then newSelection' else lp:newSelection'
-      newSelLps = pushAlways newSelLps_pushfn _selectionManagerConfig_select
-      -- PARTIAL the above should never fail if layers is working correctly so I would rather it crash for now
-      -- non-partial version:
-      --fmapMaybe sequence $ sEltLayerTree_tagSuperSEltsByPos _selectionManagerConfig_sEltLayerTree _selectionManagerConfig_select
-      r = fmap (fmap fromJust) $ sEltLayerTree_tagSuperSEltsByPos _selectionManagerConfig_sEltLayerTree newSelLps
-
+    selFromLayers = layerPosEvToSuperSEltLabelEv $ pushAlways selection_pushfn $ fmap (\(b,lp) -> (b, [lp])) _selectionManagerConfig_select
 
     -- ::selection from CanvasWidget::
     potatoTotalDyn = _pfo_potato_potatoTotal $ _pFWidgetCtx_pfo _selectionManagerConfig_pfctx
-    pushSelFromCanvas :: Either [REltId] [REltId] -> PushM t [SuperSEltLabel]
-    pushSelFromCanvas erids = do
+    pushSelFromCanvas :: (Bool, Either [REltId] [REltId]) -> PushM t [LayerPos]
+    pushSelFromCanvas (addToSelection, erids) = do
       pt <- sample . current $ potatoTotalDyn
       let
         -- PARTIAL
-        mapToLp = map (\rid -> (rid, fromJust . _potatoTotal_layerPosMap pt $ rid))
+        mapToLp = map (\rid -> (fromJust . _potatoTotal_layerPosMap pt $ rid))
         lps = case erids of
           Left rids  -> case mapToLp rids of
             [] -> []
-            xs -> [L.maximumBy (\(_,lp1) (_,lp2) -> compare lp2 lp1) xs]
+            xs -> [L.maximumBy (\lp1 lp2 -> compare lp2 lp1) xs]
           Right rids -> mapToLp rids
-      return $ map (\(rid,lp) -> (rid, lp, _potatoTotal_sEltLabelMap pt IM.! rid)) lps
+      selection_pushfn (addToSelection, lps)
     selFromCanvas :: Event t ([SuperSEltLabel])
-    selFromCanvas = pushAlways pushSelFromCanvas _selectionManagerConfig_selectByREltId
+    selFromCanvas = layerPosEvToSuperSEltLabelEv $ pushAlways pushSelFromCanvas _selectionManagerConfig_selectByREltId
 
     -- ::selection doesn't change but contents do change::
     selChangesFromModified :: Event t (REltIdMap (Maybe SEltLabel))

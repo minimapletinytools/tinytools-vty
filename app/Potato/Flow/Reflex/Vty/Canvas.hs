@@ -45,7 +45,7 @@ data CanvasWidget t = CanvasWidget {
   , _canvasWidget_modify            :: Event t (Bool, ControllersWithId)
 
   , _canvasWidget_consumingKeyboard :: Behavior t Bool
-  , _canvasWidget_select            :: Event t (Either [REltId] [REltId]) -- ^ (left is select single, right is select many)
+  , _canvasWidget_select            :: Event t (Bool, Either [REltId] [REltId]) -- ^ (left is select single, right is select many)
 }
 
 holdCanvasWidget :: forall t m. (MonadWidget t m)
@@ -120,7 +120,7 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
   -- TODO go straight into CBoundingBox move on single select
     -- unless <some modifier> is held, in which case do normal selecting
   let
-    selectPushFn :: ((Int,Int),Drag2) -> PushM t (Maybe (Either [REltId] [REltId]))
+    selectPushFn :: ((Int,Int),Drag2) -> PushM t (Maybe (Bool, Either [REltId] [REltId]))
     selectPushFn ((sx,sy), drag) = case drag of
       Drag2 (fromX, fromY) (toX, toY) _ mods _ -> do
         let
@@ -129,7 +129,7 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
           selectBox = LBox (V2 (fromX-sx) (fromY-sy)) boxSize
           selectType = if boxSize == 0 then Left else Right
         bpt <- sample . current $ _broadPhase_bPTree broadPhase
-        return $ Just $ selectType $ broadPhase_cull selectBox bpt
+        return $ Just $ (shiftClick, selectType $ broadPhase_cull selectBox bpt)
       _ -> return Nothing
     selectEv = push selectPushFn (cursorEndEv CSSelecting)
 
