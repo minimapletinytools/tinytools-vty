@@ -26,6 +26,7 @@ import           Data.Dependent.Sum                        (DSum ((:=>)))
 import qualified Data.IntMap.Strict                        as IM
 import qualified Data.List.NonEmpty                        as NE
 import           Data.These
+import           Data.Tuple.Extra
 
 import           Reflex
 import           Reflex.Network
@@ -44,7 +45,7 @@ maybeRight _         = Nothing
 
 data ManipulatorWidgetConfig t = ManipulatorWidgetConfig {
   _manipulatorWigetConfig_pfctx      :: PFWidgetCtx t
-  , _manipulatorWigetConfig_selected :: Dynamic t (Bool, [SuperSEltLabel])
+  , _manipulatorWigetConfig_selected :: Dynamic t (Bool, ManipSelectionType, [SuperSEltLabel])
   , _manipulatorWidgetConfig_panPos  :: Behavior t (Int, Int)
   , _manipulatorWidgetConfig_drag    :: Event t Drag2
   , _manipulatorWidgetConfig_tool    :: Dynamic t Tool
@@ -66,24 +67,20 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
   let selectionChangedEv = updated _manipulatorWigetConfig_selected
   -- tracks whether an elements was newly created or not
   -- NOTE very timing dependent
-  newEltBeh <- hold False (fmap fst selectionChangedEv)
+  newEltBeh <- hold False (fmap fst3 selectionChangedEv)
   -- LayerPos this is needed to recreate a new element after undoing it
   selectionLayerPos <- hold (-1)
     $ fmap (maybe (-1) (\(_,lp,_) -> lp))
     $ fmap (viaNonEmpty NE.head)
-    $ fmap snd selectionChangedEv
+    $ fmap thd3 selectionChangedEv
   let
     -- TODO this is broken
     wasLastModifyAdd = ffor3 (current isManipulatingDyn) newEltBeh selectionLayerPos (\m n lp -> if m && n then Just lp else Nothing)
 
   -- ::convert to Manipulator EventSelector::
-  dynManipulator <- toManipulator $ fmap snd selectionChangedEv
-  dynManipSelTypeChange <- holdDyn MSTNone $ ffor (updated dynManipulator) $ \case
-    (MTagBox :=> _) -> MSTBox
-    (MTagLine :=> _) -> MSTLine
-    (MTagText :=> _) -> MSTText
-    (MTagBoundingBox :=> _) -> MSTBBox
-    _ -> MSTNone
+  dynManipulator <- toManipulator $ fmap thd3 selectionChangedEv
+  selectionTypeDyn <- holdDyn MSTNone (fmap snd3 selectionChangedEv)
+
   let
     selectManip :: MTag a -> Event t (Bool, a)
     selectManip mtag = r where
@@ -91,11 +88,11 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
       -- NOTE this completely negates the performance of using select/fan, you need to stick the tuple inside the DSum to do this right
       alignfn (These ns m) = Just (ns, m)
       alignfn _            = Nothing
-      r = alignEventWithMaybe alignfn (fmap fst $ selectionChangedEv) selectManip'
+      r = alignEventWithMaybe alignfn (fmap fst3 $ selectionChangedEv) selectManip'
 
   -- ::tools overwrite selection type::
   let
-    manipulatorTypeDyn' = ffor2 _manipulatorWidgetConfig_tool  dynManipSelTypeChange $ \tool selType -> case tool of
+    manipulatorTypeDyn' = ffor2 _manipulatorWidgetConfig_tool selectionTypeDyn $ \tool selType -> case tool of
       TBox  -> MSTBox
       TLine -> MSTLine
       TText -> MSTText

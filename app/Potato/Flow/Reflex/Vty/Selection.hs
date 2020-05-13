@@ -9,12 +9,13 @@ module Potato.Flow.Reflex.Vty.Selection (
 import           Relude
 
 import           Potato.Flow
+import           Potato.Flow.Reflex.Vty.Manipulator.Types
 import           Potato.Flow.Reflex.Vty.PFWidgetCtx
 import           Reflex.Potato.Helpers
 
 import           Control.Monad.Fix
-import qualified Data.IntMap.Strict                 as IM
-import qualified Data.List                          as L
+import qualified Data.IntMap.Strict                       as IM
+import qualified Data.List                                as L
 import           Data.Maybe
 import           Data.These
 import           Data.Tuple.Extra
@@ -23,6 +24,16 @@ import           Reflex
 
 disjointUnion :: (Eq a) => [a] -> [a] -> [a]
 disjointUnion a b = L.union a b L.\\ L.intersect a b
+
+computeSelectionType :: [SuperSEltLabel] -> ManipSelectionType
+computeSelectionType = foldl' foldfn MSTNone where
+  foldfn accType (_,_,SEltLabel _ selt) = case accType of
+    MSTNone -> case selt of
+      SEltBox _  -> MSTBox
+      SEltLine _ -> MSTLine
+      SEltText _ -> MSTText
+      _          -> MSTNone
+    _ -> MSTBBox
 
 
 data SelectionManagerConfig t = SelectionManagerConfig {
@@ -42,7 +53,7 @@ data SelectionManagerConfig t = SelectionManagerConfig {
 
 data SelectionManager t = SelectionManager {
   -- TODO remove the bool, canvas should track new elements itself I think
-  _selectionManager_selected :: Dynamic t (Bool, [SuperSEltLabel]) -- (selection via newly created (but not pasted) only true for one frame where element was created, list of selected elements)
+  _selectionManager_selected :: Dynamic t (Bool, ManipSelectionType, [SuperSEltLabel]) -- (selection via newly created (but not pasted) only true for one frame where element was created, list of selected elements)
 }
 
 holdSelectionManager :: forall t m. (Reflex t, MonadHold t m, MonadFix m)
@@ -112,7 +123,10 @@ holdSelectionManager SelectionManagerConfig {..} = mdo
     selectedInputEv :: Event t (These (Bool, [SuperSEltLabel]) (REltIdMap (Maybe SEltLabel)))
     selectedInputEv = alignEventWithMaybe Just selectedNew selChangesFromModified
 
-    selectionFoldFn :: These (Bool, [SuperSEltLabel]) (REltIdMap (Maybe SEltLabel)) -> (Bool, [SuperSEltLabel]) -> (Bool, [SuperSEltLabel])
+    selectionFoldFn ::
+      These (Bool, [SuperSEltLabel]) (REltIdMap (Maybe SEltLabel))
+      -> (Bool, [SuperSEltLabel])
+      -> (Bool, [SuperSEltLabel])
     selectionFoldFn (This x) _ = x
     -- this will happen if we create a new element, in which case we've already read the most updated value in 'selFromVeryNew' and can safely ignore than changes
     selectionFoldFn (These x _) _ = x
@@ -127,7 +141,7 @@ holdSelectionManager SelectionManagerConfig {..} = mdo
     <- foldDyn selectionFoldFn (False, []) selectedInputEv
   return
     SelectionManager {
-      _selectionManager_selected = selected
+      _selectionManager_selected = fmap (\(b,sseltls) -> (b, computeSelectionType sseltls, sseltls)) selected
     }
 
 
