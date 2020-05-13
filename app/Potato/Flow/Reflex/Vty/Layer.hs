@@ -128,7 +128,7 @@ data LayerWidgetConfig t = LayerWidgetConfig {
 }
 
 data LayerWidget t = LayerWidget {
-  _layerWidget_select              :: Event t [LayerPos]
+  _layerWidget_select              :: Event t (Bool, LayerPos)
   , _layerWidget_changeName        :: Event t ControllersWithId
   -- TODO expand to support multi-move
   , _layerWidget_move              ::Event t (LayerPos, LayerPos)
@@ -333,22 +333,15 @@ holdLayerWidget' LayerWidgetConfig {..} = do
     clickOnSelectedEv = push clickOnSelected_pushfn click
 
     -- ::selecting::
-    selectEv_pushfn :: SingleClick -> PushM t (Maybe [LayerPos])
+    selectEv_pushfn :: SingleClick -> PushM t (Maybe (Bool,LayerPos))
     selectEv_pushfn SingleClick {..} =  do
       let
         pos = _singleClick_coordinates
         shiftClick = isJust $ find (==V.MShift) _singleClick_modifiers
       layerMouse_pushfn pos >>= \case
         Nothing -> return Nothing
-        Just (lp, _, (x,_), _) -> if not shiftClick
-          -- TODO ignore clicks on buttons
-          then return $ Just [lp]
-          else do
-            currentSelection <- sample . current $ selectedDyn >>= return . map snd
-            let
-              (found,newSelection') = foldl' (\(found',ss) s -> if s == lp then (True, ss) else (found', s:ss)) (False,[]) currentSelection
-              newSelection = if found then newSelection' else lp:newSelection'
-            return $ Just newSelection
+        -- TODO ignore clicks on buttons
+        Just (lp, _, (x,_), _) -> return $ Just (shiftClick, lp)
     selectEv = push selectEv_pushfn (difference click clickOnSelectedEv)
 
 

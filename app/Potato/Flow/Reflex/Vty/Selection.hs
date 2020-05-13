@@ -17,6 +17,7 @@ import qualified Data.IntMap.Strict                 as IM
 import qualified Data.List                          as L
 import           Data.Maybe
 import           Data.These
+import           Data.Tuple.Extra
 
 import           Reflex
 
@@ -29,10 +30,9 @@ data SelectionManagerConfig t = SelectionManagerConfig {
   -- connect to _sEltLayerTree_changeView
   , _selectionManagerConfig_sEltLayerTree   :: SEltLayerTree t
 
+  -- connect to _layerWidget_select
+  , _selectionManagerConfig_select          :: Event t (Bool, LayerPos)
 
-  -- TODO change both these events to except Bool parameter of whether to add to selection or not. See code in Layer
-  -- TODO use Dynamic Seq instead maybe
-  , _selectionManagerConfig_select          :: Event t [LayerPos]
   -- connect to _canvasWidget_select
   -- left is select just one, right is select many (canvas is unaware of ordering)
   , _selectionManagerConfig_selectByREltId  :: Event t (Either [REltId] [REltId])
@@ -46,7 +46,7 @@ data SelectionManager t = SelectionManager {
 holdSelectionManager :: forall t m. (Reflex t, MonadHold t m, MonadFix m)
   => SelectionManagerConfig t
   -> m (SelectionManager t)
-holdSelectionManager SelectionManagerConfig {..} = do
+holdSelectionManager SelectionManagerConfig {..} = mdo
   let
 
 
@@ -62,12 +62,23 @@ holdSelectionManager SelectionManagerConfig {..} = do
     selFromVeryNew :: Event t ([SuperSEltLabel])
     selFromVeryNew = fmap (fmap fromJust) $ alignEventWithMaybe selFromVeryNew_alignfn _selectionManagerConfig_newElt_layerPos newSingle
 
+
     -- ::selection from LayersWidget::
-    selFromLayers :: Event t ([SuperSEltLabel])
-    selFromLayers = fmap (fmap fromJust) $ sEltLayerTree_tagSuperSEltsByPos _selectionManagerConfig_sEltLayerTree _selectionManagerConfig_select
-    -- PARTIAL the above should never fail if layers is working correctly so I would rather it crash for now
-    -- non-partial version:
-    --selFromLayers = fmapMaybe sequence $ sEltLayerTree_tagSuperSEltsByPos _selectionManagerConfig_sEltLayerTree _selectionManagerConfig_select
+    selFromLayers :: Event t [SuperSEltLabel]
+    selFromLayers = r where
+      newSelLps_pushfn :: (Bool, LayerPos) -> PushM t [LayerPos]
+      newSelLps_pushfn (addToSelection,lp) = if not addToSelection
+        then return [lp]
+        else do
+          currentSelection <- sample . current $ fmap (fmap snd3 . snd) selected
+          let (found,newSelection') = foldl' (\(found',ss) s -> if s == lp then (True, ss) else (found', s:ss)) (False,[]) currentSelection
+          return $ if found then newSelection' else lp:newSelection'
+      newSelLps = pushAlways newSelLps_pushfn _selectionManagerConfig_select
+      -- PARTIAL the above should never fail if layers is working correctly so I would rather it crash for now
+      -- non-partial version:
+      --fmapMaybe sequence $ sEltLayerTree_tagSuperSEltsByPos _selectionManagerConfig_sEltLayerTree _selectionManagerConfig_select
+      r = fmap (fmap fromJust) $ sEltLayerTree_tagSuperSEltsByPos _selectionManagerConfig_sEltLayerTree newSelLps
+
 
     -- ::selection from CanvasWidget::
     potatoTotalDyn = _pfo_potato_potatoTotal $ _pFWidgetCtx_pfo _selectionManagerConfig_pfctx

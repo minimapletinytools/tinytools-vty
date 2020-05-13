@@ -96,6 +96,32 @@
   -selected bounding box
 -params
 
+::line tool::
+-series of points restricted to V/H
+::text tool::
+-click once and just start typing, return adds a new line
+-click and drag to establish an area to type in
+-params
+  -text align
+  -insert vs overwrite
+    -need a way to convert overwrite to insert based on text align without adding too many space characters
+::free line tool::
+-series of points
+-params
+  -line style
+
+::params::
+
+
+::TODO TMRW::
+-move multiselect into selection manager
+-move new elt into manipulator
+  -align in manipulator/canvas to decide if it's a "very new" elt
+-boundingbox stuff
+-figure out how to choose boundingbox vs specific manipulator when only one elt is selected
+  -you could do the "v" and "a" tool as in illustrator, probably the way to go
+    -but what happens when you click and drag with the "a" tool?
+
 
 
 ::TODO::
@@ -105,7 +131,7 @@
     -tool choice shows manipulator type
       -unselects all
       -using tool unselects the tool
-  -cancel event to cancel manipulator drags 
+  -cancel event to cancel manipulator drags
   -add keyboard manipulation to manipulators
   -move dynManipulator into selection
   -move create new elt into manipulator
