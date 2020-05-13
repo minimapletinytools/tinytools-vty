@@ -101,7 +101,7 @@ data BoxManipWidgetConfig t = BoxManipWidgetConfig {
   -- TODO probably better if you somehow attach above things to this, then use this to create Dynamic that tracks what type of operation we need
   , _boxManipWidgetConfig_updated        :: Event t (Bool, MBox)
 
-  , _boxManipWidgetConfig_drag           :: Event t ((Int,Int), Drag2)
+  , _boxManipWidgetConfig_drag           :: Event t Drag2
   , _boxManipWidgetConfig_panPos         :: Behavior t (Int, Int)
   , _boxManipWidgetConfig_pfctx          :: PFWidgetCtx t
 }

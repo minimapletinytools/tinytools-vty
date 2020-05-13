@@ -45,7 +45,7 @@ data HandleWidgetConfig t = HandleWidgetConfig {
   -- we do it inside of Handle to avoid switching to disable handles and just makes everything easier
   , _handleWidgetConfig_mbox      :: Behavior t (Maybe LBox) -- ^ if this is Nothing, the handle is effecitvely disabled
   , _handleWidgetConfig_graphic   :: Behavior t (Maybe Char)
-  , _handleWidgetConfig_dragEv    :: Event t ((Int,Int), Drag2)
+  , _handleWidgetConfig_dragEv    :: Event t Drag2
 
   -- N.B. very sensitive to timing, this needs to sync up one frame after networkHold
   , _handleWidgetConfig_forceDrag :: Behavior t Bool
@@ -92,7 +92,7 @@ holdHandle HandleWidgetConfig {..} = do
             then Just (ManipEnd, Just (toX-fromX, toY-fromY))
             else Nothing
 
-  trackingDyn <- foldDynMaybeM trackMouse (ManipEnd, Nothing) $ attach _handleWidgetConfig_forceDrag $ fmap snd _handleWidgetConfig_dragEv
+  trackingDyn <- foldDynMaybeM trackMouse (ManipEnd, Nothing) $ attach _handleWidgetConfig_forceDrag $ _handleWidgetConfig_dragEv
 
   --debugStream [fmapLabelShow "drag" $ _handleWidgetConfig_dragEv]
 

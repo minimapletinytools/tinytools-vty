@@ -33,6 +33,7 @@ import           Reflex.Potato.Helpers
 import           Reflex.Vty
 
 
+
 maybeLeft :: Either a b -> Maybe a
 maybeLeft (Left a) = Just a
 maybeLeft _        = Nothing
@@ -42,10 +43,10 @@ maybeRight (Right b) = Just b
 maybeRight _         = Nothing
 
 data ManipulatorWidgetConfig t = ManipulatorWidgetConfig {
-  _manipulatorWigetConfig_pfctx :: PFWidgetCtx t
-  , _manipulatorWigetConfig_selected  :: Dynamic t (Bool, [SuperSEltLabel])
-  , _manipulatorWidgetConfig_panPos :: Behavior t (Int, Int)
-  , _manipulatorWidgetConfig_drag   :: Event t ((CursorState, (Int,Int)), Drag2)
+  _manipulatorWigetConfig_pfctx      :: PFWidgetCtx t
+  , _manipulatorWigetConfig_selected :: Dynamic t (Bool, [SuperSEltLabel])
+  , _manipulatorWidgetConfig_panPos  :: Behavior t (Int, Int)
+  , _manipulatorWidgetConfig_drag    :: Event t Drag2
 }
 
 data ManipulatorWidget t = ManipulatorWidget {
@@ -59,13 +60,6 @@ holdManipulatorWidget :: forall t m. (MonadWidget t m)
   => ManipulatorWidgetConfig t
   -> VtyWidget t m (ManipulatorWidget t)
 holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
-
-  -- ::track if we are manipulating::
-  -- TODO probably can delete, handles track this themselves
-  -- Tracks whether we're manipulating. This is needed so that we don't undo the first manipulation event.
-  --let dragEnd = cursorDragStateEv Nothing (Just DragEnd) _manipulatorWidgetConfig_drag
-  --bManipulating <- return . current
-  --  =<< (holdDyn False $ leftmost [dragEnd $> False, manipulateEv $> True])
 
   -- ::collected various change events::
   let selectionChangedEv = updated _manipulatorWigetConfig_selected
@@ -107,7 +101,7 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
       , _boxManipWidgetConfig_isNewElt = newEltBeh
       , _boxManipWidgetConfig_updated = selectManip MTagBox
       -- TODO this only needs CSSelecting for modify and CSBox for creating new boxes
-      , _boxManipWidgetConfig_drag  = cursorDragStateEv Nothing Nothing _manipulatorWidgetConfig_drag
+      , _boxManipWidgetConfig_drag  = _manipulatorWidgetConfig_drag
       , _boxManipWidgetConfig_panPos = _manipulatorWidgetConfig_panPos
       , _boxManipWidgetConfig_pfctx = _manipulatorWigetConfig_pfctx
     }

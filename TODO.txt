@@ -114,7 +114,9 @@
 
 
 ::TODO TMRW::
--move multiselect into selection manager
+DONE-move multiselect into selection manager
+-probably remove cursor and just use tooldyn
+-activate manipulator on tool select
 -move new elt into manipulator
   -align in manipulator/canvas to decide if it's a "very new" elt
 -boundingbox stuff
@@ -133,6 +135,7 @@
       -using tool unselects the tool
   -cancel event to cancel manipulator drags
   -add keyboard manipulation to manipulators
+    -no selection -> pans canvas
   -move dynManipulator into selection
   -move create new elt into manipulator
     -fix issue where manipulator still thinks it's in the first elt drag state for click release elts (didn't go through manipulator new elt code)

@@ -30,6 +30,20 @@ import           Reflex.Vty
 
 
 
+dynLBox_to_dynRegion :: (Reflex t) => Dynamic t LBox -> DynRegion t
+dynLBox_to_dynRegion dlb = r where
+  x' = flip fmap dlb $ \(LBox (V2 x _) _) -> x
+  y' = flip fmap dlb $ \(LBox (V2 _ y) _) -> y
+  w' = flip fmap dlb $ \(LBox _ (V2 w _)) -> w
+  h' = flip fmap dlb $ \(LBox _ (V2 _ h)) -> h
+  r = DynRegion x' y' w' h'
+
+translate_dynRegion :: (Reflex t) => Dynamic t (Int, Int) -> DynRegion t -> DynRegion t
+translate_dynRegion pos dr = dr {
+    _dynRegion_left = liftA2 (+) (_dynRegion_left dr) (fmap fst pos)
+    , _dynRegion_top = liftA2 (+) (_dynRegion_top dr) (fmap snd pos)
+  }
+
 
 data CanvasWidgetConfig t = CanvasWidgetConfig {
   _canvasWidgetConfig_pfctx              :: PFWidgetCtx t
@@ -175,7 +189,7 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
         , _manipulatorWigetConfig_selected = _selectionManager_selected _canvasWidgetConfig_selectionManager
         , _manipulatorWidgetConfig_panPos = current panPos
         -- TODO this is not correct
-        , _manipulatorWidgetConfig_drag = dragOrigEv
+        , _manipulatorWidgetConfig_drag = fmap snd dragOrigEv
       }
   manipulatorW <- holdManipulatorWidget manipCfg
 
