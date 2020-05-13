@@ -81,7 +81,7 @@ holdCanvasWidget :: forall t m. (MonadWidget t m)
 holdCanvasWidget CanvasWidgetConfig {..} = mdo
   inp <- input
 
-  -- ::prep broadphase/canvas::
+  -- ::prepare broadphase/canvas::
   let
     bpc = BroadPhaseConfig $ fmap (fmap snd) $ _sEltLayerTree_changeView (_pfo_layers _canvasWidgetConfig_pfo)
     --renderfn :: ([LBox], BPTree, REltIdMap (Maybe SEltLabel)) -> RenderedCanvas -> PushM t RenderedCanvas
@@ -114,7 +114,7 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
     foldCanvasFn (These _ _) _ = error "resize and change events should never occur simultaneously"
   broadPhase <- holdBroadPhase bpc
 
-  -- :: prepare rendered canvas ::
+  -- ::prepare rendered canvas ::
   renderedCanvas <- foldDynM foldCanvasFn (emptyRenderedCanvas defaultCanvasLBox)
     $ alignEventWithMaybe Just (_broadPhase_render broadPhase) (updated . _canvas_box $ _pfo_canvas _canvasWidgetConfig_pfo)
 
@@ -140,6 +140,7 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
   -- ::selecting::
   -- TODO draw a select box I guess
   -- TODO go straight into CBoundingBox move on single select
+    --so listen to dragstart event and if it clicked on something pass through selection event and ignore dragend event
     -- unless <some modifier> is held, in which case do normal selecting
   let
     selectPushFn :: ((Int,Int),Drag2) -> PushM t (Maybe (Bool, Either [REltId] [REltId]))
@@ -198,6 +199,7 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
         , _manipulatorWidgetConfig_panPos = current panPos
         -- TODO this is not correct
         , _manipulatorWidgetConfig_drag = fmap snd dragOrigEv
+        , _manipulatorWidgetConfig_tool = _canvasWidgetConfig_tool
       }
   manipulatorW <- holdManipulatorWidget manipCfg
 

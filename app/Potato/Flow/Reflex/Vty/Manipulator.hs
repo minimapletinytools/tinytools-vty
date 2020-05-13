@@ -15,6 +15,7 @@ import           Potato.Flow.Reflex.Vty.Manipulator.Box
 import           Potato.Flow.Reflex.Vty.Manipulator.Handle
 import           Potato.Flow.Reflex.Vty.Manipulator.Types
 import           Potato.Flow.Reflex.Vty.PFWidgetCtx
+import           Potato.Flow.Reflex.Vty.Tools
 import           Potato.Reflex.Vty.Helpers
 import           Potato.Reflex.Vty.Widget
 
@@ -46,6 +47,7 @@ data ManipulatorWidgetConfig t = ManipulatorWidgetConfig {
   , _manipulatorWigetConfig_selected :: Dynamic t (Bool, [SuperSEltLabel])
   , _manipulatorWidgetConfig_panPos  :: Behavior t (Int, Int)
   , _manipulatorWidgetConfig_drag    :: Event t Drag2
+  , _manipulatorWidgetConfig_tool    :: Dynamic t Tool
 }
 
 data ManipulatorWidget t = ManipulatorWidget {
@@ -74,17 +76,14 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
     -- TODO this is broken
     wasLastModifyAdd = ffor3 (current isManipulatingDyn) newEltBeh selectionLayerPos (\m n lp -> if m && n then Just lp else Nothing)
 
-  -- TODO move this into Selection
   -- ::convert to Manipulator EventSelector::
   dynManipulator <- toManipulator $ fmap snd selectionChangedEv
-  -- see comments on 'manipWidget'
-  dynManipSelTypeChange' <- holdDyn MSTNone $ ffor (updated dynManipulator) $ \case
+  dynManipSelTypeChange <- holdDyn MSTNone $ ffor (updated dynManipulator) $ \case
     (MTagBox :=> _) -> MSTBox
     (MTagLine :=> _) -> MSTLine
     (MTagText :=> _) -> MSTText
     (MTagBoundingBox :=> _) -> MSTBBox
     _ -> MSTNone
-  dynManipSelTypeChange <- holdUniqDyn dynManipSelTypeChange'
   let
     selectManip :: MTag a -> Event t (Bool, a)
     selectManip mtag = r where
@@ -94,12 +93,21 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
       alignfn _            = Nothing
       r = alignEventWithMaybe alignfn (fmap fst $ selectionChangedEv) selectManip'
 
+  -- ::tools overwrite selection type::
+  let
+    manipulatorTypeDyn' = ffor2 _manipulatorWidgetConfig_tool  dynManipSelTypeChange $ \tool selType -> case tool of
+      TBox  -> MSTBox
+      TLine -> MSTLine
+      TText -> MSTText
+      --TPan -> MSTNone
+      _     -> selType
+  manipulatorTypeDyn <- holdUniqDyn manipulatorTypeDyn'
+
   -- ::create the manipulators::
   boxManip <- makeBoxManipWidget  BoxManipWidgetConfig {
       _boxManipWidgetConfig_wasLastModifyAdd = wasLastModifyAdd
       , _boxManipWidgetConfig_isNewElt = newEltBeh
       , _boxManipWidgetConfig_updated = selectManip MTagBox
-      -- TODO this only needs CSSelecting for modify and CSBox for creating new boxes
       , _boxManipWidgetConfig_drag  = _manipulatorWidgetConfig_drag
       , _boxManipWidgetConfig_panPos = _manipulatorWidgetConfig_panPos
       , _boxManipWidgetConfig_pfctx = _manipulatorWigetConfig_pfctx
@@ -108,7 +116,7 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
   -- ::networkHold the correct manipulator::
   let
     finalManip :: Event t (VtyWidget t m (ManipOutput t))
-    finalManip = ffor (updated dynManipSelTypeChange) $ \case
+    finalManip = ffor (updated manipulatorTypeDyn) $ \case
       MSTBox -> boxManip
       _ -> return (never, never)
   -- NOTE the 'networkHold' here doesn't seem to play well with other places where I use 'runWithAdjust'
