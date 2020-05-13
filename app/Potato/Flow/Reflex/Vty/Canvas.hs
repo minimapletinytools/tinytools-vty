@@ -11,7 +11,6 @@ module Potato.Flow.Reflex.Vty.Canvas (
 import           Relude
 
 import           Potato.Flow
-import           Potato.Flow.Reflex.Vty.CanvasPane
 import           Potato.Flow.Reflex.Vty.Manipulator
 import           Potato.Flow.Reflex.Vty.PFWidgetCtx
 import           Potato.Flow.Reflex.Vty.Selection
@@ -30,6 +29,20 @@ import           Reflex.Vty
 
 
 
+-- TODO rename to canvasCursorDragStateEv
+-- TODO probably can delete panPos from the tuple, it's only needed by pan
+-- returns pan position at start of drag and dragging info filtered for tool/drag state
+toolDragStateEv :: (Reflex t)
+  => Maybe Tool -- ^ tool state to select for
+  -> Maybe DragState
+  -> Event t ((Tool, (Int,Int)), Drag2) -- ^ ((tool, panPos), drag)
+  -> Event t ((Int,Int), Drag2)
+toolDragStateEv c' d' dragEv = r where
+  fmapMaybeFn ((c,p),d) = if maybe True (_drag2_state d  ==) d' && maybe True (c ==) c'
+    then Just (p,d)
+    else Nothing
+  r = fmapMaybe fmapMaybeFn dragEv
+
 dynLBox_to_dynRegion :: (Reflex t) => Dynamic t LBox -> DynRegion t
 dynLBox_to_dynRegion dlb = r where
   x' = flip fmap dlb $ \(LBox (V2 x _) _) -> x
@@ -47,7 +60,7 @@ translate_dynRegion pos dr = dr {
 
 data CanvasWidgetConfig t = CanvasWidgetConfig {
   _canvasWidgetConfig_pfctx              :: PFWidgetCtx t
-  , _canvasWidgetConfig_tool             :: Event t Tool
+  , _canvasWidgetConfig_tool             :: Dynamic t Tool
   , _canvasWidgetConfig_selectionManager :: SelectionManager t
   , _canvasWidgetConfig_pfo              :: PFOutput t
 }
@@ -106,19 +119,14 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
     $ alignEventWithMaybe Just (_broadPhase_render broadPhase) (updated . _canvas_box $ _pfo_canvas _canvasWidgetConfig_pfo)
 
   -- ::cursor::
-  let
-    escEv = fforMaybe inp $ \case
-      V.EvKey (V.KEsc) [] -> Just ()
-      _ -> Nothing
-  cursor <- holdDyn CSSelecting $ leftmost [fmap tool_cursorState _canvasWidgetConfig_tool, CSSelecting <$ escEv]
-  dragOrigEv :: Event t ((CursorState, (Int,Int)), Drag2) <- drag2AttachOnStart V.BLeft (ffor2 (current cursor)  (current panPos) (,))
+  dragOrigEv :: Event t ((Tool, (Int,Int)), Drag2)
+    <- drag2AttachOnStart V.BLeft (ffor2 (current _canvasWidgetConfig_tool) (current panPos) (,))
   let
     -- ignore inputs captured by manipulator
     dragEv = difference dragOrigEv (_manipulatorWidget_didCaptureMouse manipulatorW)
-    cursorDragEv c' = cursorDragStateEv (Just c') Nothing dragEv
-    --cursorDraggingEv c' = cursorDragStateEv (Just c') (Just Dragging) dragEv
-    cursorStartEv c' = cursorDragStateEv (Just c') (Just DragStart) dragEv
-    cursorEndEv c' = cursorDragStateEv (Just c') (Just DragEnd) dragEv
+    toolDragEv c' = toolDragStateEv (Just c') Nothing dragEv
+    toolStartEv c' = toolDragStateEv (Just c') (Just DragStart) dragEv
+    toolEndEv c' = toolDragStateEv (Just c') (Just DragEnd) dragEv
 
   -- ::panning::
   LBox (V2 cx0 cy0) (V2 cw0 ch0) <- sample $ current (fmap renderedCanvas_box renderedCanvas)
@@ -127,7 +135,7 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
   let
     panFoldFn ((sx,sy), Drag2 (fromX, fromY) (toX, toY) _ _ _) _ = (sx + toX-fromX, sy + toY-fromY)
   -- panPos is position of upper left corner of canvas relative to screen
-  panPos <- foldDyn panFoldFn (cx0 - (cw0-pw0)`div`2, cy0 - (ch0-ph0)`div`2) $ cursorDragEv CSPan
+  panPos <- foldDyn panFoldFn (cx0 - (cw0-pw0)`div`2, cy0 - (ch0-ph0)`div`2) $ toolDragEv TPan
 
   -- ::selecting::
   -- TODO draw a select box I guess
@@ -145,7 +153,7 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
         bpt <- sample . current $ _broadPhase_bPTree broadPhase
         return $ Just $ (shiftClick, selectType $ broadPhase_cull selectBox bpt)
       _ -> return Nothing
-    selectEv = push selectPushFn (cursorEndEv CSSelecting)
+    selectEv = push selectPushFn (toolEndEv TSelect)
 
 
   -- ::new elts::
@@ -157,7 +165,7 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
       --return $ (pos, SEltLabel "<box>" $ SEltBox $ SBox (LBox (V2 (fromX-px) (fromY-py)) (V2 1 1)) def)
       -- 0,0 initial size is more correct for immediate manipulation, but kind of annoying as you can end up with 0x0 boxes very easily...
       return $ (pos, SEltLabel "<box>" $ SEltBox $ SBox (LBox (V2 (fromX-px) (fromY-py)) (V2 0 0)) def)
-    newBoxEv = pushAlways boxPushFn $ cursorStartEv CSBox
+    newBoxEv = pushAlways boxPushFn $ toolStartEv TBox
 
   -- ::draw the canvas::
   let
@@ -174,12 +182,12 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
       --, fmapLabelShow "select" selectEv
       --, fmapLabelShow "drag" dragEv
       --, fmapLabelShow "input" inp
-      --, fmapLabelShow "cursor" (updated cursor)
+      --, fmapLabelShow "_canvasWidgetConfig_tool" (updated _canvasWidgetConfig_tool)
       --, fmapLabelShow "selection" (updated $ _selectionManager_selected _canvasWidgetConfig_selectionManager)
       --, fmapLabelShow "manip" $ _manipulatorWidget_modify manipulatorW
       ]
     --fixed 1 $ row $ do
-    --  fixed 15 $ text $ fmap (\x -> "cursor: " <> show x) $ current cursor
+    --  fixed 15 $ text $ fmap (\x -> "_canvasWidgetConfig_tool: " <> show x) $ current _canvasWidgetConfig_tool
 
 
   -- ::manipulators::

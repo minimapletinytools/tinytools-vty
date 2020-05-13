@@ -11,7 +11,6 @@ import           Relude
 
 
 import           Potato.Flow
-import           Potato.Flow.Reflex.Vty.CanvasPane
 import           Potato.Flow.Reflex.Vty.Manipulator.Handle
 import           Potato.Flow.Reflex.Vty.Manipulator.Types
 import           Potato.Flow.Reflex.Vty.PFWidgetCtx

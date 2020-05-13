@@ -3,7 +3,6 @@
 
 module Potato.Flow.Reflex.Vty.Tools (
   Tool(..)
-  , tool_cursorState
   , ToolWidgetConfig(..)
   , ToolWidget(..)
   , holdToolsWidget
@@ -12,7 +11,6 @@ module Potato.Flow.Reflex.Vty.Tools (
 import           Relude
 
 import           Potato.Flow.Reflex.Vty.Attrs
-import           Potato.Flow.Reflex.Vty.CanvasPane
 import           Potato.Flow.Reflex.Vty.PFWidgetCtx
 import           Potato.Reflex.Vty.Helpers
 
@@ -66,11 +64,6 @@ radioList buttonsDyn activeDyn = do
 
 data Tool = TSelect | TPan | TBox | TLine | TText deriving (Eq, Show, Enum)
 
-tool_cursorState :: Tool -> CursorState
-tool_cursorState TPan = CSPan
-tool_cursorState TBox = CSBox
-tool_cursorState _    = CSSelecting
-
 data ToolWidgetConfig t = ToolWidgetConfig {
   _toolWidgetConfig_pfctx               :: PFWidgetCtx t
   , _toolWidgetConfig_setDefault        :: Event t ()
@@ -78,7 +71,7 @@ data ToolWidgetConfig t = ToolWidgetConfig {
 }
 
 data ToolWidget t = ToolWidget {
-  _toolWidget_tool :: Event t Tool
+  _toolWidget_tool :: Dynamic t Tool
 }
 
 
@@ -125,7 +118,7 @@ holdToolsWidget ToolWidgetConfig {..} = mdo
     , TText <$ leftmost [textB, keyPressEv 't']]
 
   return ToolWidget {
-    _toolWidget_tool = updated dynTool
+    _toolWidget_tool = dynTool
   }
 
   {-
