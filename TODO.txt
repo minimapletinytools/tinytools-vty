@@ -128,6 +128,7 @@ DONE-boundingbox stuff
 DONE-try this http://nominolo.blogspot.com/2010/04/haskell-tip-redirect-stdout-in-haskell.html to get stdout
 
 ::TODO::
+-click and release makes box with default size (so no 0 size boxes)
 -figure out how to choose boundingbox vs specific manipulator when only one elt is selected
   -you could do the "v" and "a" tool as in illustrator, probably the way to go
     -but what happens when you click and drag with the "a" tool?

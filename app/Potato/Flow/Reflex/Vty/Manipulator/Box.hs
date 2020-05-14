@@ -178,6 +178,9 @@ makeBoxManipWidget BoxManipWidgetConfig {..} = do
         return $ (pos, SEltLabel "<box>" $ SEltBox $ SBox (LBox (V2 (fromX-px) (fromY-py)) (V2 0 0)) def)
       newBoxEv' = pushAlways boxPushFn $ toolDragStateEv (Just TBox) (Just DragStart) _boxManipWidgetConfig_drag
       newBoxEv = fmap (\x -> (ManipStart, Right x)) newBoxEv'
+    -- TODO single click creates box with default size rather than 0 size
+    -- to do this, you need to listen for release event ater a new elt was created but  that weren't also returned by handles
+    -- (taking advantage of funny fact that releasing after a dragging a handle does produce an redundant manip event )
 
     -- ::handle events::
     let
