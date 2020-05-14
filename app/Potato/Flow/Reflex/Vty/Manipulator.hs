@@ -87,6 +87,7 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
   -- ::create the manipulators::
   boxManip <- makeBoxManipWidget  BoxManipWidgetConfig {
       _boxManipWidgetConfig_updated = selectManip MTagBox
+      , _boxManipWidgetConfig_tool = current _manipulatorWidgetConfig_tool
       , _boxManipWidgetConfig_drag  = _manipulatorWidgetConfig_drag
       , _boxManipWidgetConfig_panPos = _manipulatorWidgetConfig_panPos
       , _boxManipWidgetConfig_pfctx = _manipulatorWigetConfig_pfctx

@@ -107,6 +107,7 @@ makeDeltaBox bht (dx,dy) = case bht of
 data BoxManipWidgetConfig t = BoxManipWidgetConfig {
 
   _boxManipWidgetConfig_updated        :: Event t MBox
+  , _boxManipWidgetConfig_tool         :: Behavior t Tool
   , _boxManipWidgetConfig_drag         :: Event t (Tool, Drag2)
   , _boxManipWidgetConfig_panPos       :: Behavior t (Int, Int)
   , _boxManipWidgetConfig_selectionPos :: Behavior t LayerPos

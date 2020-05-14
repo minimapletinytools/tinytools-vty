@@ -127,7 +127,10 @@ DONE-move multiselect into selection manager
 
 
 ::TODO::
--click select seems to select bottom most now 
+-box handles still showing when they aren't suppose to
+  -prob will fix itself when you to BBoundingBox
+  -consider adding hide flag to handles
+-click select seems to select bottom most now
 -manipulator refactor
   -rearchitect
     -selection manager shows manipulator type
