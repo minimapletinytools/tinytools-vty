@@ -119,15 +119,25 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
     $ alignEventWithMaybe Just (_broadPhase_render broadPhase) (updated . _canvas_box $ _pfo_canvas _canvasWidgetConfig_pfo)
 
   -- ::cursor::
+  -- NOTE the way we check if drag events go to canvas vs handle is a little bad TODO please fix
   dragOrigEv :: Event t ((Tool, (Int,Int)), Drag2)
     <- drag2AttachOnStart V.BLeft (ffor2 (current _canvasWidgetConfig_tool) (current panPos) (,))
+  canvasIsDraggingDyn <- foldDynMaybe canvasIsDraggingDyn_foldfn False $ fmap snd $ dragEv
   let
-    -- ignore inputs captured by manipulator
-    -- TODO this breaks on cancel events
     dragEv = difference dragOrigEv (_manipulatorWidget_didCaptureMouse manipulatorW)
-    toolDragEv c' = toolDragStateEv (Just c') Nothing dragEv
     toolStartEv c' = toolDragStateEv (Just c') (Just DragStart) dragEv
-    toolEndEv c' = toolDragStateEv (Just c') (Just DragEnd) dragEv
+    toolDragEv c' = gate (current canvasIsDraggingDyn) $ toolDragStateEv (Just c') Nothing dragEv
+    toolEndEv c' = gate (current canvasIsDraggingDyn) $ toolDragStateEv (Just c') (Just DragEnd) dragEv
+    -- I'm still not totally sure if DragEnd is guarantee to trigger after a DragStart, but this is harmless-ish if it doesn't happen in this case
+    canvasIsDraggingDyn_foldfn :: Drag2 -> Bool -> Maybe Bool
+    canvasIsDraggingDyn_foldfn (Drag2 _ _ _ _ DragStart) _ = Just True
+    canvasIsDraggingDyn_foldfn (Drag2 _ _ _ _ DragEnd) _   = Just False
+    canvasIsDraggingDyn_foldfn _ _                         = Nothing
+
+
+
+
+
 
   -- ::panning::
   LBox (V2 cx0 cy0) (V2 cw0 ch0) <- sample $ current (fmap renderedCanvas_box renderedCanvas)
@@ -156,6 +166,9 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
         return $ Just $ (shiftClick, selectType $ broadPhase_cull selectBox bpt)
       _ -> return Nothing
     selectEv = push selectPushFn (toolEndEv TSelect)
+
+  --isSelectingDyn <- foldDyn False $ toolStart
+  --selectBoxDyn <- foldDyn Nothing
 
   -- ::draw the canvas::
   let

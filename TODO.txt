@@ -117,6 +117,7 @@
 -refactor selecting code
   -selecting code still runs after a cancel
   -single click -> straight into dragging
+  -select draws a box
 -create a common manipulator include file
   -all manipulators take a common input so you should just combine them into a single data struct
 
@@ -128,6 +129,9 @@ DONE-boundingbox stuff
 DONE-try this http://nominolo.blogspot.com/2010/04/haskell-tip-redirect-stdout-in-haskell.html to get stdout
 
 ::TODO::
+-manipulate many doesn't work well with inverted boxes
+  -one way to fix this is to force normalize boxes on ManipEnd but I don't like this... what if we want inverted stuff in the future?
+  -so the "right" way to fix is to store the normalized state at start of bulk manipulate in a dynamic
 -click and release makes box with default size (so no 0 size boxes)
 -figure out how to choose boundingbox vs specific manipulator when only one elt is selected
   -you could do the "v" and "a" tool as in illustrator, probably the way to go
