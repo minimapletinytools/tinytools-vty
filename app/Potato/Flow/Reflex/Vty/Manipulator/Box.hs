@@ -122,8 +122,11 @@ makeBoxManipWidget BoxManipWidgetConfig {..} = do
   -- ::created persistent dynamics (do not get recreated each time manipulator type changes)::
   let
     handleTypes = [BH_BR, BH_TL, BH_TR, BH_BL, BH_A]
-  mBoxDyn <- holdDyn Nothing
-    $ fmap Just _boxManipWidgetConfig_updated
+  mBoxDyn <- holdDyn Nothing $ leftmost
+    [ fmap Just _boxManipWidgetConfig_updated
+    -- TODO remove this temp hack to disable manipulator after cancel of newly created box
+    -- proper way is you need to listen/attach to toolDyn etc..
+    , _boxManipWidgetConfig_cancel $> Nothing]
 
 
   return $ mdo
