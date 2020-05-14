@@ -19,6 +19,7 @@ import           Potato.Reflex.Vty.Helpers
 import           Potato.Reflex.Vty.Widget
 import           Reflex.Potato.Helpers
 
+import           Control.Lens
 import           Control.Monad.Fix
 import qualified Data.IntMap.Strict                 as IM
 import           Data.These
@@ -29,8 +30,6 @@ import           Reflex.Vty
 
 
 
--- TODO rename to canvasCursorDragStateEv
--- TODO probably can delete panPos from the tuple, it's only needed by pan
 -- returns pan position at start of drag and dragging info filtered for tool/drag state
 toolDragStateEv :: (Reflex t)
   => Maybe Tool -- ^ tool state to select for
@@ -156,18 +155,6 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
       _ -> return Nothing
     selectEv = push selectPushFn (toolEndEv TSelect)
 
-
-  -- ::new elts::
-  -- TODO move this inside of Manipulator
-  let
-    boxPushFn ((px,py), Drag2 (fromX, fromY) _ _ _ _) = do
-      -- TODO this should not be responsible for choosing layer position
-      pos <- return 0
-      --return $ (pos, SEltLabel "<box>" $ SEltBox $ SBox (LBox (V2 (fromX-px) (fromY-py)) (V2 1 1)) def)
-      -- 0,0 initial size is more correct for immediate manipulation, but kind of annoying as you can end up with 0x0 boxes very easily...
-      return $ (pos, SEltLabel "<box>" $ SEltBox $ SBox (LBox (V2 (fromX-px) (fromY-py)) (V2 0 0)) def)
-    newBoxEv = pushAlways boxPushFn $ toolStartEv TBox
-
   -- ::draw the canvas::
   let
     canvasRegion = translate_dynRegion panPos $ dynLBox_to_dynRegion (fmap renderedCanvas_box renderedCanvas)
@@ -198,7 +185,7 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
         , _manipulatorWigetConfig_selected = _selectionManager_selected _canvasWidgetConfig_selectionManager
         , _manipulatorWidgetConfig_panPos = current panPos
         -- TODO this is not correct
-        , _manipulatorWidgetConfig_drag = fmap snd dragOrigEv
+        , _manipulatorWidgetConfig_drag = fmap (over _1 fst) dragOrigEv
         , _manipulatorWidgetConfig_tool = _canvasWidgetConfig_tool
       }
   manipulatorW <- holdManipulatorWidget manipCfg
@@ -206,9 +193,7 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
   return CanvasWidget {
       -- TODO
       _canvasWidget_isManipulating = constDyn False
-      , _canvasWidget_addSEltLabel = leftmostwarn "canvas add"
-        [fmap (\x -> (False, x)) newBoxEv
-        , _manipulatorWidget_add manipulatorW]
+      , _canvasWidget_addSEltLabel = _manipulatorWidget_add manipulatorW
       , _canvasWidget_modify = _manipulatorWidget_modify manipulatorW
       , _canvasWidget_select = selectEv
       -- TODO

@@ -28,7 +28,6 @@ import qualified Data.Text                          as T
 import           Data.Text.Zipper
 import qualified Data.Text.Zipper                   as TZ
 import           Data.These
-import           Data.Tuple.Extra
 
 import qualified Graphics.Vty                       as V
 import           Reflex
@@ -204,7 +203,7 @@ holdLayerWidget' LayerWidgetConfig {..} = do
     selectedEv :: Event t ([(REltId, LayerPos)])
     selectedEv = updated
       $ fmap (fmap (\(rid,lp,_) -> (rid,lp)))
-      $ fmap thd3
+      $ fmap snd
       $ _selectionManager_selected _layerWidgetConfig_selectionManager
 
     deselectAll :: REltIdMap LEltState -> REltIdMap LEltState

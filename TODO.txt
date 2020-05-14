@@ -127,6 +127,7 @@ DONE-move multiselect into selection manager
 
 
 ::TODO::
+-click select seems to select bottom most now 
 -manipulator refactor
   -rearchitect
     -selection manager shows manipulator type

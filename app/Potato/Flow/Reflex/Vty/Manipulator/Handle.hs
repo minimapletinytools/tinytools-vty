@@ -19,7 +19,6 @@ import           Potato.Reflex.Vty.Helpers
 import           Potato.Reflex.Vty.Widget
 
 import           Control.Monad.Fix
-import           Data.Tuple.Extra
 
 import qualified Graphics.Vty                             as V
 import           Reflex
@@ -78,9 +77,9 @@ holdHandle HandleWidgetConfig {..} = do
       mbox <- sample _handleWidgetConfig_mbox
       return $ case mbox of
         Nothing -> Nothing
-        Just box -> case dstate of
+        Just lbox -> case dstate of
           -- TODO
-          DragStart -> if does_LBox_contains_XY box (V2 fromX fromY)
+          DragStart -> if does_LBox_contains_XY lbox (V2 fromX fromY)
             then Just (ManipJustStart,  Nothing)
             else Nothing
           Dragging | forceDrag || tracking == ManipJustStart ->
@@ -88,13 +87,13 @@ holdHandle HandleWidgetConfig {..} = do
           Dragging -> if tracking /= ManipEnd
             then Just (Manipulating, Just (toX-fromX, toY-fromY))
             else Nothing
-          DragEnd -> if tracking == Manipulating
+          DragEnd -> if tracking /= ManipEnd
             then Just (ManipEnd, Just (toX-fromX, toY-fromY))
             else Nothing
 
   trackingDyn <- foldDynMaybeM trackMouse (ManipEnd, Nothing) $ attach _handleWidgetConfig_forceDrag $ _handleWidgetConfig_dragEv
 
-  --debugStream [fmapLabelShow "drag" $ _handleWidgetConfig_dragEv]
+  debugStream [fmapLabelShow "track" $ ffilter (\x -> fst x /= ManipJustStart) $  updated trackingDyn]
 
   return
     HandleWidget {

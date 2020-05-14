@@ -19,14 +19,8 @@ import           Potato.Flow.Reflex.Vty.Tools
 import           Potato.Reflex.Vty.Helpers
 import           Potato.Reflex.Vty.Widget
 
-import           Control.Exception
 import           Control.Lens                              (over, _1)
-import           Control.Monad.Fix
-import           Data.Dependent.Sum                        (DSum ((:=>)))
-import qualified Data.IntMap.Strict                        as IM
 import qualified Data.List.NonEmpty                        as NE
-import           Data.These
-import           Data.Tuple.Extra
 
 import           Reflex
 import           Reflex.Network
@@ -45,9 +39,9 @@ maybeRight _         = Nothing
 
 data ManipulatorWidgetConfig t = ManipulatorWidgetConfig {
   _manipulatorWigetConfig_pfctx      :: PFWidgetCtx t
-  , _manipulatorWigetConfig_selected :: Dynamic t (Bool, ManipSelectionType, [SuperSEltLabel])
+  , _manipulatorWigetConfig_selected :: Dynamic t (ManipSelectionType, [SuperSEltLabel])
   , _manipulatorWidgetConfig_panPos  :: Behavior t (Int, Int)
-  , _manipulatorWidgetConfig_drag    :: Event t Drag2
+  , _manipulatorWidgetConfig_drag    :: Event t (Tool, Drag2)
   , _manipulatorWidgetConfig_tool    :: Dynamic t Tool
 }
 
@@ -65,30 +59,20 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
 
   -- ::collected various change events::
   let selectionChangedEv = updated _manipulatorWigetConfig_selected
-  -- tracks whether an elements was newly created or not
-  -- NOTE very timing dependent
-  newEltBeh <- hold False (fmap fst3 selectionChangedEv)
-  -- LayerPos this is needed to recreate a new element after undoing it
-  selectionLayerPos <- hold (-1)
+
+  -- TODO make this position of last selected element
+  selectionLayerPosBeh :: Behavior t LayerPos <- hold (-1)
     $ fmap (maybe (-1) (\(_,lp,_) -> lp))
     $ fmap (viaNonEmpty NE.head)
-    $ fmap thd3 selectionChangedEv
-  let
-    -- TODO this is broken
-    wasLastModifyAdd = ffor3 (current isManipulatingDyn) newEltBeh selectionLayerPos (\m n lp -> if m && n then Just lp else Nothing)
+    $ fmap snd selectionChangedEv
 
   -- ::convert to Manipulator EventSelector::
-  dynManipulator <- toManipulator $ fmap thd3 selectionChangedEv
-  selectionTypeDyn <- holdDyn MSTNone (fmap snd3 selectionChangedEv)
+  dynManipulator <- toManipulator $ fmap snd selectionChangedEv
+  selectionTypeDyn <- holdDyn MSTNone $ fmap fst selectionChangedEv
 
   let
-    selectManip :: MTag a -> Event t (Bool, a)
-    selectManip mtag = r where
-      selectManip' = select (fanDSum (updated dynManipulator)) mtag
-      -- NOTE this completely negates the performance of using select/fan, you need to stick the tuple inside the DSum to do this right
-      alignfn (These ns m) = Just (ns, m)
-      alignfn _            = Nothing
-      r = alignEventWithMaybe alignfn (fmap fst3 $ selectionChangedEv) selectManip'
+    selectManip :: MTag a -> Event t a
+    selectManip mtag = select (fanDSum (updated dynManipulator)) mtag
 
   -- ::tools overwrite selection type::
   let
@@ -102,12 +86,11 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
 
   -- ::create the manipulators::
   boxManip <- makeBoxManipWidget  BoxManipWidgetConfig {
-      _boxManipWidgetConfig_wasLastModifyAdd = wasLastModifyAdd
-      , _boxManipWidgetConfig_isNewElt = newEltBeh
-      , _boxManipWidgetConfig_updated = selectManip MTagBox
+      _boxManipWidgetConfig_updated = selectManip MTagBox
       , _boxManipWidgetConfig_drag  = _manipulatorWidgetConfig_drag
       , _boxManipWidgetConfig_panPos = _manipulatorWidgetConfig_panPos
       , _boxManipWidgetConfig_pfctx = _manipulatorWigetConfig_pfctx
+      , _boxManipWidgetConfig_selectionPos = selectionLayerPosBeh
     }
 
   -- ::networkHold the correct manipulator::
@@ -116,10 +99,6 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
     finalManip = ffor (updated manipulatorTypeDyn) $ \case
       MSTBox -> boxManip
       _ -> return (never, never)
-  -- NOTE the 'networkHold' here doesn't seem to play well with other places where I use 'runWithAdjust'
-  -- thus, we use 'dynManipSelTypeChange' above instead to limit the number of times the widget changes (even if nothing actually changes)
-  -- CORRECTION, this is probbaly just because dynamics inside manip widgets are getting recreated by networkHold and less related to runWithAdjust conflicts
-  -- still better to have fewer network updates like this.
   manipWidget :: Dynamic t (ManipOutput t)
     <- networkHold (return (never, never)) finalManip
 
@@ -130,12 +109,12 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
     manipulateEv = fmap (over _1 needUndoFirst) $ rawManipEv
     didCaptureMouseEv :: Event t ()
     didCaptureMouseEv = switchDyn (fmap snd manipWidget)
-  isManipulatingDyn <- holdDyn False $ fmap isManipulating (fmap fst rawManipEv)
+  --isManipulatingDyn <- holdDyn False $ fmap isManipulating (fmap fst rawManipEv)
 
   debugStream [
     never
-    , fmapLabelShow "manip" $ manipulateEv
-    , fmapLabelShow "isManip" $ updated isManipulatingDyn
+    --, fmapLabelShow "manip" $ manipulateEv
+    --, fmapLabelShow "isManip" $ updated isManipulatingDyn
     --, fmapLabelShow "dynManip" $ selectionChangedEv
     --, fmapLabelShow "dynManip" $ selectManip MTagBox
     --, fmapLabelShow "changes" $ _sEltLayerTree_changeView $ _pfo_layers $ _pFWidgetCtx_pfo _manipulatorWigetConfig_pfctx

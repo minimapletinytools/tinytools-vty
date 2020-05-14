@@ -52,8 +52,7 @@ data SelectionManagerConfig t = SelectionManagerConfig {
 }
 
 data SelectionManager t = SelectionManager {
-  -- TODO remove the bool, canvas should track new elements itself I think
-  _selectionManager_selected :: Dynamic t (Bool, ManipSelectionType, [SuperSEltLabel]) -- (selection via newly created (but not pasted) only true for one frame where element was created, list of selected elements)
+  _selectionManager_selected :: Dynamic t (ManipSelectionType, [SuperSEltLabel]) -- (selection via newly created (but not pasted) only true for one frame where element was created, list of selected elements)
 }
 
 holdSelectionManager :: forall t m. (Reflex t, MonadHold t m, MonadFix m)
@@ -80,7 +79,7 @@ holdSelectionManager SelectionManagerConfig {..} = mdo
     selection_pushfn (addToSelection,lps) = if not addToSelection
       then return lps
       else do
-        currentSelection <- sample . current $ fmap (fmap snd3 . snd) selected
+        currentSelection <- sample . current $ (fmap (fmap snd3)) selected
         return $ disjointUnion lps currentSelection
 
     layerPosEvToSuperSEltLabelEv :: Event t [LayerPos] -> Event t [SuperSEltLabel]
@@ -116,32 +115,32 @@ holdSelectionManager SelectionManagerConfig {..} = mdo
 
     -- ::combine everything togethr
     selectedNew = leftmostwarn "SelectionManager - selectedNew"
-      [fmap (\x -> (True,  x)) selFromVeryNew
-      , fmap (\x -> (False, x)) selFromLayers
-      , fmap (\x -> (False, x)) selFromCanvas]
+      [selFromVeryNew
+      , selFromLayers
+      , selFromCanvas]
 
-    selectedInputEv :: Event t (These (Bool, [SuperSEltLabel]) (REltIdMap (Maybe SEltLabel)))
+    selectedInputEv :: Event t (These [SuperSEltLabel] (REltIdMap (Maybe SEltLabel)))
     selectedInputEv = alignEventWithMaybe Just selectedNew selChangesFromModified
 
     selectionFoldFn ::
-      These (Bool, [SuperSEltLabel]) (REltIdMap (Maybe SEltLabel))
-      -> (Bool, [SuperSEltLabel])
-      -> (Bool, [SuperSEltLabel])
+      These [SuperSEltLabel] (REltIdMap (Maybe SEltLabel))
+      -> [SuperSEltLabel]
+      -> [SuperSEltLabel]
     selectionFoldFn (This x) _ = x
     -- this will happen if we create a new element, in which case we've already read the most updated value in 'selFromVeryNew' and can safely ignore than changes
     selectionFoldFn (These x _) _ = x
-    selectionFoldFn (That slm) (_, ssls) = (False, foldr innerfoldfn [] ssls) where
+    selectionFoldFn (That slm) ssls = foldr innerfoldfn [] ssls where
       innerfoldfn sl@(rid, lp, _) acc = case IM.lookup rid slm of
         Nothing -> sl : acc
         Just mseltl -> case mseltl of
           Nothing    -> acc -- this means item got deleted
           Just seltl -> (rid, lp, seltl) : acc
 
-  selected :: Dynamic t (Bool, [SuperSEltLabel])
-    <- foldDyn selectionFoldFn (False, []) selectedInputEv
+  selected :: Dynamic t [SuperSEltLabel]
+    <- foldDyn selectionFoldFn [] selectedInputEv
   return
     SelectionManager {
-      _selectionManager_selected = fmap (\(b,sseltls) -> (b, computeSelectionType sseltls, sseltls)) selected
+      _selectionManager_selected = fmap (\sseltls ->  (computeSelectionType sseltls, sseltls)) selected
     }
 
 

@@ -102,18 +102,15 @@ mainPFWidget = mdo
     leftPanel = col $ do
       fixed 5 $ debugStream [
         never
+        , fmapLabelShow "doManipulate" $ doManipulate
+        , fmapLabelShow "doNewElt" $ doNewElt
         --, fmapLabelShow "undo" $ _canvasWidget_addSEltLabel canvasW
         --, fmapLabelShow "input" inp
-        --, fmapLabelShow "tool" (_toolWidget_tool toolsW)
-        --, fmapLabelShow "canvas size" $ updated . _canvas_box $ _pfo_canvas pfo
-        --, fmapLabelShow "render" $ fmap fst3 (_broadPhase_render broadPhase)
-        --, fmapLabelShow "change" $ fmap (fmap snd) $ _sEltLayerTree_changeView (_pfo_layers pfo)
         ]
       tools' <- fixed 10 $ holdToolsWidget $  ToolWidgetConfig {
           _toolWidgetConfig_pfctx = pfctx
           , _toolWidgetConfig_consumingKeyboard = consumingKeyboard
-          -- TODO hook up to new elt created I guess
-          , _toolWidgetConfig_setDefault = never
+          , _toolWidgetConfig_setDefault = never --void $ _canvasWidget_addSEltLabel canvasW
         }
 
       layers' <- stretch $ holdLayerWidget $ LayerWidgetConfig {
