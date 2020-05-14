@@ -119,31 +119,35 @@
   -single click -> straight into dragging
 -create a common manipulator include file
   -all manipulators take a common input so you should just combine them into a single data struct
--figure out how to choose boundingbox vs specific manipulator when only one elt is selected
-  -you could do the "v" and "a" tool as in illustrator, probably the way to go
-    -but what happens when you click and drag with the "a" tool?
+
 -get basic params working
--consider adding hide flag to handles
+DONE-consider adding hide flag to handles
   -very broken after switching to box tool when previous just created object was changed
 DONE-boundingbox stuff
   -use same code as MBox, but different behavior based on manipulateImmediately
 DONE-try this http://nominolo.blogspot.com/2010/04/haskell-tip-redirect-stdout-in-haskell.html to get stdout
 
 ::TODO::
+-figure out how to choose boundingbox vs specific manipulator when only one elt is selected
+  -you could do the "v" and "a" tool as in illustrator, probably the way to go
+    -but what happens when you click and drag with the "a" tool?
+-delete button support
+-duplicate support plz
 -refactor didCaptureInput so it's not done on a per event basis
 -consuming keyboard
 DONE/IGNORE-box handles still showing when they aren't suppose to
   -prob will fix itself when you to BBoundingBox
 -click select seems to select bottom most now
 -load file D: lots of work to do
+-render outside canvas border
 -I want it so selected elements get a soft highlight in the background D:
-  -this requires changing canvas render implementation
-  -maybe for now you can do annoying blink overlay D:
+  -do a second render of just selected elements
+    -backgroundFill to render empty stuff
+    -you can hook this up to the same delta rendering only
 -figure out how you want to handle vty attributes
--you need to do monolithic layers because processing drag events using widgets individually gets way too expensive
--consider storing visibility/lock states in SEltLabel
--consider hiding handle during creation drag
 -do render order properly in Canvas
+DONE-you need to do monolithic layers because processing drag events using widgets individually gets way too expensive5\IGNORE-consider storing visibility/lock states in SEltLabel
+IGNORE-consider hiding handle during creation drag
 DONE-move multiselect into selection manager
 DONE-probably remove cursor and just use tooldyn
 DONE-activate manipulator on tool select

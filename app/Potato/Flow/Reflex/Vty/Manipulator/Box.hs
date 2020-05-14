@@ -128,10 +128,7 @@ makeBoxManipWidget BoxManipWidgetConfig {..} = do
   let
     handleTypes = [BH_BR, BH_TL, BH_TR, BH_BL, BH_A]
   mBoxDyn <- holdDyn Nothing $ leftmost
-    [ fmap Just _boxManipWidgetConfig_updated
-    -- TODO remove this temp hack to disable manipulator after cancel of newly created box
-    -- proper way is you need to listen/attach to toolDyn etc..
-    , _boxManipWidgetConfig_cancel $> Nothing]
+    [ fmap Just _boxManipWidgetConfig_updated]
 
 
   return $ mdo
@@ -156,7 +153,7 @@ makeBoxManipWidget BoxManipWidgetConfig {..} = do
       holdHandle $ HandleWidgetConfig {
           _handleWidgetConfig_pfctx = _boxManipWidgetConfig_pfctx
           , _handleWidgetConfig_mbox = mHandleBoxBeh
-          , _handleWidgetConfig_graphic = constant $ manipChar bht
+          , _handleWidgetConfig_graphic = ffor _boxManipWidgetConfig_tool $ \tool -> if tool == TSelect then manipChar bht else Nothing
           , _handleWidgetConfig_dragEv = difference (toolDragStateEv Nothing Nothing _boxManipWidgetConfig_drag) newBoxEv
           , _handleWidgetConfig_forceDrag = if bht == BH_BR then current newEltDyn else constant False
           , _handleWidgetConfig_cancel = _boxManipWidgetConfig_cancel
