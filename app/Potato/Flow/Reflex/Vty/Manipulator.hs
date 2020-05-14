@@ -116,8 +116,8 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
     isManipulatingDyn_foldfn :: Either () ManipState -> Bool -> Bool
     isManipulatingDyn_foldfn (Left _) _   = False
     isManipulatingDyn_foldfn (Right ms) _ = isManipulating ms
-    isManipulatingDyn_foldfn _ _          = True
-  isManipulatingDyn <- foldDyn isManipulatingDyn_foldfn False $ leftmostassert "isManipulatingDyn" [fmap (Right . fst) rawManipEv, fmap Left (_pFWidgetCtx_ev_cancel _manipulatorWigetConfig_pfctx)]
+  isManipulatingDyn <- foldDyn isManipulatingDyn_foldfn False $
+    leftmostassert "isManipulatingDyn" [fmap (Right . fst) rawManipEv, fmap Left (_pFWidgetCtx_ev_cancel _manipulatorWigetConfig_pfctx)]
 
   let
     undoEv = gate (current isManipulatingDyn) (_pFWidgetCtx_ev_cancel _manipulatorWigetConfig_pfctx)

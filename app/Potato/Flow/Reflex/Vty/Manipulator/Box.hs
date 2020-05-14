@@ -2,7 +2,15 @@
 {-# LANGUAGE RecursiveDo     #-}
 
 module Potato.Flow.Reflex.Vty.Manipulator.Box (
+  -- * exposed for use in BoundingBox.hs
   BoxHandleType(..)
+  , manipChar
+  , makeHandleBox
+  , makeDeltaBox
+  , toolDragStateEv
+
+  -- *
+  , BoxHandleType(..)
   , BoxManipWidgetConfig(..)
   , makeBoxManipWidget
 ) where
@@ -49,19 +57,20 @@ toolDragStateEv c' d' dragEv = r where
 data BoxHandleType = BH_TL | BH_TR | BH_BL | BH_BR | BH_T | BH_B | BH_L | BH_R | BH_A deriving (Show, Eq, Enum)
 
 manipChar :: BoxHandleType -> Maybe Char
--- TODO Switch these all to something else since corners will flip sides
-manipChar BH_TL = Just '╝'
-manipChar BH_TR = Just '╚'
-manipChar BH_BL = Just '╗'
-manipChar BH_BR = Just '╔'
+--manipChar BH_TL = Just '╝'
+--manipChar BH_TR = Just '╚'
+--manipChar BH_BL = Just '╗'
+--manipChar BH_BR = Just '╔'
+manipChar BH_TL = Just '*'
+manipChar BH_TR = Just '*'
+manipChar BH_BL = Just '*'
+manipChar BH_BR = Just '*'
 manipChar BH_T  = Just '═'
 manipChar BH_B  = Just '═'
 manipChar BH_L  = Just '║'
 manipChar BH_R  = Just '║'
 manipChar BH_A  = Just '$'
 
-
---let brBeh = ffor2 _manipulatorWidgetConfig_panPos (current lBoxDyn) (makeHandleBox bht)
 
 makeHandleBox ::
   BoxHandleType
@@ -86,10 +95,6 @@ makeHandleBox bht (px, py) mlbox = case mlbox of
       r = x+px+w - nudgex
       b = y+py+h - nudgey
 
-
---Just $ (,) ms $ Left $ IM.singleton _mBox_target $ CTagBox :=> (Identity $ CBox {
---  _cBox_deltaBox = makeDeltaBox bht (dx, dy)
---})
 
 makeDeltaBox :: BoxHandleType -> (Int, Int) -> DeltaLBox
 makeDeltaBox bht (dx,dy) = case bht of
