@@ -194,7 +194,7 @@ makeBoxManipWidget BoxManipWidgetConfig {..} = do
           Nothing -> Nothing
           Just MBox {..} -> if newElt
             then assert (ms == ManipStart && bht == BH_BR) $ Just $ (,) Manipulating $ Right $
-              (remakelp, SEltLabel "<box>" $ SEltBox $ SBox (LBox (_lBox_ul _mBox_box) (V2 dx dy)) def)
+              (remakelp, SEltLabel "<box>" $ SEltBox $ SBox (LBox (_lBox_tl _mBox_box) (V2 dx dy)) def)
             else Just $ (,) ms $ Left $ IM.singleton _mBox_target $ CTagBox :=> (Identity $ CBox {
                 _cBox_deltaBox = makeDeltaBox bht (dx, dy)
               })
