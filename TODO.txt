@@ -114,21 +114,26 @@
 
 
 ::TODO TMRW::
--all manipulators take a common input so you should just combine them into a single data struct
+-refactor selecting code
+  -selecting code still runs after a cancel
+  -single click -> straight into dragging
 -create a common manipulator include file
--boundingbox stuff
-  -use same code as MBox, but different behavior based on manipulateImmediately
+  -all manipulators take a common input so you should just combine them into a single data struct
 -figure out how to choose boundingbox vs specific manipulator when only one elt is selected
   -you could do the "v" and "a" tool as in illustrator, probably the way to go
     -but what happens when you click and drag with the "a" tool?
 -get basic params working
+-consider adding hide flag to handles
+  -very broken after switching to box tool when previous just created object was changed
+DONE-boundingbox stuff
+  -use same code as MBox, but different behavior based on manipulateImmediately
 DONE-try this http://nominolo.blogspot.com/2010/04/haskell-tip-redirect-stdout-in-haskell.html to get stdout
 
 ::TODO::
+-refactor didCaptureInput so it's not done on a per event basis
 -consuming keyboard
--box handles still showing when they aren't suppose to
+DONE/IGNORE-box handles still showing when they aren't suppose to
   -prob will fix itself when you to BBoundingBox
-  -consider adding hide flag to handles
 -click select seems to select bottom most now
 -load file D: lots of work to do
 -I want it so selected elements get a soft highlight in the background D:
@@ -152,6 +157,7 @@ DONE-splitHDrag resizing is broken
 DONE-move TODO into vty
 
 ::FUTURE::
+-multiple BoundingBox scaling modes
 -add keyboard manipulation to manipulators
   -no selection -> pans canvas
 

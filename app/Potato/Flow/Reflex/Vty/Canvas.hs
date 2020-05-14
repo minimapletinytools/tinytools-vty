@@ -123,6 +123,7 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
     <- drag2AttachOnStart V.BLeft (ffor2 (current _canvasWidgetConfig_tool) (current panPos) (,))
   let
     -- ignore inputs captured by manipulator
+    -- TODO this breaks on cancel events
     dragEv = difference dragOrigEv (_manipulatorWidget_didCaptureMouse manipulatorW)
     toolDragEv c' = toolDragStateEv (Just c') Nothing dragEv
     toolStartEv c' = toolDragStateEv (Just c') (Just DragStart) dragEv

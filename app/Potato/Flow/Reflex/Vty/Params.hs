@@ -10,18 +10,22 @@ module Potato.Flow.Reflex.Vty.Params (
 import           Relude
 
 import           Potato.Flow
+import           Potato.Flow.Reflex.Vty.Manipulator.Types
 import           Potato.Flow.Reflex.Vty.PFWidgetCtx
 import           Potato.Flow.Reflex.Vty.Selection
 
 import           Control.Monad.Fix
 import           Control.Monad.NodeId
 
-import qualified Graphics.Vty                       as V
+import qualified Graphics.Vty                             as V
 import           Reflex
 import           Reflex.Vty
 
 
 
+data SEltParams = SEltParams {
+    --_sEltParams_sBox =
+  }
 
 data ParamsWidgetConfig t = ParamsWidgetConfig {
   _paramsWidgetConfig_pfctx              :: PFWidgetCtx t
@@ -31,15 +35,17 @@ data ParamsWidgetConfig t = ParamsWidgetConfig {
 data ParamsWidget t = ParamsWidget {
   _paramsWidget_consumingKeyboard :: Behavior t Bool
   , _paramsWidget_modify          :: Event t ControllersWithId
+
+  , _paramsWidget_defaults        :: Behavior t ()
 }
 
 holdParamsWidget :: forall t m. (PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m)
   => ParamsWidgetConfig t
   -> VtyWidget t m (ParamsWidget t)
 holdParamsWidget ParamsWidgetConfig {..} = do
-  --let
-  --  selected :: Dynamic t [SuperSEltLabel]
-  --  selected = fmap snd $ _selectionManager_selected _paramsWidgetConfig_selectionManager
+  let
+    selected :: Dynamic t (ManipSelectionType, [SuperSEltLabel])
+    selected = _selectionManager_selected _paramsWidgetConfig_selectionManager
 
   fill '#'
 
