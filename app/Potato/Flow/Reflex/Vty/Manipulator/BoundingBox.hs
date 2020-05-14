@@ -78,6 +78,7 @@ makeBoundingBoxManipWidget BoundingBoxManipWidgetConfig {..} = do
 
     vLayoutPad 4 $ debugStream $ [
       never
+      --, fmapLabelShow "modifyOrCreate" $ modifyOrCreateEv
       --, fmapLabelShow "box" $ _boundingBoxManipWidgetConfig_updated
       ] -- <> map (\(x,h) -> fmapLabelShow (show x) (_handleWidget_dragged h)) (zip handleTypes handles)
 

@@ -87,7 +87,7 @@ holdHandle HandleWidgetConfig {..} = do
           Dragging -> if tracking /= ManipEnd
             then Just (Manipulating, Just (toX-fromX, toY-fromY))
             else Nothing
-          DragEnd -> if tracking /= ManipEnd
+          DragEnd -> if tracking /= ManipEnd && tracking /= ManipJustStart
             then Just (ManipEnd, Just (toX-fromX, toY-fromY))
             else Nothing
 
