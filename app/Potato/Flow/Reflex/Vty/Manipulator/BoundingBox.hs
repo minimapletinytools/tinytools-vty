@@ -18,18 +18,12 @@ import           Potato.Flow.Reflex.Vty.Tools
 import           Potato.Reflex.Vty.Helpers
 import           Potato.Reflex.Vty.Widget
 
-import           Control.Exception
-import           Control.Lens                              (over, _1, _2)
-import           Control.Monad.Fix
+import           Control.Lens                              (over, _2)
 import           Data.Dependent.Sum                        (DSum ((:=>)))
 import qualified Data.IntMap.Strict                        as IM
 import qualified Data.List.NonEmpty                        as NE
-import           Data.These
-import           Data.Tuple.Extra
 
-import qualified Graphics.Vty                              as V
 import           Reflex
-import           Reflex.Network
 import           Reflex.Potato.Helpers
 import           Reflex.Vty
 
@@ -56,11 +50,6 @@ makeBoundingBoxManipWidget BoundingBoxManipWidgetConfig {..} = do
   mBoundingBoxDyn <- holdDyn Nothing $ fmap Just _boundingBoxManipWidgetConfig_updated
 
   return $ mdo
-    let
-      modifyFinalizedEv = leftmost
-        [ _boundingBoxManipWidgetConfig_cancel $> Right ()
-        , toolDragStateEv (Just TSelect) (Just DragEnd) _boundingBoxManipWidgetConfig_drag $> Right ()]
-
     handles <- forM handleTypes $ \bht -> do
       let mHandleBoxBeh = ffor2 _boundingBoxManipWidgetConfig_panPos (current (union_LBoxes . fmap snd . _mBoundingBox_bounded_targets <<$>> mBoundingBoxDyn)) (makeHandleBox bht)
 
@@ -92,8 +81,8 @@ makeBoundingBoxManipWidget BoundingBoxManipWidgetConfig {..} = do
         return $ case mmbox of
           Nothing -> Nothing
           Just MBoundingBox {..} -> Just $ (,) ms $ IM.fromList . NE.toList $ flip fmap _mBoundingBox_bounded_targets
-            -- TODO do relative scaling on orig
-            $ \(rid, orig) -> (rid, CTagBoundingBox :=> (Identity $ CBoundingBox {
+            -- TODO option for relative scaling on orig
+            $ \(rid, _) -> (rid, CTagBoundingBox :=> (Identity $ CBoundingBox {
                 _cBoundingBox_deltaBox = makeDeltaBox bht (dx, dy)
               }))
       modifyOrCreateEv :: Event t (ManipState, Either ControllersWithId (LayerPos, SEltLabel))

@@ -3,8 +3,7 @@
 
 module Potato.Flow.Reflex.Vty.Manipulator.Box (
   -- * exposed for use in BoundingBox.hs
-  BoxHandleType(..)
-  , manipChar
+  manipChar
   , makeHandleBox
   , makeDeltaBox
   , toolDragStateEv
@@ -27,17 +26,10 @@ import           Potato.Reflex.Vty.Helpers
 import           Potato.Reflex.Vty.Widget
 
 import           Control.Exception
-import           Control.Lens                              (over, _1)
-import           Control.Monad.Fix
 import           Data.Dependent.Sum                        (DSum ((:=>)))
 import qualified Data.IntMap.Strict                        as IM
-import qualified Data.List.NonEmpty                        as NE
-import           Data.These
-import           Data.Tuple.Extra
 
-import qualified Graphics.Vty                              as V
 import           Reflex
-import           Reflex.Network
 import           Reflex.Potato.Helpers
 import           Reflex.Vty
 

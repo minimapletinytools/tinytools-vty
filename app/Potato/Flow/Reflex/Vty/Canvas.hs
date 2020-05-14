@@ -20,7 +20,6 @@ import           Potato.Reflex.Vty.Widget
 import           Reflex.Potato.Helpers
 
 import           Control.Lens
-import           Control.Monad.Fix
 import qualified Data.IntMap.Strict                 as IM
 import           Data.These
 
@@ -79,7 +78,6 @@ holdCanvasWidget :: forall t m. (MonadWidget t m)
   => CanvasWidgetConfig t
   -> VtyWidget t m (CanvasWidget t)
 holdCanvasWidget CanvasWidgetConfig {..} = mdo
-  inp <- input
 
   -- ::prepare broadphase/canvas::
   let
@@ -122,22 +120,18 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
   -- NOTE the way we check if drag events go to canvas vs handle is a little bad TODO please fix
   dragOrigEv :: Event t ((Tool, (Int,Int)), Drag2)
     <- drag2AttachOnStart V.BLeft (ffor2 (current _canvasWidgetConfig_tool) (current panPos) (,))
-  canvasIsDraggingDyn <- foldDynMaybe canvasIsDraggingDyn_foldfn False $ fmap snd $ dragEv
+  canvasIsDraggingDyn <- foldDynMaybe canvasIsDraggingDyn_foldfn False $ fmap snd $ dragEv'
   let
-    dragEv = difference dragOrigEv (_manipulatorWidget_didCaptureMouse manipulatorW)
-    toolStartEv c' = toolDragStateEv (Just c') (Just DragStart) dragEv
-    toolDragEv c' = gate (current canvasIsDraggingDyn) $ toolDragStateEv (Just c') Nothing dragEv
-    toolEndEv c' = gate (current canvasIsDraggingDyn) $ toolDragStateEv (Just c') (Just DragEnd) dragEv
+    dragEv' = difference dragOrigEv (_manipulatorWidget_didCaptureMouse manipulatorW)
+    toolStartEv c' = toolDragStateEv (Just c') (Just DragStart) dragEv'
+    toolDragEv c' = gate (current canvasIsDraggingDyn) $ toolDragStateEv (Just c') Nothing dragEv'
+    toolEndEv c' = gate (current canvasIsDraggingDyn) $ toolDragStateEv (Just c') (Just DragEnd) dragEv'
+    dragEv c' = leftmost [toolStartEv c', toolDragEv c', toolEndEv c']
     -- I'm still not totally sure if DragEnd is guarantee to trigger after a DragStart, but this is harmless-ish if it doesn't happen in this case
     canvasIsDraggingDyn_foldfn :: Drag2 -> Bool -> Maybe Bool
     canvasIsDraggingDyn_foldfn (Drag2 _ _ _ _ DragStart) _ = Just True
     canvasIsDraggingDyn_foldfn (Drag2 _ _ _ _ DragEnd) _   = Just False
     canvasIsDraggingDyn_foldfn _ _                         = Nothing
-
-
-
-
-
 
   -- ::panning::
   LBox (V2 cx0 cy0) (V2 cw0 ch0) <- sample $ current (fmap renderedCanvas_box renderedCanvas)
@@ -149,12 +143,8 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
   panPos <- foldDyn panFoldFn (cx0 - (cw0-pw0)`div`2, cy0 - (ch0-ph0)`div`2) $ toolDragEv TPan
 
   -- ::selecting::
-  -- TODO draw a select box I guess
-  -- TODO go straight into CBoundingBox move on single select
-    --so listen to dragstart event and if it clicked on something pass through selection event and ignore dragend event
-    -- unless <some modifier> is held, in which case do normal selecting
   let
-    selectPushFn :: ((Int,Int),Drag2) -> PushM t (Maybe (Bool, Either [REltId] [REltId]))
+    selectPushFn :: ((Int,Int),Drag2) -> PushM t (Bool, Either [REltId] [REltId])
     selectPushFn ((sx,sy), drag) = case drag of
       Drag2 (fromX, fromY) (toX, toY) _ mods _ -> do
         let
@@ -163,12 +153,18 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
           selectBox = LBox (V2 (fromX-sx) (fromY-sy)) boxSize
           selectType = if boxSize == 0 then Left else Right
         bpt <- sample . current $ _broadPhase_bPTree broadPhase
-        return $ Just $ (shiftClick, selectType $ broadPhase_cull selectBox bpt)
-      _ -> return Nothing
-    selectEv = push selectPushFn (toolEndEv TSelect)
+        return $ (shiftClick, selectType $ broadPhase_cull selectBox bpt)
+    selectEv = pushAlways selectPushFn (toolEndEv TSelect)
+{-
+  -- TODO go straight into CBoundingBox move on single select
+    --so listen to dragstart event and if it clicked on something pass through selection event and ignore dragend event
+    -- unless <some modifier> is held, in which case do normal selecting
 
-  --isSelectingDyn <- foldDyn False $ toolStart
-  --selectBoxDyn <- foldDyn Nothing
+    TODO finish this
+    selectingBoxDyn_foldfn :: ((Int,Int),Drag2) -> (Bool, LBox) -> (Bool, LBox)
+    selectingBoxDyn_foldfn ((sx,sy), drag) _ = case drag of
+  selectingBoxDyn <- foldDyn selectingBoxDyn_foldfn (False, LBox 0 0) (dragEv TSelect)
+-}
 
   -- ::draw the canvas::
   let
