@@ -69,7 +69,7 @@ manipChar BH_T  = Just '═'
 manipChar BH_B  = Just '═'
 manipChar BH_L  = Just '║'
 manipChar BH_R  = Just '║'
-manipChar BH_A  = Just '$'
+manipChar BH_A  = Nothing --Just '$'
 
 
 makeHandleBox ::

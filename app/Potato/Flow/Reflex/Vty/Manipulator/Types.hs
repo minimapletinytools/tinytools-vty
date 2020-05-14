@@ -12,7 +12,7 @@ import           Reflex
 import           Reflex.Vty
 
 data ManipState = ManipJustStart | ManipStart | Manipulating | ManipEnd deriving (Show, Eq)
-data ManipSelectionType = MSTNone | MSTBox | MSTLine | MSTText | MSTBBox deriving (Show, Eq)
+data ManipSelectionType = MSTNone | MSTBox | MSTLine | MSTText | MSTBoundingBox deriving (Show, Eq)
 data ManipOutput t = ManipOutput {
   _manipOutput_manipulate :: Event t (ManipState, Either ControllersWithId (LayerPos, SEltLabel))
   , _manipOutput_consumedInput :: Event t ()

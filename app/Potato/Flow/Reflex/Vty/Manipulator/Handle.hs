@@ -95,7 +95,7 @@ holdHandle HandleWidgetConfig {..} = do
     [ fmap Left $ _handleWidgetConfig_cancel
     , fmap Right $ attach _handleWidgetConfig_forceDrag $ _handleWidgetConfig_dragEv]
 
-  debugStream [fmapLabelShow "track" $ ffilter (\x -> fst x /= ManipJustStart) $  updated trackingDyn]
+  --debugStream [fmapLabelShow "track" $ ffilter (\x -> fst x /= ManipJustStart) $  updated trackingDyn]
 
   return
     HandleWidget {

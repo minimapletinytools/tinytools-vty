@@ -169,4 +169,4 @@ MERGED-fixed an issue in `drag` where mouse down would trigger on wrong button
 -added `Drag2` and `drag2` which can track drag start events
   -TODO implement splitVDrag with Drag2 as an example
 -add default implementations of HasVtyInput, HasFocus and ImageWriter
--added
+-add hDuplicateTo for stderr

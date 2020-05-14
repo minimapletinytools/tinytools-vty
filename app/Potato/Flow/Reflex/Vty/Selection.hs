@@ -33,7 +33,7 @@ computeSelectionType = foldl' foldfn MSTNone where
       SEltLine _ -> MSTLine
       SEltText _ -> MSTText
       _          -> MSTNone
-    _ -> MSTBBox
+    _ -> MSTBoundingBox
 
 
 data SelectionManagerConfig t = SelectionManagerConfig {
