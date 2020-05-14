@@ -122,6 +122,7 @@
   -you could do the "v" and "a" tool as in illustrator, probably the way to go
     -but what happens when you click and drag with the "a" tool?
 -get basic params working
+DONE-try this http://nominolo.blogspot.com/2010/04/haskell-tip-redirect-stdout-in-haskell.html to get stdout
 
 ::TODO::
 -consuming keyboard
