@@ -112,6 +112,7 @@ data BoxManipWidgetConfig t = BoxManipWidgetConfig {
   , _boxManipWidgetConfig_panPos       :: Behavior t (Int, Int)
   , _boxManipWidgetConfig_selectionPos :: Behavior t LayerPos
   , _boxManipWidgetConfig_pfctx        :: PFWidgetCtx t
+  , _boxManipWidgetConfig_cancel       :: Event t ()
 }
 
 makeBoxManipWidget :: forall t m. (MonadWidget t m)
@@ -127,15 +128,15 @@ makeBoxManipWidget BoxManipWidgetConfig {..} = do
 
   return $ mdo
     let
-      -- this works for what we need it for, but semantically is kind of wrong
-      newEltFinalizedEv = toolDragStateEv Nothing (Just DragEnd) _boxManipWidgetConfig_drag $> Right ()
-
+      modifyFinalizedEv = leftmost
+        [ _boxManipWidgetConfig_cancel $> Right ()
+        , toolDragStateEv Nothing (Just DragEnd) _boxManipWidgetConfig_drag $> Right ()]
       newEltDyn_foldfn :: Either (ManipState, Either ControllersWithId (LayerPos, SEltLabel)) () -> Bool -> Bool
       newEltDyn_foldfn (Left (ManipEnd, _)) _ = False
       newEltDyn_foldfn (Left (_, Right _)) _  = True
       newEltDyn_foldfn _ _                    = False
     newEltDyn <- foldDyn newEltDyn_foldfn False $ leftmost [
-      newEltFinalizedEv
+      modifyFinalizedEv
       , fmap Left modifyOrCreateEv
       , fmap Left newBoxEv
       -- this does not work becaues if we undo first hence this happens one frame after newBoxEv/modifyOrCreateEv
@@ -150,19 +151,19 @@ makeBoxManipWidget BoxManipWidgetConfig {..} = do
           , _handleWidgetConfig_graphic = constant $ manipChar bht
           , _handleWidgetConfig_dragEv = difference (toolDragStateEv Nothing Nothing _boxManipWidgetConfig_drag) newBoxEv
           , _handleWidgetConfig_forceDrag = if bht == BH_BR then current newEltDyn else constant False
+          , _handleWidgetConfig_cancel = _boxManipWidgetConfig_cancel
         }
     let
       handleDragEv = leftmost $ fmap (\(bht, h) -> fmap (\x -> (bht,x)) $ _handleWidget_dragged h) $ zip handleTypes handles
       didCaptureInput = leftmost $ (newBoxEv $> ()) : fmap _handleWidget_didCaptureInput handles
 
-    vLayoutPad 3 $ debugStreamBeh $ [ fmapLabelShow "newElt" (current newEltDyn) ]
-
+    --vLayoutPad 3 $ debugStreamBeh $ [ fmapLabelShow "newElt" (current newEltDyn) ]
     vLayoutPad 4 $ debugStream $ [
       never
-      , fmapLabelShow "box" $ _boxManipWidgetConfig_updated
-      , fmapLabelShow "drag" $ _boxManipWidgetConfig_drag
-      , fmapLabelShow "moc" $ modifyOrCreateEv
-      ] <> map (\(x,h) -> fmapLabelShow (show x) (_handleWidget_dragged h)) (zip handleTypes handles)
+      --, fmapLabelShow "box" $ _boxManipWidgetConfig_updated
+      --, fmapLabelShow "drag" $ _boxManipWidgetConfig_drag
+      --, fmapLabelShow "moc" $ modifyOrCreateEv
+      ] -- <> map (\(x,h) -> fmapLabelShow (show x) (_handleWidget_dragged h)) (zip handleTypes handles)
 
     -- ::create new events::
     let
@@ -191,4 +192,11 @@ makeBoxManipWidget BoxManipWidgetConfig {..} = do
               })
       modifyOrCreateEv :: Event t (ManipState, Either ControllersWithId (LayerPos, SEltLabel))
       modifyOrCreateEv = push pushfn handleDragEv
-    return (leftmostassert "create box" [modifyOrCreateEv, newBoxEv], didCaptureInput)
+
+      manipulateEv = leftmostassert "box manipulate" [modifyOrCreateEv, newBoxEv]
+
+    return
+      ManipOutput {
+        _manipOutput_manipulate = manipulateEv
+        , _manipOutput_consumedInput = didCaptureInput
+      }

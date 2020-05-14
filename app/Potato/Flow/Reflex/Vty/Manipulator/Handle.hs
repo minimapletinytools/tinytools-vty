@@ -45,9 +45,8 @@ data HandleWidgetConfig t = HandleWidgetConfig {
   , _handleWidgetConfig_mbox      :: Behavior t (Maybe LBox) -- ^ if this is Nothing, the handle is effecitvely disabled
   , _handleWidgetConfig_graphic   :: Behavior t (Maybe Char)
   , _handleWidgetConfig_dragEv    :: Event t Drag2
-
-  -- N.B. very sensitive to timing, this needs to sync up one frame after networkHold
   , _handleWidgetConfig_forceDrag :: Behavior t Bool
+  , _handleWidgetConfig_cancel    :: Event t ()
 }
 
 data HandleWidget t = HandleWidget {
@@ -70,10 +69,11 @@ holdHandle HandleWidgetConfig {..} = do
   -- handle input
   let
     trackMouse ::
-      (Bool, Drag2)
+      Either () (Bool, Drag2)
       -> (ManipState, Maybe (Int, Int))
       -> PushM t (Maybe (ManipState, Maybe (Int, Int)))
-    trackMouse (forceDrag, (Drag2 (fromX, fromY) (toX, toY) _ _ dstate)) (tracking, _) = do
+    trackMouse (Left _) _ = return $ Just (ManipEnd, Nothing)
+    trackMouse (Right (forceDrag, (Drag2 (fromX, fromY) (toX, toY) _ _ dstate))) (tracking, _) = do
       mbox <- sample _handleWidgetConfig_mbox
       return $ case mbox of
         Nothing -> Nothing
@@ -91,7 +91,9 @@ holdHandle HandleWidgetConfig {..} = do
             then Just (ManipEnd, Just (toX-fromX, toY-fromY))
             else Nothing
 
-  trackingDyn <- foldDynMaybeM trackMouse (ManipEnd, Nothing) $ attach _handleWidgetConfig_forceDrag $ _handleWidgetConfig_dragEv
+  trackingDyn <- foldDynMaybeM trackMouse (ManipEnd, Nothing) $ leftmost
+    [ fmap Left $ _handleWidgetConfig_cancel
+    , fmap Right $ attach _handleWidgetConfig_forceDrag $ _handleWidgetConfig_dragEv]
 
   debugStream [fmapLabelShow "track" $ ffilter (\x -> fst x /= ManipJustStart) $  updated trackingDyn]
 

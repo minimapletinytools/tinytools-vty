@@ -109,7 +109,7 @@ holdToolsWidget ToolWidgetConfig {..} = mdo
   dynTool <- holdDyn TSelect $ leftmost
     [TSelect <$ leftmost
       [ selectB
-      , onlyIfBeh (_pFWidgetCtx_ev_cancel _toolWidgetConfig_pfctx) allowKB
+      --, onlyIfBeh (_pFWidgetCtx_ev_cancel _toolWidgetConfig_pfctx) allowKB
       , _toolWidgetConfig_setDefault
       , keyPressEv 'v']
     , TPan <$ leftmost [panB, keyPressEv ' ']

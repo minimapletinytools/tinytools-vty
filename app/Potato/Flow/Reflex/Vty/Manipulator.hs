@@ -50,6 +50,7 @@ data ManipulatorWidget t = ManipulatorWidget {
   , _manipulatorWidget_add             :: Event t (Bool, (LayerPos, SEltLabel)) -- ^ first param is whether we should undo previous action or not
   --, _manipulatorWidget_manipulating :: Dynamic t Bool
   , _manipulatorWidget_didCaptureMouse :: Event t ()
+  , _manipulatorWidget_undo            :: Event t ()
 }
 
 holdManipulatorWidget :: forall t m. (MonadWidget t m)
@@ -92,6 +93,7 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
       , _boxManipWidgetConfig_panPos = _manipulatorWidgetConfig_panPos
       , _boxManipWidgetConfig_pfctx = _manipulatorWigetConfig_pfctx
       , _boxManipWidgetConfig_selectionPos = selectionLayerPosBeh
+      , _boxManipWidgetConfig_cancel = undoEv
     }
 
   -- ::networkHold the correct manipulator::
@@ -99,18 +101,26 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
     finalManip :: Event t (VtyWidget t m (ManipOutput t))
     finalManip = ffor (updated manipulatorTypeDyn) $ \case
       MSTBox -> boxManip
-      _ -> return (never, never)
+      _ -> return $ ManipOutput never never
   manipWidget :: Dynamic t (ManipOutput t)
-    <- networkHold (return (never, never)) finalManip
+    <- networkHold (return (ManipOutput never never)) finalManip
 
   -- ::collect output events::
   let
-    rawManipEv = switchDyn (fmap fst manipWidget)
+    rawManipEv = switchDyn (fmap _manipOutput_manipulate manipWidget)
     manipulateEv :: Event t (Bool, Either ControllersWithId (LayerPos, SEltLabel))
     manipulateEv = fmap (over _1 needUndoFirst) $ rawManipEv
     didCaptureMouseEv :: Event t ()
-    didCaptureMouseEv = switchDyn (fmap snd manipWidget)
-  --isManipulatingDyn <- holdDyn False $ fmap isManipulating (fmap fst rawManipEv)
+    didCaptureMouseEv = switchDyn (fmap _manipOutput_consumedInput manipWidget)
+
+    isManipulatingDyn_foldfn :: Either () ManipState -> Bool -> Bool
+    isManipulatingDyn_foldfn (Left _) _   = False
+    isManipulatingDyn_foldfn (Right ms) _ = isManipulating ms
+    isManipulatingDyn_foldfn _ _          = True
+  isManipulatingDyn <- foldDyn isManipulatingDyn_foldfn False $ leftmostassert "isManipulatingDyn" [fmap (Right . fst) rawManipEv, fmap Left (_pFWidgetCtx_ev_cancel _manipulatorWigetConfig_pfctx)]
+
+  let
+    undoEv = gate (current isManipulatingDyn) (_pFWidgetCtx_ev_cancel _manipulatorWigetConfig_pfctx)
 
   debugStream [
     never
@@ -126,4 +136,5 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
       _manipulatorWidget_modify = fmapMaybe (\(b,e) -> maybeLeft e >>= (\l -> return (b,l))) manipulateEv
       , _manipulatorWidget_add = fmapMaybe (\(b,e) -> maybeRight e >>= (\r -> return (b,r))) manipulateEv
       , _manipulatorWidget_didCaptureMouse = didCaptureMouseEv
+      , _manipulatorWidget_undo = undoEv
     }

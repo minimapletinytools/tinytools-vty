@@ -59,7 +59,7 @@ extra-deps:
 - github: pdlla/reflex-dynamic-containers
   commit: 607cf12fe2b0df1eb3bf3ccdc49e62744cba95ba
 - github: pdlla/reflex-potatoes
-  commit: 9b03e229f3d101e4a9fc88b56b83a33a598ce7f4
+  commit: 5651a28eaa4cb7052c9a8181da119bef3e440786
 - github: pdlla/potato-flow
   commit: 2d40a0f7838339b46e3be07ddb2826bfac9b67b4
 - github: pdlla/reflex-vty

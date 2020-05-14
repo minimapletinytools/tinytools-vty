@@ -72,6 +72,7 @@ data CanvasWidget t = CanvasWidget {
 
   , _canvasWidget_consumingKeyboard :: Behavior t Bool
   , _canvasWidget_select            :: Event t (Bool, Either [REltId] [REltId]) -- ^ (left is select single, right is select many)
+  , _canvasWidget_undo              :: Event t ()
 }
 
 holdCanvasWidget :: forall t m. (MonadWidget t m)
@@ -198,5 +199,6 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
       , _canvasWidget_select = selectEv
       -- TODO
       , _canvasWidget_consumingKeyboard = constant False
+      , _canvasWidget_undo = _manipulatorWidget_undo manipulatorW
 
     }
