@@ -27,8 +27,6 @@ import qualified Graphics.Vty                       as V
 import           Reflex
 import           Reflex.Vty
 
-
-
 -- returns pan position at start of drag and dragging info filtered for tool/drag state
 toolDragStateEv :: (Reflex t)
   => Maybe Tool -- ^ tool state to select for
@@ -118,6 +116,7 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
 
   -- ::cursor::
   -- NOTE the way we check if drag events go to canvas vs handle is a little bad TODO please fix
+  -- probably each manipulator should just have a begin/end event to wrestle control?
   dragOrigEv :: Event t ((Tool, (Int,Int)), Drag2)
     <- drag2AttachOnStart V.BLeft (ffor2 (current _canvasWidgetConfig_tool) (current panPos) (,))
   canvasIsDraggingDyn <- foldDynMaybe canvasIsDraggingDyn_foldfn False $ fmap snd $ dragEv'

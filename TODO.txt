@@ -110,6 +110,13 @@
 -params
   -line style
 
+::new dragging::
+-manipulator takes a (Event t Drag -> Event t Drag) where output event fires if manip does not use drag
+-create  drag :: Dynamic (Dynamic Drag)
+  -each new mouse down event changes the outside dynamic,
+  -somehow track release events so we know when we're done dragging
+
+
 ::params::
 
 
