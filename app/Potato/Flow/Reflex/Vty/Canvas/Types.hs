@@ -3,7 +3,8 @@
 
 
 module Potato.Flow.Reflex.Vty.Canvas.Types (
-  TrackedDrag(..)
+  CanvasDrag
+  , TrackedDrag(..)
   , trackDrag
   , captureTrackedDrag
   , switchTrackedDrag
@@ -24,18 +25,18 @@ import           Reflex
 import           Reflex.Potato.Helpers
 import           Reflex.Vty
 
-type CanvasDrag = (Tool, (Int,Int), Drag2)
+type CanvasDrag = ((Tool, (Int,Int)), Drag2)
 
-data TrackedDrag t = TrackedDrag {
-  _trackedDrag_drag       :: Event t CanvasDrag -- (tool at start of drag, pan position at start of drag, drag info)
+data TrackedDrag t a = TrackedDrag {
+  _trackedDrag_drag       :: Event t (a, Drag2) -- (tool at start of drag, pan position at start of drag, drag info)
   , _trackedDrag_cancel   :: Event t ()
   , _trackedDrag_dragging :: Dynamic t Bool
 }
 
 trackDrag :: (Reflex t, MonadFix m, MonadHold t m)
-  => Event t (Tool, (Int, Int), Drag2)
+  => Event t (a, Drag2)
   -> Event t () -- ^ force cancel event
-  -> m (TrackedDrag t)
+  -> m (TrackedDrag t a)
 trackDrag dragEv cancelEv = do
   let
     isTrackingDyn_foldfn :: Either DragState () -> Bool -> Maybe Bool
@@ -43,7 +44,7 @@ trackDrag dragEv cancelEv = do
     isTrackingDyn_foldfn (Left DragEnd) _   = Just False
     isTrackingDyn_foldfn (Right _) _        = Just False
     isTrackingDyn_foldfn _ _                = Nothing
-  isTrackingDyn <- foldDynMaybe isTrackingDyn_foldfn False $ alignEitherAssert "tracking drag" (fmap (_drag2_state . thd3) dragEv) cancelEv
+  isTrackingDyn <- foldDynMaybe isTrackingDyn_foldfn False $ alignEitherAssert "tracking drag" (fmap (_drag2_state . snd) dragEv) cancelEv
   return $
     TrackedDrag  {
       _trackedDrag_drag = dragEv
@@ -51,10 +52,10 @@ trackDrag dragEv cancelEv = do
       , _trackedDrag_dragging = isTrackingDyn
     }
 
-captureTrackedDrag :: forall t m. (Reflex t, MonadFix m, MonadHold t m)
-  => TrackedDrag t
+captureTrackedDrag :: forall t m a. (Reflex t, MonadFix m, MonadHold t m)
+  => TrackedDrag t a
   -> Event t () -- ^ captures the whole drag if this event fires at the same time as a DragStart
-  -> m (Dynamic t (TrackedDrag t))
+  -> m (Dynamic t (TrackedDrag t a))
 captureTrackedDrag orig@TrackedDrag {..} didCaptureEv = do
   let
     neverPass = TrackedDrag {
@@ -75,10 +76,10 @@ captureTrackedDrag orig@TrackedDrag {..} didCaptureEv = do
     isCapturingDyn_foldfn (This (Right _)) _           = Just False
     isCapturingDyn_foldfn _ _                          = Nothing
 
-  isCapturingDyn <- foldDynMaybe isCapturingDyn_foldfn False $ align (alignEitherAssert "capture drag" (fmap (_drag2_state . thd3) _trackedDrag_drag) _trackedDrag_cancel) didCaptureEv
+  isCapturingDyn <- foldDynMaybe isCapturingDyn_foldfn False $ align (alignEitherAssert "capture drag" (fmap (_drag2_state . snd) _trackedDrag_drag) _trackedDrag_cancel) didCaptureEv
   return $ fmap (\c -> if c then neverPass else orig) isCapturingDyn
 
-switchTrackedDrag :: (Reflex t) => Dynamic t (TrackedDrag t) -> TrackedDrag t
+switchTrackedDrag :: (Reflex t) => Dynamic t (TrackedDrag t a ) -> TrackedDrag t a
 switchTrackedDrag dtd = r where
   dragEv = switchDyn $ fmap _trackedDrag_drag dtd
   cancelEv = switchDyn $ fmap _trackedDrag_cancel dtd
