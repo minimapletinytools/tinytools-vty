@@ -98,6 +98,7 @@
 
 ::line tool::
 -series of points restricted to V/H
+
 ::text tool::
 -click once and just start typing, return adds a new line
 -click and drag to establish an area to type in
@@ -105,10 +106,12 @@
   -text align
   -insert vs overwrite
     -need a way to convert overwrite to insert based on text align without adding too many space characters
+
 ::free line tool::
 -series of points
 -params
   -line style
+
 
 ::new dragging::
 -manipulator takes a (Event t Drag -> Event t Drag) where output event fires if manip does not use drag
@@ -121,14 +124,14 @@
 
 
 ::TODO TMRW::
--refactor selecting code
-  -selecting code still runs after a cancel
-  -single click -> straight into dragging
-  -select draws a box
+
+-single click -> straight into dragging (see commens in Canvas)
 -create a common manipulator include file
   -all manipulators take a common input so you should just combine them into a single data struct
-
 -get basic params working
+DONE-refactor selecting code
+  DONE-selecting code still runs after a cancel
+  DONE-select draws a box
 DONE-consider adding hide flag to handles
   -very broken after switching to box tool when previous just created object was changed
 DONE-boundingbox stuff

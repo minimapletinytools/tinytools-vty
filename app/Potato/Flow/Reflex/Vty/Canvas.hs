@@ -18,29 +18,14 @@ import           Potato.Flow.Reflex.Vty.Selection
 import           Potato.Flow.Reflex.Vty.Tools
 import           Potato.Reflex.Vty.Helpers
 import           Potato.Reflex.Vty.Widget
-import           Reflex.Potato.Helpers
 
-import           Control.Lens
 import qualified Data.IntMap.Strict                  as IM
+import qualified Data.Text                           as T
 import           Data.These
 
 import qualified Graphics.Vty                        as V
 import           Reflex
 import           Reflex.Vty
-
--- returns pan position at start of drag and dragging info filtered for tool/drag state
-toolDragStateEv :: (Reflex t)
-  => Maybe Tool -- ^ tool state to select for
-  -> Maybe DragState
-  -> Event t CanvasDrag
-  -> Event t ((Int,Int), Drag2)
-toolDragStateEv c' d' dragEv = r where
-  fmapMaybeFn ((c,p),d) = if maybe True (_drag2_state d  ==) d' && maybe True (c ==) c'
-    then Just (p,d)
-    else Nothing
-  r = fmapMaybe fmapMaybeFn dragEv
-
-
 
 
 dynLBox_to_dynRegion :: (Reflex t) => Dynamic t LBox -> DynRegion t
@@ -142,9 +127,6 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
   manipulatorW <- holdManipulatorWidget manipCfg
   trackedDrag1 <- return $ _manipulatorWidget_trackedDrag manipulatorW
 
-
-
-
   -- ::panning::
   (trackedDrag2, panDrag) <- filterCanvasTrackedDrag (Just TPan) trackedDrag1
   let
@@ -159,10 +141,18 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
 
 
   -- ::selecting::
+  -- TODO go straight into CBoundingBox move on single select
+  -- this requires manipulator to be capturing the drag after selection (which happens one frame later)
+  -- so to do this, have a separate routine that checks for click on a single element, manipulator captures drag in this case
+  -- code below can stay as before
   (_, selectDrag) <- filterCanvasTrackedDrag (Just TSelect) trackedDrag2
   let
-    selectPushFn :: ((Int,Int),Drag2) -> PushM t (Bool, Either [REltId] [REltId])
-    selectPushFn ((sx,sy), drag) = case drag of
+    selectLBox_foldfn :: ((Int,Int), Drag2) -> Maybe LBox -> Maybe LBox
+    selectLBox_foldfn (_, d) _ = case d of
+      Drag2 _ _ _ _ DragEnd -> Nothing
+      Drag2 (fromX, fromY) (toX, toY) _ _ _ -> Just $ LBox (V2 fromX fromY) (V2 (toX-fromX) (toY-fromY))
+    selectEv_pushfn :: ((Int,Int), Drag2) -> PushM t (Bool, Either [REltId] [REltId])
+    selectEv_pushfn ((sx,sy), d) = case d of
       Drag2 (fromX, fromY) (toX, toY) _ mods _ -> do
         let
           shiftClick = isJust $ find (==V.MShift) mods
@@ -171,18 +161,9 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
           selectType = if boxSize == 0 then Left else Right
         bpt <- sample . current $ _broadPhase_bPTree broadPhase
         return $ (shiftClick, selectType $ broadPhase_cull selectBox bpt)
-    selectEv = pushAlways selectPushFn $ _trackedDrag_drag selectDrag
-{-
-  -- TODO go straight into CBoundingBox move on single select
-    --so listen to dragstart event and if it clicked on something pass through selection event and ignore dragend event
-    -- unless <some modifier> is held, in which case do normal selecting
-
-    TODO finish this
-    selectingBoxDyn_foldfn :: ((Int,Int),Drag2) -> (Bool, LBox) -> (Bool, LBox)
-    selectingBoxDyn_foldfn ((sx,sy), drag) _ = case drag of
-  selectingBoxDyn <- foldDyn selectingBoxDyn_foldfn (False, LBox 0 0) (dragEv TSelect)
--}
-
+    selectEv = pushAlways selectEv_pushfn $ _trackedDrag_drag selectDrag
+  selectLBox <- foldDyn selectLBox_foldfn Nothing $ _trackedDrag_drag selectDrag
+  selectBoxWidget $ fmap (maybe (LBox 0 0) id) selectLBox
 
   -- ::info pane::
   col $ do
@@ -210,3 +191,70 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
       , _canvasWidget_undo = _manipulatorWidget_undo manipulatorW
 
     }
+
+
+
+
+
+
+
+-- box drawing code for selection box
+-- pretty much copy pasted from boxTitle in 'Reflex.Vty.Widget'
+withinImage :: Region -> V.Image -> V.Image
+withinImage (Region left top width height)
+  | width < 0 || height < 0 = withinImage (Region left top 0 0)
+  | otherwise = V.translate left top . V.crop width height
+selectBoxWidget' :: (Monad m, Reflex t, MonadNodeId m)
+    => Behavior t BoxStyle
+    -> Text
+    -> VtyWidget t m a
+    -> VtyWidget t m a
+selectBoxWidget' boxStyle title child = do
+  dh <- displayHeight
+  dw <- displayWidth
+  let boxReg = DynRegion (pure 0) (pure 0) dw dh
+      innerReg = DynRegion (pure 1) (pure 1) (subtract 2 <$> dw) (subtract 2 <$> dh)
+  tellImages (boxImages <$> boxStyle <*> currentRegion boxReg)
+  --tellImages (fmap (\r -> [regionBlankImage r]) (currentRegion innerReg))
+  pane innerReg (pure True) child
+  where
+    boxImages :: BoxStyle -> Region -> [V.Image]
+    boxImages style (Region left top width height) =
+      let right = left + width - 1
+          bottom = top + height - 1
+          sides =
+            [ withinImage (Region (left + 1) top (width - 2) 1) $
+                V.text' V.defAttr $
+                  hPadText title (_boxStyle_n style) (width - 2)
+            , withinImage (Region right (top + 1) 1 (height - 2)) $
+                V.charFill V.defAttr (_boxStyle_e style) 1 (height - 2)
+            , withinImage (Region (left + 1) bottom (width - 2) 1) $
+                V.charFill V.defAttr (_boxStyle_s style) (width - 2) 1
+            , withinImage (Region left (top + 1) 1 (height - 2)) $
+                V.charFill V.defAttr (_boxStyle_w style) 1 (height - 2)
+            ]
+          corners =
+            [ withinImage (Region left top 1 1) $
+                V.char V.defAttr (_boxStyle_nw style)
+            , withinImage (Region right top 1 1) $
+                V.char V.defAttr (_boxStyle_ne style)
+            , withinImage (Region right bottom 1 1) $
+                V.char V.defAttr (_boxStyle_se style)
+            , withinImage (Region left bottom 1 1) $
+                V.char V.defAttr (_boxStyle_sw style)
+            ]
+      in sides ++ if width > 1 && height > 1 then corners else []
+    hPadText :: T.Text -> Char -> Int -> T.Text
+    hPadText t c l = if lt >= l
+                     then t
+                     else left <> t <> right
+      where
+        lt = T.length t
+        delta = l - lt
+        mkHalf n = T.replicate (n `div` 2) (T.singleton c)
+        left = mkHalf $ delta + 1
+        right = mkHalf delta
+selectBoxWidget :: (Reflex t, MonadNodeId m)
+  => Dynamic t LBox
+  -> VtyWidget t m ()
+selectBoxWidget db = pane (dynLBox_to_dynRegion db) (constDyn False) $ selectBoxWidget' (constant singleBoxStyle) mempty (return ())
