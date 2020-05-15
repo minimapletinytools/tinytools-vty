@@ -95,13 +95,13 @@ captureTrackedDrag' orig@TrackedDrag {..} didCaptureEv = do
 
 switchTrackedDrag :: (Reflex t) => Dynamic t (TrackedDrag t a) -> TrackedDrag t a
 switchTrackedDrag dtd = r where
-  dragEv = switchDyn $ fmap _trackedDrag_drag dtd
-  cancelEv = switchDyn $ fmap _trackedDrag_cancel dtd
-  draggingBeh = join $ fmap _trackedDrag_dragging dtd
+  dragEv = switchPromptlyDyn $ fmap _trackedDrag_drag dtd
+  cancelEv = switchPromptlyDyn $ fmap _trackedDrag_cancel dtd
+  draggingDyn = join $ fmap _trackedDrag_dragging dtd
   r = TrackedDrag {
       _trackedDrag_drag = dragEv
       , _trackedDrag_cancel = cancelEv
-      , _trackedDrag_dragging = draggingBeh
+      , _trackedDrag_dragging = draggingDyn
     }
 
 captureTrackedDrag :: forall t m a. (Reflex t, MonadFix m, MonadHold t m)
