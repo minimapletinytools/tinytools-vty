@@ -11,6 +11,7 @@ module Potato.Flow.Reflex.Vty.Canvas (
 import           Relude
 
 import           Potato.Flow
+import           Potato.Flow.Reflex.Vty.Canvas.Types
 import           Potato.Flow.Reflex.Vty.Manipulator
 import           Potato.Flow.Reflex.Vty.PFWidgetCtx
 import           Potato.Flow.Reflex.Vty.Selection
@@ -20,10 +21,10 @@ import           Potato.Reflex.Vty.Widget
 import           Reflex.Potato.Helpers
 
 import           Control.Lens
-import qualified Data.IntMap.Strict                 as IM
+import qualified Data.IntMap.Strict                  as IM
 import           Data.These
 
-import qualified Graphics.Vty                       as V
+import qualified Graphics.Vty                        as V
 import           Reflex
 import           Reflex.Vty
 
@@ -31,13 +32,16 @@ import           Reflex.Vty
 toolDragStateEv :: (Reflex t)
   => Maybe Tool -- ^ tool state to select for
   -> Maybe DragState
-  -> Event t ((Tool, (Int,Int)), Drag2) -- ^ ((tool, panPos), drag)
+  -> Event t CanvasDrag
   -> Event t ((Int,Int), Drag2)
 toolDragStateEv c' d' dragEv = r where
   fmapMaybeFn ((c,p),d) = if maybe True (_drag2_state d  ==) d' && maybe True (c ==) c'
     then Just (p,d)
     else Nothing
   r = fmapMaybe fmapMaybeFn dragEv
+
+
+
 
 dynLBox_to_dynRegion :: (Reflex t) => Dynamic t LBox -> DynRegion t
 dynLBox_to_dynRegion dlb = r where
@@ -110,38 +114,52 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
     foldCanvasFn (These _ _) _ = error "resize and change events should never occur simultaneously"
   broadPhase <- holdBroadPhase bpc
 
-  -- ::prepare rendered canvas ::
+  -- ::draw the canvas ::
   renderedCanvas <- foldDynM foldCanvasFn (emptyRenderedCanvas defaultCanvasLBox)
     $ alignEventWithMaybe Just (_broadPhase_render broadPhase) (updated . _canvas_box $ _pfo_canvas _canvasWidgetConfig_pfo)
-
-  -- ::cursor::
-  -- NOTE the way we check if drag events go to canvas vs handle is a little bad TODO please fix
-  -- probably each manipulator should just have a begin/end event to wrestle control?
-  dragOrigEv :: Event t ((Tool, (Int,Int)), Drag2)
-    <- drag2AttachOnStart V.BLeft (ffor2 (current _canvasWidgetConfig_tool) (current panPos) (,))
-  canvasIsDraggingDyn <- foldDynMaybe canvasIsDraggingDyn_foldfn False $ fmap snd $ dragEv'
   let
-    dragEv' = difference dragOrigEv (_manipulatorWidget_didCaptureMouse manipulatorW)
-    toolStartEv c' = toolDragStateEv (Just c') (Just DragStart) dragEv'
-    toolDragEv c' = gate (current canvasIsDraggingDyn) $ toolDragStateEv (Just c') Nothing dragEv'
-    toolEndEv c' = gate (current canvasIsDraggingDyn) $ toolDragStateEv (Just c') (Just DragEnd) dragEv'
-    dragEv c' = leftmost [toolStartEv c', toolDragEv c', toolEndEv c']
-    -- I'm still not totally sure if DragEnd is guarantee to trigger after a DragStart, but this is harmless-ish if it doesn't happen in this case
-    canvasIsDraggingDyn_foldfn :: Drag2 -> Bool -> Maybe Bool
-    canvasIsDraggingDyn_foldfn (Drag2 _ _ _ _ DragStart) _ = Just True
-    canvasIsDraggingDyn_foldfn (Drag2 _ _ _ _ DragEnd) _   = Just False
-    canvasIsDraggingDyn_foldfn _ _                         = Nothing
+    canvasRegion = translate_dynRegion panPos $ dynLBox_to_dynRegion (fmap renderedCanvas_box renderedCanvas)
+  fill '░'
+  pane canvasRegion (constDyn True) $ do
+    text $ current (fmap renderedCanvasToText renderedCanvas)
+
+
+  -- ::drag events::
+  dragOrigEv :: Event t CanvasDrag
+    <- drag2AttachOnStart V.BLeft (ffor2 (current _canvasWidgetConfig_tool) (current panPos) (,))
+  trackedDrag0 <- trackDrag dragOrigEv (_pFWidgetCtx_ev_cancel _canvasWidgetConfig_pfctx)
+
+  -- ::create manipulator::
+  -- since trackDrag is monadic, drag consumers must be created in order
+  let
+    manipCfg = ManipulatorWidgetConfig {
+        _manipulatorWigetConfig_pfctx = _canvasWidgetConfig_pfctx
+        , _manipulatorWigetConfig_selected = _selectionManager_selected _canvasWidgetConfig_selectionManager
+        , _manipulatorWidgetConfig_panPos = current panPos
+        , _manipulatorWidgetConfig_trackedDrag = trackedDrag0
+        , _manipulatorWidgetConfig_tool = _canvasWidgetConfig_tool
+      }
+  manipulatorW <- holdManipulatorWidget manipCfg
+  trackedDrag1 <- return $ _manipulatorWidget_trackedDrag manipulatorW
+
+
+
 
   -- ::panning::
+  (trackedDrag2, panDrag) <- filterCanvasTrackedDrag (Just TPan) trackedDrag1
+  let
+    panFoldFn :: Either ((Int,Int), Drag2) () -> (Int,Int) -> (Int, Int)
+    -- TODO needs to sample last finalized pan position from somewhere..
+    panFoldFn (Right _) p = p
+    panFoldFn (Left ((sx,sy), Drag2 (fromX, fromY) (toX, toY) _ _ _)) _ = (sx + toX-fromX, sy + toY-fromY)
   LBox (V2 cx0 cy0) (V2 cw0 ch0) <- sample $ current (fmap renderedCanvas_box renderedCanvas)
   pw0 <- displayWidth >>= sample . current
   ph0 <- displayHeight >>= sample . current
-  let
-    panFoldFn ((sx,sy), Drag2 (fromX, fromY) (toX, toY) _ _ _) _ = (sx + toX-fromX, sy + toY-fromY)
-  -- panPos is position of upper left corner of canvas relative to screen
-  panPos <- foldDyn panFoldFn (cx0 - (cw0-pw0)`div`2, cy0 - (ch0-ph0)`div`2) $ toolDragEv TPan
+  panPos <- foldDyn panFoldFn (cx0 - (cw0-pw0)`div`2, cy0 - (ch0-ph0)`div`2) $ alignTrackedDrag panDrag
+
 
   -- ::selecting::
+  (_, selectDrag) <- filterCanvasTrackedDrag (Just TSelect) trackedDrag2
   let
     selectPushFn :: ((Int,Int),Drag2) -> PushM t (Bool, Either [REltId] [REltId])
     selectPushFn ((sx,sy), drag) = case drag of
@@ -153,7 +171,7 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
           selectType = if boxSize == 0 then Left else Right
         bpt <- sample . current $ _broadPhase_bPTree broadPhase
         return $ (shiftClick, selectType $ broadPhase_cull selectBox bpt)
-    selectEv = pushAlways selectPushFn (toolEndEv TSelect)
+    selectEv = pushAlways selectPushFn $ _trackedDrag_drag selectDrag
 {-
   -- TODO go straight into CBoundingBox move on single select
     --so listen to dragstart event and if it clicked on something pass through selection event and ignore dragend event
@@ -165,19 +183,13 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
   selectingBoxDyn <- foldDyn selectingBoxDyn_foldfn (False, LBox 0 0) (dragEv TSelect)
 -}
 
-  -- ::draw the canvas::
-  let
-    canvasRegion = translate_dynRegion panPos $ dynLBox_to_dynRegion (fmap renderedCanvas_box renderedCanvas)
-  fill '░'
-  pane canvasRegion (constDyn True) $ do
-    text $ current (fmap renderedCanvasToText renderedCanvas)
 
   -- ::info pane::
   col $ do
     fixed 2 $ debugStream
       [
       never
-      --, fmapLabelShow "select" selectEv
+      --, fmapLabelShow "pan" (_trackedDrag_drag panDrag)
       --, fmapLabelShow "drag" dragEv
       --, fmapLabelShow "input" inp
       --, fmapLabelShow "_canvasWidgetConfig_tool" (updated _canvasWidgetConfig_tool)
@@ -186,19 +198,6 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
       ]
     --fixed 1 $ row $ do
     --  fixed 15 $ text $ fmap (\x -> "_canvasWidgetConfig_tool: " <> show x) $ current _canvasWidgetConfig_tool
-
-
-  -- ::manipulators::
-  let
-    manipCfg = ManipulatorWidgetConfig {
-        _manipulatorWigetConfig_pfctx = _canvasWidgetConfig_pfctx
-        , _manipulatorWigetConfig_selected = _selectionManager_selected _canvasWidgetConfig_selectionManager
-        , _manipulatorWidgetConfig_panPos = current panPos
-        -- TODO this is not correct
-        , _manipulatorWidgetConfig_drag = fmap (over _1 fst) dragOrigEv
-        , _manipulatorWidgetConfig_tool = _canvasWidgetConfig_tool
-      }
-  manipulatorW <- holdManipulatorWidget manipCfg
 
   return CanvasWidget {
       -- TODO

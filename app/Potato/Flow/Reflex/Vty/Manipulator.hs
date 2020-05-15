@@ -11,6 +11,7 @@ import           Relude
 
 
 import           Potato.Flow
+import           Potato.Flow.Reflex.Vty.Canvas.Types
 import           Potato.Flow.Reflex.Vty.Manipulator.BoundingBox
 import           Potato.Flow.Reflex.Vty.Manipulator.Box
 import           Potato.Flow.Reflex.Vty.Manipulator.Handle
@@ -42,16 +43,17 @@ data ManipulatorWidgetConfig t = ManipulatorWidgetConfig {
   _manipulatorWigetConfig_pfctx      :: PFWidgetCtx t
   , _manipulatorWigetConfig_selected :: Dynamic t (ManipSelectionType, [SuperSEltLabel])
   , _manipulatorWidgetConfig_panPos  :: Behavior t (Int, Int)
-  , _manipulatorWidgetConfig_drag    :: Event t (Tool, Drag2)
   , _manipulatorWidgetConfig_tool    :: Dynamic t Tool
+
+  , _manipulatorWidgetConfig_trackedDrag :: CanvasTrackedDrag t
 }
 
 data ManipulatorWidget t = ManipulatorWidget {
-  _manipulatorWidget_modify            :: Event t (Bool, ControllersWithId) -- ^ first param is whether we should undo previous action or not
-  , _manipulatorWidget_add             :: Event t (Bool, (LayerPos, SEltLabel)) -- ^ first param is whether we should undo previous action or not
-  --, _manipulatorWidget_manipulating :: Dynamic t Bool
-  , _manipulatorWidget_didCaptureMouse :: Event t ()
-  , _manipulatorWidget_undo            :: Event t ()
+  _manipulatorWidget_modify        :: Event t (Bool, ControllersWithId) -- ^ first param is whether we should undo previous action or not
+  , _manipulatorWidget_add         :: Event t (Bool, (LayerPos, SEltLabel)) -- ^ first param is whether we should undo previous action or not
+  , _manipulatorWidget_undo        :: Event t ()
+
+  , _manipulatorWidget_trackedDrag :: CanvasTrackedDrag t
 }
 
 holdManipulatorWidget :: forall t m. (MonadWidget t m)
@@ -90,7 +92,7 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
   boxManip <- makeBoxManipWidget  BoxManipWidgetConfig {
       _boxManipWidgetConfig_updated = selectManip MTagBox
       , _boxManipWidgetConfig_tool = current _manipulatorWidgetConfig_tool
-      , _boxManipWidgetConfig_drag  = _manipulatorWidgetConfig_drag
+      , _boxManipWidgetConfig_drag  = fmap (over _1 fst) $ _trackedDrag_drag _manipulatorWidgetConfig_trackedDrag
       , _boxManipWidgetConfig_panPos = _manipulatorWidgetConfig_panPos
       , _boxManipWidgetConfig_pfctx = _manipulatorWigetConfig_pfctx
       , _boxManipWidgetConfig_selectionPos = selectionLayerPosBeh
@@ -99,7 +101,7 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
 
   boundingBoxManip <- makeBoundingBoxManipWidget BoundingBoxManipWidgetConfig {
       _boundingBoxManipWidgetConfig_updated  = selectManip MTagBoundingBox
-      , _boundingBoxManipWidgetConfig_drag   = _manipulatorWidgetConfig_drag
+      , _boundingBoxManipWidgetConfig_drag   = fmap (over _1 fst) $ _trackedDrag_drag _manipulatorWidgetConfig_trackedDrag
       , _boundingBoxManipWidgetConfig_panPos = _manipulatorWidgetConfig_panPos
       , _boundingBoxManipWidgetConfig_pfctx  = _manipulatorWigetConfig_pfctx
       , _boundingBoxManipWidgetConfig_cancel = undoEv
@@ -142,10 +144,13 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
     --, fmapLabelShow "changes" $ _sEltLayerTree_changeView $ _pfo_layers $ _pFWidgetCtx_pfo _manipulatorWigetConfig_pfctx
     ]
 
+
+  outTrackedDragDyn <- captureTrackedDrag _manipulatorWidgetConfig_trackedDrag didCaptureMouseEv
+
   return
     ManipulatorWidget {
       _manipulatorWidget_modify = fmapMaybe (\(b,e) -> maybeLeft e >>= (\l -> return (b,l))) manipulateEv
       , _manipulatorWidget_add = fmapMaybe (\(b,e) -> maybeRight e >>= (\r -> return (b,r))) manipulateEv
-      , _manipulatorWidget_didCaptureMouse = didCaptureMouseEv
       , _manipulatorWidget_undo = undoEv
+      , _manipulatorWidget_trackedDrag = outTrackedDragDyn
     }

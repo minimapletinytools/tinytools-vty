@@ -31,7 +31,6 @@ import           Reflex.Vty
 union_LBoxes :: NonEmpty LBox -> LBox
 union_LBoxes (x:|xs) = foldl' union_LBox x xs
 
-
 data BoundingBoxManipWidgetConfig t = BoundingBoxManipWidgetConfig {
   _boundingBoxManipWidgetConfig_updated  :: Event t MBoundingBox
   , _boundingBoxManipWidgetConfig_drag   :: Event t (Tool, Drag2)

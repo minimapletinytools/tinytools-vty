@@ -25,8 +25,6 @@ import           Reflex
 import           Reflex.Vty
 
 
-
-
 needUndoFirst :: ManipState -> Bool
 needUndoFirst ManipStart     = False
 needUndoFirst ManipJustStart = error "this should never happen"
