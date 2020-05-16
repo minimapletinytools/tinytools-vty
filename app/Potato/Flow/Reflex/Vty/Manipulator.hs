@@ -134,9 +134,12 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
   let
     undoEv = gate (current isManipulatingDyn) (_pFWidgetCtx_ev_cancel _manipulatorWigetConfig_pfctx)
 
-  debugStream [
+  outTrackedDragDyn <- captureTrackedDrag _manipulatorWidgetConfig_trackedDrag didCaptureMouseEv
+
+
+  vLayoutPad 12 $ debugStream [
     never
-    --, fmapLabelShow "manipType" $ updated manipulatorTypeDyn
+    , fmapLabelShow "capture" $ didCaptureMouseEv
     --, fmapLabelShow "manip" $ manipulateEv
     --, fmapLabelShow "isManip" $ updated isManipulatingDyn
     --, fmapLabelShow "dynManip" $ selectionChangedEv
@@ -145,7 +148,7 @@ holdManipulatorWidget ManipulatorWidgetConfig {..} = mdo
     ]
 
 
-  outTrackedDragDyn <- captureTrackedDrag _manipulatorWidgetConfig_trackedDrag didCaptureMouseEv
+
 
   return
     ManipulatorWidget {

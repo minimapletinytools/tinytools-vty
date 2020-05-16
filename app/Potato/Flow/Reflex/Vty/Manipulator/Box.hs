@@ -157,8 +157,9 @@ makeBoxManipWidget BoxManipWidgetConfig {..} = do
     --vLayoutPad 3 $ debugStreamBeh $ [ fmapLabelShow "newElt" (current newEltDyn) ]
     vLayoutPad 4 $ debugStream $ [
       never
+      , fmapLabelShow "capture" $ didCaptureInput
       --, fmapLabelShow "box" $ _boxManipWidgetConfig_updated
-      --, fmapLabelShow "drag" $ _boxManipWidgetConfig_drag
+      , fmapLabelShow "drag" $ _boxManipWidgetConfig_drag
       --, fmapLabelShow "moc" $ modifyOrCreateEv
       ] -- <> map (\(x,h) -> fmapLabelShow (show x) (_handleWidget_dragged h)) (zip handleTypes handles)
 

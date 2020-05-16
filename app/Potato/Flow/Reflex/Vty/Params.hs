@@ -23,10 +23,6 @@ import           Reflex.Vty
 
 
 
-data SEltParams = SEltParams {
-    --_sEltParams_sBox =
-  }
-
 data ParamsWidgetConfig t = ParamsWidgetConfig {
   _paramsWidgetConfig_pfctx              :: PFWidgetCtx t
   , _paramsWidgetConfig_selectionManager :: SelectionManager t
@@ -36,7 +32,7 @@ data ParamsWidget t = ParamsWidget {
   _paramsWidget_consumingKeyboard :: Behavior t Bool
   , _paramsWidget_modify          :: Event t ControllersWithId
 
-  , _paramsWidget_defaults        :: Behavior t ()
+  , _paramsWidget_default_sBox    :: Behavior t SBox
 }
 
 holdParamsWidget :: forall t m. (PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m)
@@ -49,7 +45,15 @@ holdParamsWidget ParamsWidgetConfig {..} = do
 
   fill '#'
 
+  -- TODO how to handle multi-select with different styles?
+  -- input events: selection changed,
+  --sboxDyn <- foldDyn sboxDyn_foldfn (SBox (LBox 0 1) def)
+
   return ParamsWidget {
     -- TODO
     _paramsWidget_consumingKeyboard = constant False
+    -- TODO
+    , _paramsWidget_modify = never
+    -- TODO
+    , _paramsWidget_default_sBox = undefined
   }

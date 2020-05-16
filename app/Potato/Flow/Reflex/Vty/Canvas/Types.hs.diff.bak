@@ -47,7 +47,15 @@ data TrackedDrag t a = TrackedDrag {
 instance (Reflex t) => Functor (TrackedDrag t) where
   fmap f td = td { _trackedDrag_drag = fmap (over _1 f) $ _trackedDrag_drag td }
 
-trackDrag :: (Reflex t, MonadFix m, MonadHold t m, MonadSample t m)
+gateOrSimultaneous :: (Reflex t)
+  => Behavior t Bool -- ^ gates on this behavior
+  -> Event t a -- ^ but also passes events on if it fired simulatenously with this one
+  -> Event t b
+  -> Event t b
+gateOrSimulataneous gbeh sev ev = leftmost [fmap fst (simultaneous sev ev), gate gbeh ev]
+
+
+trackDrag :: (Reflex t, MonadFix m, MonadHold t m)
   => Event t (a, Drag2)
   -> Event t () -- ^ force cancel event
   -> m (TrackedDrag t a)
@@ -60,11 +68,11 @@ trackDrag dragEv cancelEv = do
     isTrackingDyn_foldfn _ _                = Nothing
   isTrackingDyn <- foldDynMaybe isTrackingDyn_foldfn False $ alignEitherAssert "tracking drag" (fmap (_drag2_state . snd) dragEv) cancelEv
   let
-    outDragEv = flip push dragEv $ \out@(a, Drag2 _ _ _ _ ds) -> case ds of
-      DragStart -> return $ Just out
+    outDragEv = flip push dragEv $ \out@(a, Drag _ _ _ _ ds) -> case ds of
+      DragStart -> Just out
       _ -> do
         tracking <- sample . current $ isTrackingDyn
-        return $ if tracking then Just out else Nothing
+        if tracking then Just out else Nothing
   return $
     TrackedDrag  {
       _trackedDrag_drag = outDragEv
@@ -86,6 +94,18 @@ captureTrackedDrag' :: forall t m a. (Reflex t, MonadFix m, MonadHold t m)
   -> m (Dynamic t (TrackedDrag t a, TrackedDrag t a)) -- ^ (uncaptured, captured)
 captureTrackedDrag' orig@TrackedDrag {..} didCaptureEv = do
   let
+
+
+
+  return $ fmap (\c -> if c then (neverTrackedDrag, orig) else (orig, neverTrackedDrag)) isCapturingDyn
+
+-- | capture a TrackedDrag, returns uncaptured drags
+captureTrackedDrag :: forall t m a. (Reflex t, MonadFix m, MonadHold t m)
+  => TrackedDrag t a
+  -> Event t () -- ^ captures the whole drag if this event fires at the same time as a DragStart
+  -> m (TrackedDrag t a) -- ^ uncaptured drags
+captureTrackedDrag TrackedDrag {..} didCaptureEv = do
+  let
     isCapturingDyn_foldfn :: These (Either DragState ()) () -> Bool -> Maybe Bool
     -- begin capture on simultaneous DragStart and capture events
     isCapturingDyn_foldfn (These (Left DragStart) _) _ = Just True
@@ -99,28 +119,8 @@ captureTrackedDrag' orig@TrackedDrag {..} didCaptureEv = do
 
   isCapturingDyn <- foldDynMaybe isCapturingDyn_foldfn False
     $ align (alignEitherAssert "capture drag" (fmap (_drag2_state . snd) _trackedDrag_drag) _trackedDrag_cancel) didCaptureEv
-  return $ fmap (\c -> if c then (neverTrackedDrag, orig) else (orig, neverTrackedDrag)) isCapturingDyn
 
-switchTrackedDrag :: (Reflex t) => Dynamic t (TrackedDrag t a) -> TrackedDrag t a
-switchTrackedDrag dtd = r where
-  -- this is the only one that really needs to happen promptly
-  dragEv = switchPromptlyDyn $ fmap _trackedDrag_drag dtd
-  cancelEv = switchDyn $ fmap _trackedDrag_cancel dtd
-  draggingDyn = join $ fmap _trackedDrag_dragging dtd
-  r = TrackedDrag {
-      _trackedDrag_drag = dragEv
-      , _trackedDrag_cancel = cancelEv
-      , _trackedDrag_dragging = draggingDyn
-    }
-
--- | capture a TrackedDrag, returns uncaptured drags
-captureTrackedDrag :: forall t m a. (Reflex t, MonadFix m, MonadHold t m)
-  => TrackedDrag t a
-  -> Event t () -- ^ captures the whole drag if this event fires at the same time as a DragStart
-  -> m (TrackedDrag t a) -- ^ uncaptured drags
-captureTrackedDrag orig didCaptureEv = do
-  tddyn <- captureTrackedDrag' orig didCaptureEv
-  return $ switchTrackedDrag (fmap fst tddyn)
+  trackDrag (difference outDragEv didCaptureEv) (gate (current . fmap not $ isCapturingDyn) cancelEv)
 
 -- | use this helper method to create dynamics that follow drags until it ends or is cancelled
 alignTrackedDrag :: (Reflex t)

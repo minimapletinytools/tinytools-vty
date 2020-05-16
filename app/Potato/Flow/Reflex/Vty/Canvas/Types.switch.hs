@@ -47,7 +47,7 @@ data TrackedDrag t a = TrackedDrag {
 instance (Reflex t) => Functor (TrackedDrag t) where
   fmap f td = td { _trackedDrag_drag = fmap (over _1 f) $ _trackedDrag_drag td }
 
-trackDrag :: (Reflex t, MonadFix m, MonadHold t m, MonadSample t m)
+trackDrag :: (Reflex t, MonadFix m, MonadHold t m)
   => Event t (a, Drag2)
   -> Event t () -- ^ force cancel event
   -> m (TrackedDrag t a)
@@ -59,15 +59,9 @@ trackDrag dragEv cancelEv = do
     isTrackingDyn_foldfn (Right _) _        = Just False
     isTrackingDyn_foldfn _ _                = Nothing
   isTrackingDyn <- foldDynMaybe isTrackingDyn_foldfn False $ alignEitherAssert "tracking drag" (fmap (_drag2_state . snd) dragEv) cancelEv
-  let
-    outDragEv = flip push dragEv $ \out@(a, Drag2 _ _ _ _ ds) -> case ds of
-      DragStart -> return $ Just out
-      _ -> do
-        tracking <- sample . current $ isTrackingDyn
-        return $ if tracking then Just out else Nothing
   return $
     TrackedDrag  {
-      _trackedDrag_drag = outDragEv
+      _trackedDrag_drag = dragEv
       , _trackedDrag_cancel = cancelEv
       , _trackedDrag_dragging = isTrackingDyn
     }

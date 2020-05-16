@@ -53,7 +53,7 @@ data HandleWidget t = HandleWidget {
 }
 
 -- TODO this needs to be able to render lines as well (or maybe that's a diff function)
-holdHandle :: forall t m. (Reflex t, MonadHold t m, MonadFix m)
+holdHandle :: forall t m. (Reflex t, MonadHold t m, PostBuild t m, MonadFix m, MonadNodeId m)
   => HandleWidgetConfig t
   -> VtyWidget t m (HandleWidget t) -- ^ (manipulation state, drag to position)
 holdHandle HandleWidgetConfig {..} = do
@@ -93,7 +93,7 @@ holdHandle HandleWidgetConfig {..} = do
     [ fmap Left $ _handleWidgetConfig_cancel
     , fmap Right $ attach _handleWidgetConfig_forceDrag $ _handleWidgetConfig_dragEv]
 
-  --debugStream [fmapLabelShow "track" $ ffilter (\x -> fst x /= ManipJustStart) $  updated trackingDyn]
+  vLayoutPad 8 $ debugStream [fmapLabelShow "tracking" $  updated trackingDyn]
 
   return
     HandleWidget {

@@ -141,6 +141,7 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
 
 
   -- ::selecting::
+  -- TODO canceling drags is broken (you can fix easily by not having dynamic selecting, i.e. only select on DragEnd)
   -- TODO go straight into CBoundingBox move on single select
   -- this requires manipulator to be capturing the drag after selection (which happens one frame later)
   -- so to do this, have a separate routine that checks for click on a single element, manipulator captures drag in this case
@@ -165,11 +166,17 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
   selectLBox <- foldDyn selectLBox_foldfn Nothing $ _trackedDrag_drag selectDrag
   selectBoxWidget $ fmap (maybe (LBox 0 0) id) selectLBox
 
+  trackDrag2Dyn <- holdDyn Nothing $ (fmap Just $ _trackedDrag_drag trackedDrag2)
+
   -- ::info pane::
   col $ do
+    fixed 2 $ debugStreamBeh $ [ fmapLabelShow "trackedDrag2" (current $ trackDrag2Dyn) ]
     fixed 2 $ debugStream
       [
       never
+      --, fmapLabelShow "manipTracking" (updated $ _trackedDrag_dragging trackedDrag0)
+      --, fmapLabelShow "selectDrag" $ _trackedDrag_drag selectDrag
+      --, fmapLabelShow "trackedDrag2" $ _trackedDrag_drag trackedDrag2
       --, fmapLabelShow "pan" (_trackedDrag_drag panDrag)
       --, fmapLabelShow "drag" dragEv
       --, fmapLabelShow "input" inp
