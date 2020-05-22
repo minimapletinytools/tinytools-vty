@@ -114,7 +114,7 @@ holdSelectionManager SelectionManagerConfig {..} = mdo
     selChangesFromModified = fmap (fmap snd) $ _sEltLayerTree_changeView _selectionManagerConfig_sEltLayerTree
 
     -- ::combine everything togethr
-    selectedNew = leftmostwarn "SelectionManager - selectedNew"
+    selectedNew = leftmostWarn "SelectionManager - selectedNew"
       [selFromVeryNew
       , selFromLayers
       , selFromCanvas]
@@ -156,7 +156,7 @@ holdSelectionManager SelectionManagerConfig {..} = mdo
     selFromVeryNew = alignEventWithMaybe alignfn _selectionManagerConfig_newElt_layerPos newSingle
     selFromLayers = fmap (:[]) $ sEltLayerTree_tagSuperSEltByPos _selectionManagerConfig_sEltLayerTree _selectionManagerConfig_select
     selFromModified =
-  selected <- holdDyn (False, []) $ leftmostwarn "SelectionManager"
+  selected <- holdDyn (False, []) $ leftmostWarn "SelectionManager"
     [fmap (\x -> (True, x)) selFromVeryNew
     , fmap (\x -> (False, x)) selFromLayers]
   return

@@ -372,7 +372,7 @@ holdLayerWidget' LayerWidgetConfig {..} = do
   -- TODO finalizeSet needs to ignore cases where click on the textinput (maybe can ignore this using difference or see comments for finalizeSet)
   labelWidgetDyn :: Dynamic t (VtyWidget t m (Event t (ControllersWithId)))
     <- foldDynM labelWidgetDynFoldFn (return never)
-      (alignEitherWarn "labelWidgetDyn input" (leftmostwarn "labelWidgetDyn cancel" [cancelInput, finalizeSet]) clickOnSelectedEv)
+      (alignWarn "labelWidgetDyn input" (leftmostWarn "labelWidgetDyn cancel" [cancelInput, finalizeSet]) clickOnSelectedEv)
   changeNameEv <- networkView labelWidgetDyn >>= switchHold never
 
 

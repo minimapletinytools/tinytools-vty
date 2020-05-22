@@ -193,7 +193,7 @@ makeBoxManipWidget BoxManipWidgetConfig {..} = do
       modifyOrCreateEv :: Event t (ManipState, Either ControllersWithId (LayerPos, SEltLabel))
       modifyOrCreateEv = push pushfn handleDragEv
 
-      manipulateEv = leftmostassert "box manipulate" [modifyOrCreateEv, newBoxEv]
+      manipulateEv = leftmostAssert "box manipulate" [modifyOrCreateEv, newBoxEv]
 
     return
       ManipOutput {
