@@ -94,6 +94,52 @@ queueMouseDrag b mods ps rps = do
   lastas <- fireQueuedEventsAndRead (rps endP)
   return $ initas <> (lastas :| [])
 
+runReflexVtyTestT :: forall uintref uinev uout t m a. (MonadVtyApp t (TestGuestT t m), TestGuestConstraints t m)
+  => Dynamic t Int -- ^ virtual screen width
+  -> Dynamic t Int -- ^ virtual screen height
+  -> (uinev, uintref) -- ^ make sure uintref match uinev, i.e. return values of newEventWithTriggerRef
+  -> (uinev -> VtyWidget t (NodeIdT (TestGuestT t m)) uout) -- ^ VtyWidget to test
+  -> ReflexVtyTestT t uintref uout m a -- ^ test monad to run
+  -> m ()
+runReflexVtyTestT dw dh (uinput, uinputtrefs) app rtm = do
+
+  -- generate vty events triggers
+  (vinev, vintref) <- newEventWithTriggerRef
+
+  let ctx = VtyWidgetCtx { 
+      _vtyWidgetCtx_width = dw
+      , _vtyWidgetCtx_height = dh
+      , _vtyWidgetCtx_input = vinev
+      , _vtyWidgetCtx_focus = constDyn True
+    }
+
+  runReflexTestM
+    ((uinput, vinev), (uinputtrefs, vintref)) 
+    (\(uinput',_) -> runNodeIdT $ runVtyWidget ctx (app uinput'))
+    rtm
+  
+
+
+{-
+-- | class to help bind network and types to a 'ReflexTestT'
+-- see test/Reflex/Test/Monad/HostSpec.hs for usage example
+class ReflexVtyTestApp app t m | app -> t m where
+  data VtyAppInputTriggerRefs app :: Type
+  data VtyAppInputEvents app :: Type
+  data VtyAppOutput app :: Type
+  getApp :: VtyAppInputEvents app -> TestGuestT t m (VtyWidget t m (AppOutput app))
+  makeInputs :: m (VtyAppInputEvents app, VtyAppInputTriggerRefs app)
+
+instance (ReflexVtyTestApp app t m) => ReflexTestApp app t m where
+  data AppInputTriggerRefs app = VtyAppInputTriggerRefs app
+  data AppInputEvents app :: Type
+  data AppOutput app :: Type
+  getApp :: AppInputEvents app -> TestGuestT t m (AppOutput app)
+  makeInputs :: m (AppInputEvents app, AppInputTriggerRefs app)
+-}
+
+
+
 
 {-
 -- class variant which I couldn't figure out how to get working...
