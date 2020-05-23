@@ -15,6 +15,7 @@ import           Test.HUnit
 
 import           Control.Monad.IO.Class     (liftIO)
 import           Data.Kind
+import qualified Data.List as L
 
 import qualified Graphics.Vty               as V
 import           Reflex
@@ -37,6 +38,7 @@ instance (MonadVtyApp t (TestGuestT t m), TestGuestConstraints t m) => ReflexVty
     inp <- input
     dw <- displayWidth
     dh <- displayHeight
+    fill '#'
     return $ BasicNetworkTest1_Output inp dw dh
   makeInputs = do
     -- return dummy inputs since they are both empty
@@ -47,22 +49,29 @@ test_basic = TestLabel "basic" $ TestCase $ runSpiderHost $
   runReflexVtyTestApp @ (BasicNetworkTest1 (SpiderTimeline Global) (SpiderHost Global)) (100,100) $ do
     -- get our app's output events and subscribe to them
     BasicNetworkTest1_Output {..} <- userOutputs
-    vtyH                            <- subscribeEvent _basicNetworkTest1_Output_vtyEv
+    vtyImages <- vtyOutputs
+    vtyH <- subscribeEvent _basicNetworkTest1_Output_vtyEv
     dwH <- subscribeEvent $ updated _basicNetworkTest1_Output_displayWidth
 
+
     -- fire an empty event and ensure there is no output
-    a1 <- fireQueuedEventsAndRead $ sequence =<< readEvent vtyH
-    liftIO $ a1 @?= [Nothing]
+    -- also check that an image was rendered
+    a1 :: [(Maybe VtyEvent, [V.Image])] <- fireQueuedEventsAndRead $ do
+      a <- sequence =<< readEvent vtyH
+      b <- sample vtyImages
+      return (a,b)
+    liftIO $ (fst . L.last $ a1) @?= Nothing
+    liftIO $ (length . snd . L.last $ a1) @?= 1
 
     -- fire a vty event and ensure the output is the same as the input
     let someEvent = V.EvKey V.KEsc []
     queueVtyEvent someEvent
-    a2 <- fireQueuedEventsAndRead $ sequence =<< readEvent vtyH
+    a2 :: [Maybe VtyEvent] <- fireQueuedEventsAndRead $ sequence =<< readEvent vtyH
     liftIO $ a2 @?= [Just someEvent]
 
     -- resize the screen and check that the changes are reflected
     queueVtyEvent $ V.EvResize 10 10
-    a3 <- fireQueuedEventsAndRead $ sequence =<< readEvent dwH
+    a3  :: [Maybe Int] <- fireQueuedEventsAndRead $ sequence =<< readEvent dwH
     liftIO $ a3 @?= [Just 10]
 
 
