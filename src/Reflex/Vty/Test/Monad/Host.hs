@@ -103,9 +103,10 @@ runReflexVtyTestT :: forall uintref uinev uout t m a. (MonadVtyApp t (TestGuestT
   -> m ()
 runReflexVtyTestT dw dh (uinput, uinputtrefs) app rtm = do
 
-  -- generate vty events triggers
+  -- generate vty events trigger
   (vinev, vintref) <- newEventWithTriggerRef
 
+  -- pass it on as ctx object
   let ctx = VtyWidgetCtx { 
       _vtyWidgetCtx_width = dw
       , _vtyWidgetCtx_height = dh
@@ -113,7 +114,8 @@ runReflexVtyTestT dw dh (uinput, uinputtrefs) app rtm = do
       , _vtyWidgetCtx_focus = constDyn True
     }
 
-  runReflexTestM
+  -- unwrap VtyWidget and pass to runReflexTestT
+  runReflexTestT
     ((uinput, vinev), (uinputtrefs, vintref)) 
     (\(uinput',_) -> runNodeIdT $ runVtyWidget ctx (app uinput'))
     rtm
