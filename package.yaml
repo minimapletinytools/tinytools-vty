@@ -86,6 +86,8 @@ dependencies:
 - aeson
 - ilist
 
+- reflex-test-host
+- ref-tf
 
 
 library:

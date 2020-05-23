@@ -55,7 +55,7 @@ extra-deps:
 #- reflex-vty-0.1.3.0@sha256:f5378253825128f53ab39ab92469f5f7d2fae88aa268e1679553b8a978cd625c,2365
 
 - github: pdlla/reflex-test-host
-  commit: 5176714e81bd05428b69755b337e1947faa43c8b
+  commit: 25403a20f0386873668ba5ecd622504626953aa1
 - github: pdlla/reflex-dynamic-containers
   commit: 4ca36f1122576ec42723315f3124d3ca3e321a16
 - github: pdlla/reflex-potatoes
