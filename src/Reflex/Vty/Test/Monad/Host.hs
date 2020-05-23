@@ -1,9 +1,19 @@
 {-# LANGUAGE UndecidableInstances #-}
 
-module Reflex.Vty.Test.Monad.Host
-  (
-  )
-where
+module Reflex.Vty.Test.Monad.Host (
+  module Reflex.Test.Monad.Host
+  , ReflexVtyTestT
+  , queueVtyEvent 
+  , vtyInputTriggerRefs
+  , userInputTriggerRefs
+  , userOutputs
+  , vtyOutputs 
+  , queueMouseEventInRegion
+  , queueMouseDrag 
+  , runReflexVtyTestT
+  , ReflexVtyTestApp(..)
+  , runReflexVtyTestApp
+) where
 
 import           Relude
 
@@ -97,22 +107,26 @@ queueMouseDrag b mods ps rps = do
 
 -- | run a 'ReflexVtyTestT'
 -- analogous to runReflexTestT
-runReflexVtyTestT :: forall uintref uinev uout t m a. (MonadVtyApp t (TestGuestT t m), TestGuestConstraints t m)
-  => Dynamic t Int -- ^ virtual screen width
-  -> Dynamic t Int -- ^ virtual screen height
+runReflexVtyTestT :: forall uintref uinev uout t m a. 
+  (MonadVtyApp t (TestGuestT t m), TestGuestConstraints t m) -- ^ the reason for this constraint is that we need explicit access to both inner (m) and outer (TestGuestT m) monads 
+  => (Int, Int) -- ^ initial screen size
   -> (uinev, uintref) -- ^ make sure uintref match uinev, i.e. return values of newEventWithTriggerRef
   -> (uinev -> VtyWidget t (NodeIdT (TestGuestT t m)) uout) -- ^ VtyWidget to test
   -> ReflexVtyTestT t uintref uout m a -- ^ test monad to run
   -> m ()
-runReflexVtyTestT dw dh (uinput, uinputtrefs) app rtm = do
+runReflexVtyTestT r0 (uinput, uinputtrefs) app rtm = do
 
   -- generate vty events trigger
   (vinev, vintref) <- newEventWithTriggerRef
+  
+  size <- holdDyn r0 $ fforMaybe vinev $ \case
+      V.EvResize w h -> Just (w, h)
+      _ -> Nothing
 
   -- pass it on as ctx object
   let ctx = VtyWidgetCtx {
-      _vtyWidgetCtx_width = dw
-      , _vtyWidgetCtx_height = dh
+      _vtyWidgetCtx_width = fmap fst size
+      , _vtyWidgetCtx_height = fmap snd size
       , _vtyWidgetCtx_input = vinev
       , _vtyWidgetCtx_focus = constDyn True
     }
@@ -134,13 +148,12 @@ class ReflexVtyTestApp app t m | app -> t m where
   makeInputs :: m (VtyAppInputEvents app, VtyAppInputTriggerRefs app)
 
 runReflexVtyTestApp :: (ReflexVtyTestApp app t m, MonadVtyApp t (TestGuestT t m), TestGuestConstraints t m)
-  => Dynamic t Int -- ^ virtual screen width
-  -> Dynamic t Int -- ^ virtual screen height
+  => (Int, Int) -- ^ initial screen size
   -> ReflexVtyTestT t (VtyAppInputTriggerRefs app) (VtyAppOutput app) m ()
   -> m ()
-runReflexVtyTestApp dw dh rtm = do
+runReflexVtyTestApp r0 rtm = do
   input <- makeInputs
-  runReflexVtyTestT dw dh input getApp rtm
+  runReflexVtyTestT r0 input getApp rtm
 
 
 
