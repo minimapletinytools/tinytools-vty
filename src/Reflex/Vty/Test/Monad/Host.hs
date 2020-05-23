@@ -17,33 +17,43 @@ import           Reflex.Vty
 import qualified Graphics.Vty as V
 
 
-
-
-type ReflexVtyTestT t uin uout m = ReflexTestT t (uin, ReflexTriggerRef t m VtyEvent) uout m
+type ReflexVtyTestT t uintref uout m = ReflexTestT t (uintref, ReflexTriggerRef t m VtyEvent) (uout, Behavior t [V.Image]) m
 
 -- | queue a 'VtyEvent'
-queueVtyEvent :: (Monad m, MonadRef m) => VtyEvent -> ReflexVtyTestT t uin uout m ()
+queueVtyEvent :: (Monad m, MonadRef m) => VtyEvent -> ReflexVtyTestT t uintref uout m ()
 queueVtyEvent vtyev = do
   (_, vtytref) <- inputTriggerRefs
   queueEventTriggerRef vtytref vtyev
 
 -- | obtain vty inputs
-vtyInputTriggerRefs :: (Monad m, MonadRef m) => ReflexVtyTestT t uin uout m (ReflexTriggerRef t m VtyEvent)
+vtyInputTriggerRefs :: (Monad m, MonadRef m) => ReflexVtyTestT t uintref uout m (ReflexTriggerRef t m VtyEvent)
 vtyInputTriggerRefs = do
   (_, vtytrefs) <- inputTriggerRefs
   return vtytrefs
 
--- | obtain user inputs
-userInputTriggerRefs :: (Monad m, MonadRef m) => ReflexVtyTestT t uin uout m uin
+-- | obtain user defined inputs
+userInputTriggerRefs :: (Monad m, MonadRef m) => ReflexVtyTestT t uintref uout m uintref
 userInputTriggerRefs = do
   (usertrefs, _) <- inputTriggerRefs
   return usertrefs
+
+-- | obtain user defined outputs
+userOutputs :: (Monad m, MonadRef m) => ReflexVtyTestT t uintref uout m uout
+userOutputs = do
+  (useroutputs, _) <- outputs
+  return useroutputs
+
+-- | obtain vty outputs
+vtyOutputs :: (Monad m, MonadRef m) => ReflexVtyTestT t uintref uout m (Behavior t [V.Image])
+vtyOutputs = do
+  (_, vtyoutputs) <- outputs
+  return vtyoutputs
 
 -- | if (local) mouse coordinates are outside of the (absolute) region, returns False and does not queue any event
 queueMouseEventInRegion :: (Reflex t, MonadSample t m, Monad m, MonadRef m) 
   => DynRegion t 
   -> Either MouseDown MouseUp -- ^ mouse coordinates are LOCAL to the input region
-  -> ReflexVtyTestT t uin uout m Bool
+  -> ReflexVtyTestT t uintref uout m Bool
 queueMouseEventInRegion dr mouse = do
   region <- sample . currentRegion $ dr
   let
@@ -70,7 +80,7 @@ queueMouseDrag :: (Monad m, MonadRef m)
   -> NonEmpty (Int,Int) -- ^ list of drag positions
   -- TODO add something like DragState to this
   -> ((Int,Int) -> ReadPhase m a) -- ^ ReadPhase to run after each normal drag 
-  -> ReflexVtyTestT t uin uout m (NonEmpty [a]) -- ^ collected outputs
+  -> ReflexVtyTestT t uintref uout m (NonEmpty [a]) -- ^ collected outputs
 queueMouseDrag b mods ps rps = do
   let
     dragPs' = init ps
@@ -86,26 +96,28 @@ queueMouseDrag b mods ps rps = do
 
 
 {-
+-- class variant which I couldn't figure out how to get working...
+
 class MonadReflexVtyTest t m | m -> t where
   type UserInputTriggerRefs m :: Type
   type UserOutputEvents m :: Type
   queueVtyEvent :: VtyEvent -> m ()
 
-newtype ReflexVtyTestT t uin uout m a = ReflexVtyTestT { unReflexVtyTestT :: ReflexTestT t (uin, ReflexTriggerRef t m VtyEvent) uout m a }
+newtype ReflexVtyTestT t uintref uout m a = ReflexVtyTestT { unReflexVtyTestT :: ReflexTestT t (uintref, ReflexTriggerRef t m VtyEvent) uout m a }
   deriving (Functor, Applicative, Monad, MonadIO, MonadState (AppState t m))
 
-instance MonadTrans (ReflexVtyTestT t uin uout) where
+instance MonadTrans (ReflexVtyTestT t uintref uout) where
   lift = ReflexVtyTestT . lift
 
-instance (r ~ ReflexTriggerRef t m VtyEvent, Monad m) => MonadReader ((uin, r), uout) (ReflexVtyTestT t uin uout m) where
-  ask :: ReflexVtyTestT t uin uout m ((uin, r), uout)
-  ask = ReflexVtyTestT ask --(ask :: ReflexTestT t (uin,r) uout m (uin,r))
---deriving instance (r ~ ReflexTriggerRef t m VtyEvent) => MonadReader (uin,r) (ReflexVtyTestT t uin uout m) --via ReflexTestT t (uin,r) uout m
+instance (r ~ ReflexTriggerRef t m VtyEvent, Monad m) => MonadReader ((uintref, r), uout) (ReflexVtyTestT t uintref uout m) where
+  ask :: ReflexVtyTestT t uintref uout m ((uintref, r), uout)
+  ask = ReflexVtyTestT ask --(ask :: ReflexTestT t (uintref,r) uout m (uintref,r))
+--deriving instance (r ~ ReflexTriggerRef t m VtyEvent) => MonadReader (uintref,r) (ReflexVtyTestT t uintref uout m) --via ReflexTestT t (uintref,r) uout m
 
-instance MonadReflexVtyTest t (ReflexVtyTestT t uin uout m) where
-  type UserInputTriggerRefs (ReflexVtyTestT t uin uout m) = uin
-  type UserOutputEvents (ReflexVtyTestT t uin uout m) = uout
+instance MonadReflexVtyTest t (ReflexVtyTestT t uintref uout m) where
+  type UserInputTriggerRefs (ReflexVtyTestT t uintref uout m) = uintref
+  type UserOutputEvents (ReflexVtyTestT t uintref uout m) = uout
   queueVtyEvent vtyev = do
-    ((_, vtytref),_)  :: ((uin, ReflexTriggerRef t m VtyEvent), uout) <- ask
+    ((_, vtytref),_)  :: ((uintref, ReflexTriggerRef t m VtyEvent), uout) <- ask
     queueEventTriggerRef vtytref vtyev
 -}
