@@ -3,13 +3,13 @@
 module Reflex.Vty.Test.Monad.Host (
   module Reflex.Test.Monad.Host
   , ReflexVtyTestT
-  , queueVtyEvent 
+  , queueVtyEvent
   , vtyInputTriggerRefs
   , userInputTriggerRefs
   , userOutputs
-  , vtyOutputs 
+  , vtyOutputs
   , queueMouseEventInRegion
-  , queueMouseDrag 
+  , queueMouseDrag
   , runReflexVtyTestT
   , ReflexVtyTestApp(..)
   , runReflexVtyTestApp
@@ -23,11 +23,15 @@ import qualified Data.List.NonEmpty     as NE
 import qualified Graphics.Vty           as V
 import           Reflex
 import           Reflex.Host.Class
-import  Reflex.Test.Monad.Host (MonadReflexTest(..), ReflexTestT, ReflexTriggerRef, TestGuestT, TestGuestConstraints, runReflexTestT)
+import           Reflex.Spider.Internal (HasSpiderTimeline)
+import           Reflex.Test.Monad.Host (MonadReflexTest (..), ReflexTestT,
+                                         ReflexTriggerRef, TestGuestConstraints,
+                                         TestGuestT, runReflexTestT)
 import           Reflex.Vty
-import Reflex.Spider.Internal (HasSpiderTimeline)
 
-
+-- | reflex-vty variant of 'ReflexTestT' which packages an 'VtyEvent' into the input and 'Behavior t [V.Image]' into the output
+-- 'uintref' and 'uout' allow user to add their own inputs and outputs
+-- 'uintref' will often just be some singleton type (e.g. '()') as the app being tested still has access to the input 'Event t VtyEvent' through the 'VtyWidget' monad
 type ReflexVtyTestT t uintref uout m = ReflexTestT t (uintref, ReflexTriggerRef t m VtyEvent) (uout, Behavior t [V.Image]) m
 
 -- | queue a 'VtyEvent'
@@ -110,8 +114,8 @@ queueMouseDrag b mods ps rps = do
 
 -- | run a 'ReflexVtyTestT'
 -- analogous to runReflexTestT
-runReflexVtyTestT :: forall uintref uinev uout t m a. 
-  (MonadVtyApp t (TestGuestT t m), TestGuestConstraints t m) -- ^ the reason for this constraint is that we need explicit access to both inner (m) and outer (TestGuestT m) monads 
+runReflexVtyTestT :: forall uintref uinev uout t m a.
+  (MonadVtyApp t (TestGuestT t m), TestGuestConstraints t m) -- ^ the reason for this constraint is that we need explicit access to both inner (m) and outer (TestGuestT m) monads
   => (Int, Int) -- ^ initial screen size
   -> (uinev, uintref) -- ^ make sure uintref match uinev, i.e. return values of newEventWithTriggerRef
   -> (uinev -> VtyWidget t (NodeIdT (TestGuestT t m)) uout) -- ^ VtyWidget to test
@@ -121,7 +125,7 @@ runReflexVtyTestT r0 (uinput, uinputtrefs) app rtm = do
 
   -- generate vty events trigger
   (vinev, vintref) <- newEventWithTriggerRef
-  
+
   size <- holdDyn r0 $ fforMaybe vinev $ \case
       V.EvResize w h -> Just (w, h)
       _ -> Nothing
@@ -163,7 +167,7 @@ runReflexVtyTestApp r0 rtm = do
 -- this method is intended for tracking the 'DynRegion' of 'VtyWidget's created through the 'pane' method
 -- since the 'VtyWidgetCtx' created by 'pane' is unaware of its parent, the tracking must be handled manually by the user
 absDynRegion :: (Reflex t)
-  => DynRegion t -- ^ parent 
+  => DynRegion t -- ^ parent
   -> DynRegion t -- ^ child in parent coordinates
   -> DynRegion t -- ^ child in absolute coordinates
 absDynRegion parent child = DynRegion {
