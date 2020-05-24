@@ -105,6 +105,9 @@ queueMouseDrag b mods ps rps = do
   lastas <- fireQueuedEventsAndRead (rps endP)
   return $ initas <> (lastas :| [])
 
+-- TODO
+--queueMouseDragInRegion
+
 -- | run a 'ReflexVtyTestT'
 -- analogous to runReflexTestT
 runReflexVtyTestT :: forall uintref uinev uout t m a. 
@@ -156,6 +159,19 @@ runReflexVtyTestApp r0 rtm = do
   runReflexVtyTestT r0 input getApp rtm
 
 
+-- | creates a 'DynRegion' in absolute coordinates from a child DynRegion in the parent DynRegion coordinates
+-- this method is intended for tracking the 'DynRegion' of 'VtyWidget's created through the 'pane' method
+-- since the 'VtyWidgetCtx' created by 'pane' is unaware of its parent, the tracking must be handled manually by the user
+absDynRegion :: (Reflex t)
+  => DynRegion t -- ^ parent 
+  -> DynRegion t -- ^ child in parent coordinates
+  -> DynRegion t -- ^ child in absolute coordinates
+absDynRegion parent child = DynRegion {
+    _dynRegion_left = ffor2 (_dynRegion_left parent) (_dynRegion_left child) (+)
+    , _dynRegion_top = ffor2 (_dynRegion_top parent) (_dynRegion_top child) (+)
+    , _dynRegion_width = _dynRegion_width child
+    , _dynRegion_height = _dynRegion_height child
+  }
 
 {-
 -- class variant which I couldn't figure out how to get working...
