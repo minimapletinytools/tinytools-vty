@@ -118,9 +118,6 @@ layerEltTextInput i cfg = mdo
     , _textInput_lines = length . _displayLines_spans <$> rows
     }
 
-
-
-
 data LayerWidgetConfig t = LayerWidgetConfig {
   _layerWidgetConfig_pfctx              :: PFWidgetCtx t
   , _layerWidgetConfig_temp_sEltTree    :: Dynamic t [SuperSEltLabel]
@@ -133,7 +130,19 @@ data LayerWidget t = LayerWidget {
   -- TODO expand to support multi-move
   , _layerWidget_move              ::Event t (LayerPos, LayerPos)
   , _layerWidget_consumingKeyboard :: Behavior t Bool
+
+  -- TODO 
+  --, _layerWidget_layerWidgetTestOutput :: LayerWidgetTestOutput t
 }
+
+-- TODO add additional testing types in here
+data LayerWidgetTestOutput t = LayerWidgetTestOutput {
+  _layerWidgetTestOutput_layerImages :: Behavior t [V.Image]
+  , _layerWidgetTestOutput_lEltStateMapDyn :: Dynamic t (REltIdMap LEltState)
+  , _layerWidgetTestOutput_lEltStateList :: Dynamic t (Seq LEltState)
+  , _layerWidgetTestOutput_lEltStateContractedList :: Dynamic t (Seq LEltState)
+}
+
 
 data LEltState = LEltState {
   _lEltState_hidden          :: Bool

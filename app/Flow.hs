@@ -32,6 +32,12 @@ import           Reflex.Vty
 flowMain :: IO ()
 flowMain = mainWidget mainPFWidget
 
+-- TODO
+data MainPFTestOutput t = MainPFTestOutput {
+  _mainPFTestOutput_leftPane :: DynRegion t
+  , _mainPFTestOutput_rightPane :: DynRegion t 
+}
+
 
 mainPFWidget :: forall t m. (Reflex t, MonadHold t m, MonadFix m, NotReady t m, Adjustable t m, PostBuild t m, PerformEvent t m, TriggerEvent t m, MonadNodeId m, MonadIO (Performable m), MonadIO m)
   => VtyWidget t m (Event t ())
