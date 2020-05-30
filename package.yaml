@@ -88,6 +88,7 @@ dependencies:
 
 - reflex-test-host
 - ref-tf
+- bimap
 
 
 library:

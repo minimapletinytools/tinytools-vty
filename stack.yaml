@@ -54,6 +54,7 @@ extra-deps:
 - dependent-sum-template-0.1.0.3@sha256:0bbbacdfbd3abf2a15aaf0cf2c27e5bdd159b519441fec39e1e6f2f54424adde,1682
 #- reflex-vty-0.1.3.0@sha256:f5378253825128f53ab39ab92469f5f7d2fae88aa268e1679553b8a978cd625c,2365
 
+
 - github: pdlla/reflex-test-host
   commit: d4ce1977f6cd7926bada650e9ae773fe182004b3
 - github: pdlla/reflex-dynamic-containers
@@ -63,7 +64,7 @@ extra-deps:
 - github: pdlla/potato-flow
   commit: 047075a01b45c87097776f25a9d473d1c2701b67
 - github: pdlla/reflex-vty
-  commit: bb53903a44f54101caada1aee294afb7f5e6a510
+  commit: 1bfd8f985e832d26c7360beae913dda07e477642
 
 
 
