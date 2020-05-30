@@ -8,8 +8,11 @@ module Reflex.Vty.Test.Monad.Host (
   , userInputTriggerRefs
   , userOutputs
   , vtyOutputs
+  , queueMouseEvent
   , queueMouseEventInRegion
+  , queueMouseEventInRegionGated
   , queueMouseDrag
+  , queueMouseDragInRegion
   , runReflexVtyTestT
   , ReflexVtyTestApp(..)
   , runReflexVtyTestApp
@@ -18,12 +21,11 @@ module Reflex.Vty.Test.Monad.Host (
 import           Relude
 
 import           Control.Monad.Ref
-import qualified Data.List.NonEmpty     as NE
+import qualified Data.Map               as Map
 
 import qualified Graphics.Vty           as V
 import           Reflex
 import           Reflex.Host.Class
-import           Reflex.Spider.Internal (HasSpiderTimeline)
 import           Reflex.Test.Monad.Host (MonadReflexTest (..), ReflexTestT,
                                          ReflexTriggerRef, TestGuestConstraints,
                                          TestGuestT, runReflexTestT)
@@ -35,41 +37,64 @@ import           Reflex.Vty
 type ReflexVtyTestT t uintref uout m = ReflexTestT t (uintref, ReflexTriggerRef t m VtyEvent) (uout, Behavior t [V.Image]) m
 
 -- | queue a 'VtyEvent'
-queueVtyEvent :: (Monad m, MonadRef m) => VtyEvent -> ReflexVtyTestT t uintref uout m ()
+queueVtyEvent :: (MonadRef m) => VtyEvent -> ReflexVtyTestT t uintref uout m ()
 queueVtyEvent vtyev = do
   (_, vtytref) <- inputTriggerRefs
   queueEventTriggerRef vtytref vtyev
 
 -- | obtain vty inputs
-vtyInputTriggerRefs :: (Monad m, MonadRef m) => ReflexVtyTestT t uintref uout m (ReflexTriggerRef t m VtyEvent)
+vtyInputTriggerRefs :: (MonadRef m) => ReflexVtyTestT t uintref uout m (ReflexTriggerRef t m VtyEvent)
 vtyInputTriggerRefs = do
   (_, vtytrefs) <- inputTriggerRefs
   return vtytrefs
 
 -- | obtain user defined inputs
-userInputTriggerRefs :: (Monad m, MonadRef m) => ReflexVtyTestT t uintref uout m uintref
+userInputTriggerRefs :: (MonadRef m) => ReflexVtyTestT t uintref uout m uintref
 userInputTriggerRefs = do
   (usertrefs, _) <- inputTriggerRefs
   return usertrefs
 
 -- | obtain user defined outputs
-userOutputs :: (Monad m, MonadRef m) => ReflexVtyTestT t uintref uout m uout
+userOutputs :: (MonadRef m) => ReflexVtyTestT t uintref uout m uout
 userOutputs = do
   (useroutputs, _) <- outputs
   return useroutputs
 
 -- | obtain vty outputs
-vtyOutputs :: (Monad m, MonadRef m) => ReflexVtyTestT t uintref uout m (Behavior t [V.Image])
+vtyOutputs :: (MonadRef m) => ReflexVtyTestT t uintref uout m (Behavior t [V.Image])
 vtyOutputs = do
   (_, vtyoutputs) <- outputs
   return vtyoutputs
 
--- | if (local) mouse coordinates are outside of the (absolute) region, returns False and does not queue any event
-queueMouseEventInRegion :: (Reflex t, MonadSample t m, Monad m, MonadRef m)
+-- | queue mouse event
+queueMouseEvent :: (MonadRef m)
+  => Either MouseDown MouseUp -- ^ mouse coordinates are LOCAL to the input region
+  -> ReflexVtyTestT t uintref uout m ()
+queueMouseEvent mouse = case mouse of
+  Left (MouseDown b c mods) -> queueVtyEvent $ uncurry V.EvMouseDown c b mods
+  Right (MouseUp b c)       -> queueVtyEvent $ uncurry V.EvMouseUp c b
+
+
+-- | queue mouse event in a 'DynRegion'
+queueMouseEventInRegion :: (Reflex t, MonadSample t m, MonadRef m)
+  => DynRegion t
+  -> Either MouseDown MouseUp -- ^ mouse coordinates are LOCAL to the input region
+  -> ReflexVtyTestT t uintref uout m ()
+queueMouseEventInRegion dr mouse = do
+  let
+    absCoords (Region l t _ _) (x,y) = (x+l, y+t)
+  region <- sample . currentRegion $ dr
+  case mouse of
+    Left (MouseDown b c mods) -> queueVtyEvent $ uncurry V.EvMouseDown (absCoords region c) b mods
+    Right (MouseUp b c) -> queueVtyEvent $ uncurry V.EvMouseUp (absCoords region c) b
+
+-- | queue mouse event in a 'DynRegion'
+-- if (local) mouse coordinates are outside of the (absolute) region, returns False and does not queue any event
+queueMouseEventInRegionGated :: (Reflex t, MonadSample t m, MonadRef m)
   => DynRegion t
   -> Either MouseDown MouseUp -- ^ mouse coordinates are LOCAL to the input region
   -> ReflexVtyTestT t uintref uout m Bool
-queueMouseEventInRegion dr mouse = do
+queueMouseEventInRegionGated dr mouse = do
   region <- sample . currentRegion $ dr
   let
     absCoords (Region l t _ _) (x,y) = (x+l, y+t)
@@ -77,8 +102,6 @@ queueMouseEventInRegion dr mouse = do
       Left (MouseDown _ c _) -> c
       Right (MouseUp _ c)    -> c
     withinRegion (Region _ _ w h) (x,y) = not $ or [ x < 0, y < 0, x >= w, y >= h ]
-    --withinRegion (Region l t w h) (x,y) = not $ or [ x < l, y < t, x >= l + w, y >= t + h ]
-
   if withinRegion region coordinates
     then do
       case mouse of
@@ -89,14 +112,15 @@ queueMouseEventInRegion dr mouse = do
 
 -- | queue and fire a series of mouse events representing a mouse drag
 -- returns collected outputs
-queueMouseDrag :: (Monad m, MonadRef m)
+queueMouseDrag :: (Reflex t, MonadSample t m, MonadRef m)
   => V.Button -- ^ button to press
   -> [V.Modifier] -- ^ modifier held during drag
   -> NonEmpty (Int,Int) -- ^ list of drag positions
   -- TODO add something like DragState to this
   -> ((Int,Int) -> ReadPhase m a) -- ^ ReadPhase to run after each normal drag
   -> ReflexVtyTestT t uintref uout m (NonEmpty [a]) -- ^ collected outputs
-queueMouseDrag b mods ps rps = do
+queueMouseDrag = queueMouseDragInRegion (DynRegion 0 0 0 0)
+{-queueMouseDrag b mods ps rps = do
   let
     dragPs' = init ps
     -- if there is only 1 elt in ps, then simulate a single click
@@ -108,9 +132,30 @@ queueMouseDrag b mods ps rps = do
   queueVtyEvent (uncurry V.EvMouseUp endP (Just b))
   lastas <- fireQueuedEventsAndRead (rps endP)
   return $ initas <> (lastas :| [])
+-}
 
--- TODO
---queueMouseDragInRegion
+-- | same as queueMouseDrag but coordinates are translated to a region
+queueMouseDragInRegion :: (Reflex t, MonadSample t m, MonadRef m)
+  => DynRegion t
+  -> V.Button -- ^ button to press
+  -> [V.Modifier] -- ^ modifier held during drag
+  -> NonEmpty (Int,Int) -- ^ list of drag positions
+  -- TODO add something like DragState to this
+  -> ((Int,Int) -> ReadPhase m a) -- ^ ReadPhase to run after each normal drag
+  -> ReflexVtyTestT t uintref uout m (NonEmpty [a]) -- ^ collected outputs
+queueMouseDragInRegion region b mods ps rps = do
+  let
+    dragPs' = init ps
+    -- if there is only 1 elt in ps, then simulate a single click
+    dragPs = fromMaybe (pure (head ps)) $ viaNonEmpty id dragPs'
+    endP = last ps
+  initas <- forM dragPs $ \p -> do
+    queueMouseEventInRegion region $ Left (MouseDown b p mods)
+    fireQueuedEventsAndRead (rps p)
+  queueMouseEventInRegion region $ Right (MouseUp (Just b) endP)
+  lastas <- fireQueuedEventsAndRead (rps endP)
+  return $ initas <> (lastas :| [])
+
 
 -- | run a 'ReflexVtyTestT'
 -- analogous to runReflexTestT
@@ -159,8 +204,8 @@ runReflexVtyTestApp :: (ReflexVtyTestApp app t m, MonadVtyApp t (TestGuestT t m)
   -> ReflexVtyTestT t (VtyAppInputTriggerRefs app) (VtyAppOutput app) m ()
   -> m ()
 runReflexVtyTestApp r0 rtm = do
-  input <- makeInputs
-  runReflexVtyTestT r0 input getApp rtm
+  inp <- makeInputs
+  runReflexVtyTestT r0 inp getApp rtm
 
 
 -- | creates a 'DynRegion' in absolute coordinates from a child DynRegion in the parent DynRegion coordinates
