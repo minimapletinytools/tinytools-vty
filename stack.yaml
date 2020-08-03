@@ -52,8 +52,8 @@ extra-deps:
 - ref-tf-0.4.0.2@sha256:69de3550250e0cd69f45d080359cb314a9487c915024349c75b78732bbee9332,1134
 - witherable-0.3.1@sha256:ed3d5bc9eb1c08fa9704d9e143cdf622e1bd80b847cd5ede8c07da7bc7981ab9,1313
 - dependent-sum-template-0.1.0.3@sha256:0bbbacdfbd3abf2a15aaf0cf2c27e5bdd159b519441fec39e1e6f2f54424adde,1682
-#- reflex-vty-0.1.3.0@sha256:f5378253825128f53ab39ab92469f5f7d2fae88aa268e1679553b8a978cd625c,2365
-
+- reflex-vty-0.1.4.0@sha256:46dcb043c39532e85c08e7098ac2e1237d5f7d018183b3f758f5ef87e06f51d4,2377
+- bimap-0.3.3@sha256:232518c0410990665b9c8677eb9318ee355c001d58945ddcbedec3baa30b4160,1475
 
 - github: pdlla/reflex-test-host
   commit: d4ce1977f6cd7926bada650e9ae773fe182004b3
@@ -63,8 +63,10 @@ extra-deps:
   commit: ca25ecfcf6a651f7ee91f4c278ac8035fd48d9a5
 - github: pdlla/potato-flow
   commit: 047075a01b45c87097776f25a9d473d1c2701b67
-- github: pdlla/reflex-vty
-  commit: 1bfd8f985e832d26c7360beae913dda07e477642
+
+# - /Users/user/kitchen/faucet/reflex-vty
+# - github: pdlla/reflex-vty
+#  commit: 1bfd8f985e832d26c7360beae913dda07e477642
 
 
 

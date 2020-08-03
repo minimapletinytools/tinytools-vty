@@ -17,31 +17,30 @@ module Reflex.Vty.Test.Monad.Host (
   , runReflexVtyTestT
   , ReflexVtyTestApp(..)
   , runReflexVtyTestApp
-
-  -- Reflex.Vty.Widget.Layout.Test
-  , runLayout_debug
   -- Reflex.Vty.Widget.Test
   , splitHDrag_debug
 ) where
 
-import           Relude                 hiding (getFirst)
+import           Relude                   hiding (getFirst)
 
 import           Control.Monad.Ref
-import qualified Data.Map               as Map
+import qualified Data.Map                 as Map
 
-import qualified Graphics.Vty           as V
+import qualified Graphics.Vty             as V
+import           Potato.Reflex.Vty.Widget
 import           Reflex
 import           Reflex.Host.Class
-import           Reflex.Test.Monad.Host (MonadReflexTest (..), ReflexTestT,
-                                         ReflexTriggerRef, TestGuestConstraints,
-                                         TestGuestT, runReflexTestT)
+import           Reflex.Test.Monad.Host   (MonadReflexTest (..), ReflexTestT,
+                                           ReflexTriggerRef,
+                                           TestGuestConstraints, TestGuestT,
+                                           runReflexTestT)
 import           Reflex.Vty
 
 
 -- for debug layout/widget stuff
 import           Control.Monad.Fix
-import           Data.Bimap             (Bimap)
-import qualified Data.Bimap             as Bimap
+import           Data.Bimap               (Bimap)
+import qualified Data.Bimap               as Bimap
 import           Data.Semigroup
 
 
@@ -237,14 +236,57 @@ absDynRegion parent child = DynRegion {
     , _dynRegion_height = _dynRegion_height child
   }
 
+-- Reflex.Vty.Widget.Test
+integralFractionalDivide :: (Integral a, Fractional b) => a -> a -> b
+integralFractionalDivide n d = fromIntegral n / fromIntegral d
+
+-- | debug variant of splitHDrag_debug which outputs a pair of DynRegions for each pane
+splitHDrag_debug :: (Reflex t, MonadFix m, MonadHold t m, MonadNodeId m)
+  => Int -- ^ initial width of left panel
+  -> VtyWidget t m ()
+  -> VtyWidget t m a
+  -> VtyWidget t m b
+  -> VtyWidget t m ((a,b), (DynRegion t, DynRegion t))
+splitHDrag_debug splitter0 wS wA wB = mdo
+  dh <- displayHeight
+  dw <- displayWidth
+  w0 <- sample . current $ dw
+  dragE <- drag V.BLeft
+  splitterCheckpoint <- holdDyn splitter0 $ leftmost [fst <$> ffilter snd dragSplitter, resizeSplitter]
+  splitterPos <- holdDyn splitter0 $ leftmost [fst <$> dragSplitter, resizeSplitter]
+  splitterFrac <- holdDyn (integralFractionalDivide splitter0 w0) $ ffor (attach (current dw) (fst <$> dragSplitter)) $ \(w, x) ->
+    fromIntegral x / (max 1 (fromIntegral w))
+  let dragSplitter = fforMaybe (attach (current splitterCheckpoint) dragE) $
+        \(splitterX, Drag (fromX, _) (toX, _) _ _ end) ->
+          if splitterX == fromX then Just (toX, end) else Nothing
+      regA = DynRegion 0 0 splitterPos dh
+      regS = DynRegion splitterPos 0 1 dh
+      regB = DynRegion (splitterPos + 1) 0 (dw - splitterPos - 1) dh
+      resizeSplitter = ffor (attach (current splitterFrac) (updated dw)) $
+        \(frac, w) -> round (frac * fromIntegral w)
+  focA <- holdDyn True $ leftmost
+    [ True <$ mA
+    , False <$ mB
+    ]
+  (mA, rA) <- pane2 regA focA $ withMouseDown wA
+  pane regS (pure False) wS
+  (mB, rB) <- pane2 regB (not <$> focA) $ withMouseDown wB
+  return ((rA, rB), (regA, regB))
+  where
+    withMouseDown x = do
+      m <- mouseDown V.BLeft
+      x' <- x
+      return (m, x')
 
 
 
 
+-- TODO DELETE I don't really remember what I did here and testing Layout seems to be more a less a mistake
 -- Reflex.Vty.Widget.Layout.Test
 -- | same as 'RunLayout' except returns DynRegions for each of the queries in the layout
 -- NOTE this method recreates the 'DynRegion's inside each 'Tile' of the layout so is not very performant
 -- a better implementation is to have Layout hold its own 'DynRegion' but I'm avoid invasive changes for now.
+{-
 runLayout_debug
   :: (MonadFix m, MonadHold t m, PostBuild t m, Monad m, MonadNodeId m)
   => Dynamic t Orientation -- ^ The main-axis 'Orientation' of this 'Layout'
@@ -312,53 +354,7 @@ runLayout_debug ddir focus0 focusShift (Layout child) = mdo
   let
     focusDemux = demux $ snd <$> focussed
   return (a, solutionReg)
-
-
-
-
--- Reflex.Vty.Widget.Test
-integralFractionalDivide :: (Integral a, Fractional b) => a -> a -> b
-integralFractionalDivide n d = fromIntegral n / fromIntegral d
-
--- | debug variant of splitHDrag_debug which outputs a pair of DynRegions for each pane
-splitHDrag_debug :: (Reflex t, MonadFix m, MonadHold t m, MonadNodeId m)
-  => Int -- ^ initial width of left panel
-  -> VtyWidget t m ()
-  -> VtyWidget t m a
-  -> VtyWidget t m b
-  -> VtyWidget t m ((a,b), (DynRegion t, DynRegion t))
-splitHDrag_debug splitter0 wS wA wB = mdo
-  dh <- displayHeight
-  dw <- displayWidth
-  w0 <- sample . current $ dw
-  dragE <- drag V.BLeft
-  splitterCheckpoint <- holdDyn splitter0 $ leftmost [fst <$> ffilter snd dragSplitter, resizeSplitter]
-  splitterPos <- holdDyn splitter0 $ leftmost [fst <$> dragSplitter, resizeSplitter]
-  splitterFrac <- holdDyn (integralFractionalDivide splitter0 w0) $ ffor (attach (current dw) (fst <$> dragSplitter)) $ \(w, x) ->
-    fromIntegral x / (max 1 (fromIntegral w))
-  let dragSplitter = fforMaybe (attach (current splitterCheckpoint) dragE) $
-        \(splitterX, Drag (fromX, _) (toX, _) _ _ end) ->
-          if splitterX == fromX then Just (toX, end) else Nothing
-      regA = DynRegion 0 0 splitterPos dh
-      regS = DynRegion splitterPos 0 1 dh
-      regB = DynRegion (splitterPos + 1) 0 (dw - splitterPos - 1) dh
-      resizeSplitter = ffor (attach (current splitterFrac) (updated dw)) $
-        \(frac, w) -> round (frac * fromIntegral w)
-  focA <- holdDyn True $ leftmost
-    [ True <$ mA
-    , False <$ mB
-    ]
-  (mA, rA) <- pane2 regA focA $ withMouseDown wA
-  pane regS (pure False) wS
-  (mB, rB) <- pane2 regB (not <$> focA) $ withMouseDown wB
-  return ((rA, rB), (regA, regB))
-  where
-    withMouseDown x = do
-      m <- mouseDown V.BLeft
-      x' <- x
-      return (m, x')
-
-
+-}
 
 
 
