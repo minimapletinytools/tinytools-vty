@@ -19,7 +19,7 @@ extra-source-files:
 # common to point users to the README.md file.
 description:         Please see the README on GitHub at <https://github.com/pdlla/potato-flow-vty#readme>
 
-ghc-options:
+tions:
 - -Wall
 - -Wcompat
 - -Wincomplete-record-updates
@@ -102,6 +102,7 @@ executables:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
+    # - -dynamic
     dependencies:
     - potato-flow-vty
 
