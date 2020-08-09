@@ -30,12 +30,13 @@ import           Reflex.Vty
 
 
 flowMain :: IO ()
-flowMain = mainWidget mainPFWidget
+flowMain = do
+  mainWidget mainPFWidget
 
 -- TODO
 data MainPFTestOutput t = MainPFTestOutput {
-  _mainPFTestOutput_leftPane :: DynRegion t
-  , _mainPFTestOutput_rightPane :: DynRegion t 
+  _mainPFTestOutput_leftPane    :: DynRegion t
+  , _mainPFTestOutput_rightPane :: DynRegion t
 }
 
 
@@ -75,7 +76,7 @@ mainPFWidget = mdo
 
     pfc = PFConfig {
         _pfc_addElt     = doNewElt
-        , _pfc_removeElt  = never
+        , _pfc_deleteElts  = never
         , _pfc_manipulate = leftmostAssert "manipulate" [doManipulate, _layerWidget_changeName layersW]
         , _pfc_undo       = leftmostAssert "undo" [undoEv, undoBeforeManipulate, undoBeforeNewAdd, _canvasWidget_undo canvasW]
         , _pfc_redo       = redoEv
@@ -83,6 +84,9 @@ mainPFWidget = mdo
         , _pfc_load = never --fmapMaybe id loadFileEv
         , _pfc_resizeCanvas = never
         , _pfc_addFolder = never
+        , _pfc_moveElt = never
+        , _pfc_copy = never
+        , _pfc_paste = never
       }
   pfo <- holdPF pfc
 
@@ -98,7 +102,6 @@ mainPFWidget = mdo
     SelectionManagerConfig {
       _selectionManagerConfig_pfctx = pfctx
       , _selectionManagerConfig_newElt_layerPos = doNewElt
-      , _selectionManagerConfig_sEltLayerTree = _pfo_layers pfo
       , _selectionManagerConfig_select = _layerWidget_select layersW
       , _selectionManagerConfig_selectByREltId = _canvasWidget_select canvasW
     }

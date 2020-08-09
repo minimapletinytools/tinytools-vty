@@ -129,22 +129,17 @@ For pkg-config to find icu4c you may need to set:
 ::params::
 
 
-::TODO TMRW::
+::NEW TODO::
+-need to use holdUniqueDyn or something like that now that you have
+  -sucks that this needs to do all the equality comparisons with unique. Is there a smarter way around this?
+    -I think either way, the fanning should happen in potato-flow.. and this way it's easy to change implementation
 -refactor selecting code
   -selecting code still runs after a cancel
   -single click -> straight into dragging
   -select draws a box
 -create a common manipulator include file
   -all manipulators take a common input so you should just combine them into a single data struct
-
 -get basic params working
-DONE-consider adding hide flag to handles
-  -very broken after switching to box tool when previous just created object was changed
-DONE-boundingbox stuff
-  -use same code as MBox, but different behavior based on manipulateImmediately
-DONE-try this http://nominolo.blogspot.com/2010/04/haskell-tip-redirect-stdout-in-haskell.html to get stdout
-
-::TODO::
 -manipulate many doesn't work well with inverted boxes
   -one way to fix this is to force normalize boxes on ManipEnd but I don't like this... what if we want inverted stuff in the future?
   -so the "right" way to fix is to store the normalized state at start of bulk manipulate in a dynamic
@@ -156,8 +151,6 @@ DONE-try this http://nominolo.blogspot.com/2010/04/haskell-tip-redirect-stdout-i
 -duplicate support plz
 -refactor didCaptureInput so it's not done on a per event basis
 -consuming keyboard
-DONE/IGNORE-box handles still showing when they aren't suppose to
-  -prob will fix itself when you to BBoundingBox
 -click select seems to select bottom most now
 -load file D: lots of work to do
 -render outside canvas border
@@ -167,6 +160,14 @@ DONE/IGNORE-box handles still showing when they aren't suppose to
     -you can hook this up to the same delta rendering only
 -figure out how you want to handle vty attributes
 -do render order properly in Canvas
+
+DONE/IGNORE-box handles still showing when they aren't suppose to
+  -prob will fix itself when you to BBoundingBox
+DONE-consider adding hide flag to handles
+  -very broken after switching to box tool when previous just created object was changed
+DONE-boundingbox stuff
+  -use same code as MBox, but different behavior based on manipulateImmediately
+DONE-try this http://nominolo.blogspot.com/2010/04/haskell-tip-redirect-stdout-in-haskell.html to get stdout
 DONE-you need to do monolithic layers because processing drag events using widgets individually gets way too expensive5\IGNORE-consider storing visibility/lock states in SEltLabel
 IGNORE-consider hiding handle during creation drag
 DONE-move multiselect into selection manager

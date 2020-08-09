@@ -79,9 +79,14 @@ holdCanvasWidget :: forall t m. (MonadWidget t m)
   -> VtyWidget t m (CanvasWidget t)
 holdCanvasWidget CanvasWidgetConfig {..} = mdo
 
+  let
+    sEltLabelChangesEv = _pfo_potato_changed . _pFWidgetCtx_pfo $ _canvasWidgetConfig_pfctx
+    pFStateDyn = _pfo_pFState . _pFWidgetCtx_pfo $ _canvasWidgetConfig_pfctx
+    sCanvasDyn = fmap _pFState_canvas pFStateDyn
+
   -- ::prepare broadphase/canvas::
   let
-    bpc = BroadPhaseConfig $ fmap (fmap snd) $ _sEltLayerTree_changeView (_pfo_layers _canvasWidgetConfig_pfo)
+    bpc = BroadPhaseConfig $ sEltLabelChangesEv
     --renderfn :: ([LBox], BPTree, REltIdMap (Maybe SEltLabel)) -> RenderedCanvas -> PushM t RenderedCanvas
     renderfn (boxes, bpt, cslmap) rc = case boxes of
       [] -> return rc
@@ -89,7 +94,7 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
         Nothing -> return rc
         Just aabb -> do
           -- TODO use PotatoTotal
-          slmap <- sample . current . _directory_contents . _sEltLayerTree_directory . _pfo_layers $ _canvasWidgetConfig_pfo
+          slmap <- sample . current . fmap _pFState_directory $ pFStateDyn
           let
             rids = broadPhase_cull aabb bpt
             seltls = flip fmap rids $ \rid -> case IM.lookup rid cslmap of
@@ -114,7 +119,7 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
 
   -- ::prepare rendered canvas ::
   renderedCanvas <- foldDynM foldCanvasFn (emptyRenderedCanvas defaultCanvasLBox)
-    $ alignEventWithMaybe Just (_broadPhase_render broadPhase) (updated . _canvas_box $ _pfo_canvas _canvasWidgetConfig_pfo)
+    $ alignEventWithMaybe Just (_broadPhase_render broadPhase) (updated . fmap _sCanvas_box $ sCanvasDyn)
 
   -- ::cursor::
   -- NOTE the way we check if drag events go to canvas vs handle is a little bad TODO please fix

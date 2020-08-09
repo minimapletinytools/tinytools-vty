@@ -131,7 +131,7 @@ data LayerWidget t = LayerWidget {
   , _layerWidget_move              ::Event t (LayerPos, LayerPos)
   , _layerWidget_consumingKeyboard :: Behavior t Bool
 
-  -- TODO 
+  -- TODO
   --, _layerWidget_layerWidgetTestOutput :: LayerWidgetTestOutput t
 }
 
@@ -176,6 +176,8 @@ holdLayerWidget' LayerWidgetConfig {..} = do
 
   let
     PFWidgetCtx {..} = _layerWidgetConfig_pfctx
+    sEltLabelChangesEv = _pfo_potato_changed _pFWidgetCtx_pfo
+    pFStateDyn = _pfo_pFState _pFWidgetCtx_pfo
 
     -- event that finalizes text entry in LayerElts
     finalizeSet :: Event t ()
@@ -201,13 +203,8 @@ holdLayerWidget' LayerWidgetConfig {..} = do
     padBottom = 0
     regionDyn = ffor2 regionWidthDyn regionHeightDyn (,)
 
-
     layerREltIdsDyn :: Dynamic t (Seq REltId)
-    layerREltIdsDyn = _sEltLayerTree_view (_pfo_layers _pFWidgetCtx_pfo)
-
-    -- TODO unify with the one in Canvas
-    changesEv :: Event t (REltIdMap (Maybe SEltLabel))
-    changesEv = fmap (fmap snd) $ _sEltLayerTree_changeView (_pfo_layers _pFWidgetCtx_pfo)
+    layerREltIdsDyn = fmap _pFState_layers pFStateDyn
 
     selectedEv :: Event t ([(REltId, LayerPos)])
     selectedEv = updated
@@ -241,7 +238,7 @@ holdLayerWidget' LayerWidgetConfig {..} = do
   -- TODO figure out how to do proper deserialization of this on load (main issue is that rEltIds need to be rematched based on layer position in the LEltState)
   -- TODO Consider switching this to use Incremental/mergeIntIncremental
   lEltStateMapDyn' :: Dynamic t (REltIdMap LEltState)
-    <- foldDyn lEltStateMapDyn_foldfn IM.empty (align selectedEv changesEv)
+    <- foldDyn lEltStateMapDyn_foldfn IM.empty (align selectedEv sEltLabelChangesEv)
   lEltStateMapDyn <- holdUniqDyn lEltStateMapDyn'
 
   let
@@ -392,7 +389,7 @@ holdLayerWidget' LayerWidgetConfig {..} = do
   vLayoutPad 10 $ debugStream [
     never
     --, fmapLabelShow "changeNameEv" $ changeNameEv
-    --, fmapLabelShow "changes" $ changesEv
+    --, fmapLabelShow "changes" $ sEltLabelChangesEv
     --, fmapLabelShow "selected" $ selectedEv
     --, fmapLabelShow "click" $ click
     --, fmapLabelShow "lineIndex" $ updated lineIndexDyn

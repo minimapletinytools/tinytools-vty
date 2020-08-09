@@ -38,10 +38,9 @@ computeSelectionType = foldl' foldfn MSTNone where
 
 data SelectionManagerConfig t = SelectionManagerConfig {
   _selectionManagerConfig_pfctx             :: PFWidgetCtx t
+
   -- connect to _canvasWidget_addSEltLabel to auto select new elts
   , _selectionManagerConfig_newElt_layerPos :: Event t (LayerPos, SEltLabel)
-  -- connect to _sEltLayerTree_changeView
-  , _selectionManagerConfig_sEltLayerTree   :: SEltLayerTree t
 
   -- connect to _layerWidget_select
   , _selectionManagerConfig_select          :: Event t (Bool, LayerPos)
@@ -61,10 +60,12 @@ holdSelectionManager :: forall t m. (Reflex t, MonadHold t m, MonadFix m)
 holdSelectionManager SelectionManagerConfig {..} = mdo
   let
 
+    sEltLabelChangesEv = _pfo_potato_changed . _pFWidgetCtx_pfo $ _selectionManagerConfig_pfctx
+    pFStateDyn = _pfo_pFState . _pFWidgetCtx_pfo $ _selectionManagerConfig_pfctx
 
     -- ::selection from newly created element::
     newSingle = fmapMaybe (\im -> if IM.size im == 1 then IM.lookupMin im else Nothing)
-      $ _sEltLayerTree_changeView _selectionManagerConfig_sEltLayerTree
+      $ sEltLabelChangesEv
     selFromVeryNew_alignfn = \case
       -- we make an unchecked assumption that these two events coincide and refer to the same new element
       -- TODO add an assert that they are indeed the same elt
@@ -82,11 +83,14 @@ holdSelectionManager SelectionManagerConfig {..} = mdo
         currentSelection <- sample . current $ (fmap (fmap snd3)) selected
         return $ disjointUnion lps currentSelection
 
+    -- TODO wrap this into a helper
     layerPosEvToSuperSEltLabelEv :: Event t [LayerPos] -> Event t [SuperSEltLabel]
     -- PARTIAL the above should never fail if layers is working correctly so I would rather it crash for now
-    -- non-partial version:
-    --fmapMaybe sequence $ sEltLayerTree_tagSuperSEltsByPos _selectionManagerConfig_sEltLayerTree _selectionManagerConfig_select
-    layerPosEvToSuperSEltLabelEv = fmap (fmap fromJust) . sEltLayerTree_tagSuperSEltsByPos _selectionManagerConfig_sEltLayerTree
+    layerPosEvToSuperSEltLabelEv = pushAlways (\lps -> do
+      pFState <- sample . current $ pFStateDyn
+      return $ fmap (fromJust . flip pFState_getSuperSEltByPos pFState) lps)
+
+
 
     -- ::selection from LayersWidget::
     selFromLayers :: Event t [SuperSEltLabel]
@@ -109,10 +113,6 @@ holdSelectionManager SelectionManagerConfig {..} = mdo
     selFromCanvas :: Event t ([SuperSEltLabel])
     selFromCanvas = layerPosEvToSuperSEltLabelEv $ pushAlways pushSelFromCanvas _selectionManagerConfig_selectByREltId
 
-    -- ::selection doesn't change but contents do change::
-    selChangesFromModified :: Event t (REltIdMap (Maybe SEltLabel))
-    selChangesFromModified = fmap (fmap snd) $ _sEltLayerTree_changeView _selectionManagerConfig_sEltLayerTree
-
     -- ::combine everything togethr
     selectedNew = leftmostWarn "SelectionManager - selectedNew"
       [selFromVeryNew
@@ -120,7 +120,7 @@ holdSelectionManager SelectionManagerConfig {..} = mdo
       , selFromCanvas]
 
     selectedInputEv :: Event t (These [SuperSEltLabel] (REltIdMap (Maybe SEltLabel)))
-    selectedInputEv = alignEventWithMaybe Just selectedNew selChangesFromModified
+    selectedInputEv = alignEventWithMaybe Just selectedNew sEltLabelChangesEv
 
     selectionFoldFn ::
       These [SuperSEltLabel] (REltIdMap (Maybe SEltLabel))
