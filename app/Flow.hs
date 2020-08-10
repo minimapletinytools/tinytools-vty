@@ -124,7 +124,6 @@ mainPFWidget = mdo
 
       layers' <- stretch $ holdLayerWidget $ LayerWidgetConfig {
             _layerWidgetConfig_pfctx              = pfctx
-            , _layerWidgetConfig_temp_sEltTree    = fmap potato_simplifyPotatoTotal $ _pfo_potato_potatoTotal pfo
             , _layerWidgetConfig_selectionManager = selectionManager
           }
       params' <- fixed 5 $ holdParamsWidget $ ParamsWidgetConfig {

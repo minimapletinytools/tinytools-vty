@@ -81,8 +81,8 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
 
   let
     sEltLabelChangesEv = _pfo_potato_changed . _pFWidgetCtx_pfo $ _canvasWidgetConfig_pfctx
-    pFStateDyn = _pfo_pFState . _pFWidgetCtx_pfo $ _canvasWidgetConfig_pfctx
-    sCanvasDyn = fmap _pFState_canvas pFStateDyn
+    pFStateBeh = _pfo_pFState . _pFWidgetCtx_pfo $ _canvasWidgetConfig_pfctx
+    sCanvasDyn = _pfo_pFState_canvas . _pFWidgetCtx_pfo $ _canvasWidgetConfig_pfctx
 
   -- ::prepare broadphase/canvas::
   let
@@ -94,7 +94,7 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
         Nothing -> return rc
         Just aabb -> do
           -- TODO use PotatoTotal
-          slmap <- sample . current . fmap _pFState_directory $ pFStateDyn
+          slmap <- sample . fmap _pFState_directory $ pFStateBeh
           let
             rids = broadPhase_cull aabb bpt
             seltls = flip fmap rids $ \rid -> case IM.lookup rid cslmap of

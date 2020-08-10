@@ -61,7 +61,8 @@ holdSelectionManager SelectionManagerConfig {..} = mdo
   let
 
     sEltLabelChangesEv = _pfo_potato_changed . _pFWidgetCtx_pfo $ _selectionManagerConfig_pfctx
-    pFStateDyn = _pfo_pFState . _pFWidgetCtx_pfo $ _selectionManagerConfig_pfctx
+    pFStateBeh = _pfo_pFState . _pFWidgetCtx_pfo $ _selectionManagerConfig_pfctx
+    layerPosMapDyn = _pfo_layerPosMap $ _pFWidgetCtx_pfo _selectionManagerConfig_pfctx
 
     -- ::selection from newly created element::
     newSingle = fmapMaybe (\im -> if IM.size im == 1 then IM.lookupMin im else Nothing)
@@ -87,8 +88,8 @@ holdSelectionManager SelectionManagerConfig {..} = mdo
     layerPosEvToSuperSEltLabelEv :: Event t [LayerPos] -> Event t [SuperSEltLabel]
     -- PARTIAL the above should never fail if layers is working correctly so I would rather it crash for now
     layerPosEvToSuperSEltLabelEv = pushAlways (\lps -> do
-      pFState <- sample . current $ pFStateDyn
-      return $ fmap (fromJust . flip pFState_getSuperSEltByPos pFState) lps)
+      pFState <- sample pFStateBeh
+      return $ fmap (fromJust . pFState_getSuperSEltByPos pFState) lps)
 
 
 
@@ -97,13 +98,12 @@ holdSelectionManager SelectionManagerConfig {..} = mdo
     selFromLayers = layerPosEvToSuperSEltLabelEv $ pushAlways selection_pushfn $ fmap (\(b,lp) -> (b, [lp])) _selectionManagerConfig_select
 
     -- ::selection from CanvasWidget::
-    potatoTotalDyn = _pfo_potato_potatoTotal $ _pFWidgetCtx_pfo _selectionManagerConfig_pfctx
     pushSelFromCanvas :: (Bool, Either [REltId] [REltId]) -> PushM t [LayerPos]
     pushSelFromCanvas (addToSelection, erids) = do
-      pt <- sample . current $ potatoTotalDyn
+      layerPosMap <- sample . current $ layerPosMapDyn
       let
         -- PARTIAL
-        mapToLp = map (\rid -> (fromJust . _potatoTotal_layerPosMap pt $ rid))
+        mapToLp = map (\rid -> (fromJust . IM.lookup rid $ layerPosMap))
         lps = case erids of
           Left rids  -> case mapToLp rids of
             [] -> []
@@ -113,6 +113,10 @@ holdSelectionManager SelectionManagerConfig {..} = mdo
     selFromCanvas :: Event t ([SuperSEltLabel])
     selFromCanvas = layerPosEvToSuperSEltLabelEv $ pushAlways pushSelFromCanvas _selectionManagerConfig_selectByREltId
 
+    -- ::selection doesn't change but contents do change::
+    selChangesFromModified :: Event t (REltIdMap (Maybe SEltLabel))
+    selChangesFromModified = sEltLabelChangesEv
+
     -- ::combine everything togethr
     selectedNew = leftmostWarn "SelectionManager - selectedNew"
       [selFromVeryNew
@@ -120,7 +124,7 @@ holdSelectionManager SelectionManagerConfig {..} = mdo
       , selFromCanvas]
 
     selectedInputEv :: Event t (These [SuperSEltLabel] (REltIdMap (Maybe SEltLabel)))
-    selectedInputEv = alignEventWithMaybe Just selectedNew sEltLabelChangesEv
+    selectedInputEv = alignEventWithMaybe Just selectedNew selChangesFromModified
 
     selectionFoldFn ::
       These [SuperSEltLabel] (REltIdMap (Maybe SEltLabel))

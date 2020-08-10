@@ -120,7 +120,6 @@ layerEltTextInput i cfg = mdo
 
 data LayerWidgetConfig t = LayerWidgetConfig {
   _layerWidgetConfig_pfctx              :: PFWidgetCtx t
-  , _layerWidgetConfig_temp_sEltTree    :: Dynamic t [SuperSEltLabel]
   , _layerWidgetConfig_selectionManager :: SelectionManager t
 }
 
@@ -204,7 +203,7 @@ holdLayerWidget' LayerWidgetConfig {..} = do
     regionDyn = ffor2 regionWidthDyn regionHeightDyn (,)
 
     layerREltIdsDyn :: Dynamic t (Seq REltId)
-    layerREltIdsDyn = fmap _pFState_layers pFStateDyn
+    layerREltIdsDyn = _pfo_pFState_layers _pFWidgetCtx_pfo
 
     selectedEv :: Event t ([(REltId, LayerPos)])
     selectedEv = updated
