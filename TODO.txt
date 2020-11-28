@@ -22,7 +22,7 @@ For pkg-config to find icu4c you may need to set:
       -need to figure out inversion issue still though
     -does not show for null elements
   -specific manipulator (per tool)
-    -must manage mouse hirerachy or guarantee that manipulators never overlap
+    -must manage mouse hierarchy or guarantee that manipulators never overlap
       -maybe hide manipulators on manipulation? Nah
   -it would be nice if click once doesn't actually create  the element until
     -dragging (as it is now)

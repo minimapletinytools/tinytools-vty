@@ -61,7 +61,7 @@ holdSelectionManager SelectionManagerConfig {..} = mdo
   let
 
     sEltLabelChangesEv = _pfo_potato_changed . _pFWidgetCtx_pfo $ _selectionManagerConfig_pfctx
-    pFStateBeh = _pfo_pFState . _pFWidgetCtx_pfo $ _selectionManagerConfig_pfctx
+    pFStateBeh = current . _pfo_pFState . _pFWidgetCtx_pfo $ _selectionManagerConfig_pfctx
     layerPosMapDyn = _pfo_layerPosMap $ _pFWidgetCtx_pfo _selectionManagerConfig_pfctx
 
     -- ::selection from newly created element::
@@ -115,7 +115,7 @@ holdSelectionManager SelectionManagerConfig {..} = mdo
 
     -- ::selection doesn't change but contents do change::
     selChangesFromModified :: Event t (REltIdMap (Maybe SEltLabel))
-    selChangesFromModified = sEltLabelChangesEv
+    selChangesFromModified = fmap (fmap (fmap snd)) sEltLabelChangesEv
 
     -- ::combine everything togethr
     selectedNew = leftmostWarn "SelectionManager - selectedNew"
