@@ -65,9 +65,8 @@ radioList buttonsDyn activeDyn = do
 data Tool = TSelect | TPan | TBox | TLine | TText deriving (Eq, Show, Enum)
 
 data ToolWidgetConfig t = ToolWidgetConfig {
-  _toolWidgetConfig_pfctx               :: PFWidgetCtx t
-  , _toolWidgetConfig_setDefault        :: Event t ()
-  , _toolWidgetConfig_consumingKeyboard :: Behavior t Bool
+  _toolWidgetConfig_pfctx        :: PFWidgetCtx t
+  , _toolWidgetConfig_setDefault :: Event t ()
 }
 
 data ToolWidget t = ToolWidget {
@@ -93,7 +92,7 @@ holdToolsWidget ToolWidgetConfig {..} = mdo
     textB = void $ ffilter (==4) radioEvs
 
   let
-    allowKB = fmap not _toolWidgetConfig_consumingKeyboard
+    allowKB = constant True
     keyPressEv' k = (flip fmapMaybe) (_pFWidgetCtx_ev_input _toolWidgetConfig_pfctx) $ \case
       V.EvKey (V.KChar k') [] | k' == k -> Just ()
       _ -> Nothing

@@ -24,5 +24,4 @@ data PFWidgetCtx t = PFWidgetCtx {
 
   -- for debugging or whatever
   , _pFWidgetCtx_ev_input         :: Event t VtyEvent
-  , _pFWidgetCtx_pfo              :: PFOutput t
 }

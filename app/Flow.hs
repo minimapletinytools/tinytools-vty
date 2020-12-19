@@ -12,7 +12,6 @@ import           Potato.Flow.Reflex.Vty.Canvas
 import           Potato.Flow.Reflex.Vty.Layer
 import           Potato.Flow.Reflex.Vty.Params
 import           Potato.Flow.Reflex.Vty.PFWidgetCtx
-import           Potato.Flow.Reflex.Vty.Selection
 import           Potato.Flow.Reflex.Vty.Tools
 import           Potato.Reflex.Vty.Helpers
 import           Potato.Reflex.Vty.Widget
@@ -58,7 +57,6 @@ mainPFWidget = mdo
           V.EvKey (V.KEsc) [] -> Just ()
           _ -> Nothing
         , _pFWidgetCtx_ev_input = inp
-        , _pFWidgetCtx_pfo = pfo
       }
 
   -- potato flow stuff
@@ -74,57 +72,28 @@ mainPFWidget = mdo
       V.EvKey (V.KChar 's') [V.MCtrl] -> Just ()
       _ -> Nothing
 
-    pfc = PFConfig {
-        _pfc_addElt     = doNewElt
-        , _pfc_deleteElts  = never
-        , _pfc_manipulate = leftmostAssert "manipulate" [doManipulate, _layerWidget_changeName layersW]
-        , _pfc_undo       = leftmostAssert "undo" [undoEv, undoBeforeManipulate, undoBeforeNewAdd, _canvasWidget_undo canvasW]
-        , _pfc_redo       = redoEv
-        , _pfc_save = saveEv
-        , _pfc_load = never --fmapMaybe id loadFileEv
-        , _pfc_resizeCanvas = never
-        , _pfc_addFolder = never
-        , _pfc_moveElt = never
-        , _pfc_copy = never
-        , _pfc_paste = never
-      }
-  pfo <- holdPF pfc
-
   -- ::save/load file potato::
-  performEvent_ $ ffor (_pfo_saved pfo) $ \spf -> do
-    liftIO $ Aeson.encodeFile "potato.flow" spf
+  -- TODO
+  --performEvent_ $ ffor (_pfo_saved pfo) $ \spf -> do
+  --  liftIO $ Aeson.encodeFile "potato.flow" spf
 
   --loadFileEv <- performEvent $ ffor postBuildEv $ \_ -> do
   --  liftIO $ Aeson.decodeFileStrict "potato.flow"
 
-  -- ::selection stuff::
-  selectionManager <- holdSelectionManager
-    SelectionManagerConfig {
-      _selectionManagerConfig_pfctx = pfctx
-      , _selectionManagerConfig_newElt_layerPos = doNewElt
-      , _selectionManagerConfig_select = _layerWidget_select layersW
-      , _selectionManagerConfig_selectByREltId = _canvasWidget_select canvasW
-    }
 
   -- main panels
   let
     leftPanel = col $ do
       fixed 5 $ debugStream [
         never
-        , fmapLabelShow "doManipulate" $ doManipulate
-        , fmapLabelShow "doNewElt" $ doNewElt
-        --, fmapLabelShow "undo" $ _canvasWidget_addSEltLabel canvasW
-        --, fmapLabelShow "input" inp
         ]
       tools' <- fixed 10 $ holdToolsWidget $  ToolWidgetConfig {
           _toolWidgetConfig_pfctx = pfctx
-          , _toolWidgetConfig_consumingKeyboard = consumingKeyboard
           , _toolWidgetConfig_setDefault = never --void $ _canvasWidget_addSEltLabel canvasW
         }
 
       layers' <- stretch $ holdLayerWidget $ LayerWidgetConfig {
             _layerWidgetConfig_pfctx              = pfctx
-            , _layerWidgetConfig_selectionManager = selectionManager
           }
       params' <- fixed 5 $ holdParamsWidget $ ParamsWidgetConfig {
           _paramsWidgetConfig_pfctx = pfctx
@@ -133,9 +102,6 @@ mainPFWidget = mdo
 
     rightPanel = holdCanvasWidget $ CanvasWidgetConfig {
         _canvasWidgetConfig_pfctx = pfctx
-        , _canvasWidgetConfig_tool = (_toolWidget_tool toolsW)
-        , _canvasWidgetConfig_pfo = pfo
-        , _canvasWidgetConfig_selectionManager = selectionManager
       }
 
   ((layersW, toolsW, paramsW), canvasW) <- splitHDrag 35 (fill '*') leftPanel rightPanel

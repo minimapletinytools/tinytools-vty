@@ -12,7 +12,6 @@ import           Relude
 import           Potato.Flow
 import           Potato.Flow.Reflex.Vty.Manipulator.Types
 import           Potato.Flow.Reflex.Vty.PFWidgetCtx
-import           Potato.Flow.Reflex.Vty.Selection
 
 import           Control.Monad.Fix
 import           Control.Monad.NodeId
@@ -29,7 +28,6 @@ data SEltParams = SEltParams {
 
 data ParamsWidgetConfig t = ParamsWidgetConfig {
   _paramsWidgetConfig_pfctx              :: PFWidgetCtx t
-  , _paramsWidgetConfig_selectionManager :: SelectionManager t
 }
 
 data ParamsWidget t = ParamsWidget {
@@ -43,10 +41,6 @@ holdParamsWidget :: forall t m. (PostBuild t m, MonadHold t m, MonadFix m, Monad
   => ParamsWidgetConfig t
   -> VtyWidget t m (ParamsWidget t)
 holdParamsWidget ParamsWidgetConfig {..} = do
-  let
-    selected :: Dynamic t (ManipSelectionType, [SuperSEltLabel])
-    selected = _selectionManager_selected _paramsWidgetConfig_selectionManager
-
   fill '#'
 
   return ParamsWidget {
