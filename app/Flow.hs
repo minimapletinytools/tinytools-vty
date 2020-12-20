@@ -7,6 +7,7 @@ module Flow (
 import           Relude
 
 import           Potato.Flow
+import           Potato.Flow.Controller
 import           Potato.Flow.Reflex.Vty.Attrs
 import           Potato.Flow.Reflex.Vty.Canvas
 import           Potato.Flow.Reflex.Vty.Layer
@@ -59,6 +60,9 @@ mainPFWidget = mdo
         , _pFWidgetCtx_ev_input = inp
       }
 
+  -- everything
+
+
   -- potato flow stuff
   let
     -- TODO disable when manipulating _canvasWidget_isManipulating
@@ -80,6 +84,24 @@ mainPFWidget = mdo
   --loadFileEv <- performEvent $ ffor postBuildEv $ \_ -> do
   --  liftIO $ Aeson.decodeFileStrict "potato.flow"
 
+  let
+    everythingWidgetConfig = EverythingWidgetConfig {
+        _everythingWidgetConfig_initialState = emptyPFState
+
+        -- canvas direct input
+        , _everythingWidgetConfig_mouse = never
+        , _everythingWidgetConfig_keyboard = never
+
+        , _everythingWidgetConfig_selectTool = _toolWidget_setTool toolsW
+
+        -- debugging/deprecated stuff
+        , _everythingWidgetConfig_selectNew = never
+        , _everythingWidgetConfig_selectAdd = never
+        , _everythingWidgetConfig_setDebugLabel = never
+      }
+
+  everythingW <- holdEverythingWidget everythingWidgetConfig
+
 
   -- main panels
   let
@@ -89,14 +111,18 @@ mainPFWidget = mdo
         ]
       tools' <- fixed 10 $ holdToolsWidget $  ToolWidgetConfig {
           _toolWidgetConfig_pfctx = pfctx
-          , _toolWidgetConfig_setDefault = never --void $ _canvasWidget_addSEltLabel canvasW
+          , _toolWidgetConfig_tool =  _everythingWidget_tool everythingW
         }
 
       layers' <- stretch $ holdLayerWidget $ LayerWidgetConfig {
             _layerWidgetConfig_pfctx              = pfctx
+            --_everythingWidget_selection                :: Dynamic t Selection
+            -- , _everythingWidget_layers:: Dynamic t (Seq LayerDisplay)
           }
       params' <- fixed 5 $ holdParamsWidget $ ParamsWidgetConfig {
           _paramsWidgetConfig_pfctx = pfctx
+          --_everythingWidget_pan
+          --, _everythingWidget_broadPhase
         }
       return (layers', tools', params')
 

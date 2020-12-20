@@ -10,6 +10,7 @@ module Potato.Flow.Reflex.Vty.Tools (
 
 import           Relude
 
+import           Potato.Flow.Controller
 import           Potato.Flow.Reflex.Vty.Attrs
 import           Potato.Flow.Reflex.Vty.PFWidgetCtx
 import           Potato.Reflex.Vty.Helpers
@@ -62,15 +63,13 @@ radioList buttonsDyn activeDyn = do
 
 
 
-data Tool = TSelect | TPan | TBox | TLine | TText deriving (Eq, Show, Enum)
-
 data ToolWidgetConfig t = ToolWidgetConfig {
-  _toolWidgetConfig_pfctx        :: PFWidgetCtx t
-  , _toolWidgetConfig_setDefault :: Event t ()
+  _toolWidgetConfig_pfctx  :: PFWidgetCtx t
+  , _toolWidgetConfig_tool :: Dynamic t Tool
 }
 
 data ToolWidget t = ToolWidget {
-  _toolWidget_tool :: Dynamic t Tool
+  _toolWidget_setTool :: Event t Tool
 }
 
 
@@ -83,7 +82,7 @@ holdToolsWidget :: forall t m. (PostBuild t m, MonadHold t m, MonadFix m, MonadN
   -> VtyWidget t m (ToolWidget t)
 holdToolsWidget ToolWidgetConfig {..} = mdo
 
-  radioEvs <- radioList (constDyn ["s","╬","□","/","T"]) (fmap ((:[]) . fromEnum) dynTool)
+  radioEvs <- radioList (constDyn ["s","╬","□","/","T"]) (fmap ((:[]) . fromEnum) _toolWidgetConfig_tool)
   let
     selectB = void $ ffilter (==0) radioEvs
     panB = void $ ffilter (==1) radioEvs
@@ -92,32 +91,32 @@ holdToolsWidget ToolWidgetConfig {..} = mdo
     textB = void $ ffilter (==4) radioEvs
 
   let
+    -- TODO DELETE, we don't do key press anymore
+    {-
     allowKB = constant True
     keyPressEv' k = (flip fmapMaybe) (_pFWidgetCtx_ev_input _toolWidgetConfig_pfctx) $ \case
       V.EvKey (V.KChar k') [] | k' == k -> Just ()
       _ -> Nothing
     keyPressEv k = onlyIfBeh (keyPressEv' k) allowKB
+    -}
+    keyPressEv k = never
+
+    setTool = leftmost
+      [Tool_Select <$ leftmost [ selectB, keyPressEv 'v']
+      , Tool_Pan <$ leftmost [panB, keyPressEv ' ']
+      , Tool_Box <$ leftmost [boxB, keyPressEv 'b']
+      , Tool_Line <$ leftmost [lineB, keyPressEv 'l']
+      , Tool_Text <$ leftmost [textB, keyPressEv 't']]
 
   vLayoutPad 4 $ debugStream [
     never
     , fmapLabelShow "radio" $ radioEvs
-    , fmapLabelShow "selected" $ fmap ((:[]) . fromEnum) (updated dynTool)
+    , fmapLabelShow "selected" $ fmap ((:[]) . fromEnum) (updated _toolWidgetConfig_tool)
     ]
 
 
-  dynTool <- holdDyn TSelect $ leftmost
-    [TSelect <$ leftmost
-      [ selectB
-      --, onlyIfBeh (_pFWidgetCtx_ev_cancel _toolWidgetConfig_pfctx) allowKB
-      , _toolWidgetConfig_setDefault
-      , keyPressEv 'v']
-    , TPan <$ leftmost [panB, keyPressEv ' ']
-    , TBox <$ leftmost [boxB, keyPressEv 'b']
-    , TLine <$ leftmost [lineB, keyPressEv 'l']
-    , TText <$ leftmost [textB, keyPressEv 't']]
-
   return ToolWidget {
-    _toolWidget_tool = dynTool
+    _toolWidget_setTool = setTool
   }
 
   {-
