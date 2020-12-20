@@ -51,13 +51,12 @@ mainPFWidget = mdo
   postBuildEv <- getPostBuild
 
   let
+
     pfctx = PFWidgetCtx {
         _pFWidgetCtx_attr_default = constDyn lg_default
         , _pFWidgetCtx_attr_manipulator = constDyn lg_manip
-        , _pFWidgetCtx_ev_cancel        = fforMaybe inp $ \case
-          V.EvKey (V.KEsc) [] -> Just ()
-          _ -> Nothing
-        , _pFWidgetCtx_ev_input = inp
+        , _pFWidgetCtx_pFOutput = _everythingWidget_pFOutput everythingW
+        , _pFWidgetCtx_initialPFState = emptyPFState
       }
 
   -- everything
@@ -121,13 +120,13 @@ mainPFWidget = mdo
           }
       params' <- fixed 5 $ holdParamsWidget $ ParamsWidgetConfig {
           _paramsWidgetConfig_pfctx = pfctx
-          --_everythingWidget_pan
-          --, _everythingWidget_broadPhase
         }
       return (layers', tools', params')
 
     rightPanel = holdCanvasWidget $ CanvasWidgetConfig {
         _canvasWidgetConfig_pfctx = pfctx
+        , _canvasWidgetConfig_pan = _everythingWidget_pan everythingW
+        , _canvasWidgetConfig_broadPhase = _everythingWidget_broadPhase everythingW
       }
 
   ((layersW, toolsW, paramsW), canvasW) <- splitHDrag 35 (fill '*') leftPanel rightPanel
