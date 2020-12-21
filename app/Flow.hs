@@ -14,6 +14,7 @@ import           Potato.Flow.Reflex.Vty.Layer
 import           Potato.Flow.Reflex.Vty.Params
 import           Potato.Flow.Reflex.Vty.PFWidgetCtx
 import           Potato.Flow.Reflex.Vty.Tools
+import           Potato.Flow.TestStates
 import           Potato.Reflex.Vty.Helpers
 import           Potato.Reflex.Vty.Widget
 
@@ -56,7 +57,7 @@ mainPFWidget = mdo
         _pFWidgetCtx_attr_default = constDyn lg_default
         , _pFWidgetCtx_attr_manipulator = constDyn lg_manip
         , _pFWidgetCtx_pFOutput = _everythingWidget_pFOutput everythingW
-        , _pFWidgetCtx_initialPFState = emptyPFState
+        , _pFWidgetCtx_initialPFState = pfstate_basic1
       }
 
   -- everything
@@ -85,7 +86,8 @@ mainPFWidget = mdo
 
   let
     everythingWidgetConfig = EverythingWidgetConfig {
-        _everythingWidgetConfig_initialState = emptyPFState
+        _everythingWidgetConfig_initialState = _pFWidgetCtx_initialPFState pfctx
+        , _everythingWidgetConfig_load = never
 
         -- canvas direct input
         , _everythingWidgetConfig_mouse = never

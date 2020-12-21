@@ -97,8 +97,17 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
       renderfn (BroadPhaseState renderBoxes bpt IM.empty) (emptyRenderedCanvas lbx)
     foldCanvasFn (These _ _) _ = error "resize and change events should never occur simultaneously"
 
+
+  -- initialization stuff, wow super annoying ;__;
+  let
+    initialDir = _pFState_directory _pFWidgetCtx_initialPFState
+    initialselts = fmap (\(SEltLabel _ selt) -> selt) $ toList initialDir
+    initialCanvasBox = _sCanvas_box $ _pFState_canvas _pFWidgetCtx_initialPFState
+    -- TODO render entire screen area rather than just canvas portion
+    initialRenderedCanvas =  render initialCanvasBox initialselts (emptyRenderedCanvas initialCanvasBox)
+
   -- ::prepare rendered canvas ::
-  renderedCanvas <- foldDynM foldCanvasFn (emptyRenderedCanvas (_sCanvas_box $ _pFState_canvas _pFWidgetCtx_initialPFState))
+  renderedCanvas <- foldDynM foldCanvasFn initialRenderedCanvas
     $ alignEventWithMaybe Just (updated _canvasWidgetConfig_broadPhase) (fmap _sCanvas_box . updated . _pfo_pFState_canvas $ _pFWidgetCtx_pFOutput)
 
   -- ::draw the canvas::
