@@ -56,7 +56,8 @@ mainPFWidget = mdo
     pfctx = PFWidgetCtx {
         _pFWidgetCtx_attr_default = constDyn lg_default
         , _pFWidgetCtx_attr_manipulator = constDyn lg_manip
-        , _pFWidgetCtx_pFOutput = _everythingWidget_pFOutput everythingW
+        -- TODO don't do this, we need to break out individual changes instead so we can take advantage of holdUniqDyn
+        , _pFWidgetCtx_pFState = fmap goatState_pFState $ _goatWidget_DEBUG_goatState everythingW
         , _pFWidgetCtx_initialPFState = pfstate_basic1
       }
 
@@ -85,23 +86,21 @@ mainPFWidget = mdo
   --  liftIO $ Aeson.decodeFileStrict "potato.flow"
 
   let
-    everythingWidgetConfig = EverythingWidgetConfig {
-        _everythingWidgetConfig_initialState = _pFWidgetCtx_initialPFState pfctx
-        , _everythingWidgetConfig_load = never
+    goatWidgetConfig = GoatWidgetConfig {
+        _goatWidgetConfig_initialState = _pFWidgetCtx_initialPFState pfctx
+        , _goatWidgetConfig_load = never
 
         -- canvas direct input
-        , _everythingWidgetConfig_mouse = never
-        , _everythingWidgetConfig_keyboard = never
+        , _goatWidgetConfig_mouse = never
+        , _goatWidgetConfig_keyboard = never
 
-        , _everythingWidgetConfig_selectTool = _toolWidget_setTool toolsW
+        , _goatWidgetConfig_selectTool = _toolWidget_setTool toolsW
 
         -- debugging/deprecated stuff
-        , _everythingWidgetConfig_selectNew = never
-        , _everythingWidgetConfig_selectAdd = never
-        , _everythingWidgetConfig_setDebugLabel = never
+        , _goatWidgetConfig_setDebugLabel = never
       }
 
-  everythingW <- holdEverythingWidget everythingWidgetConfig
+  everythingW <- holdGoatWidget goatWidgetConfig
 
 
   -- main panels
@@ -112,13 +111,13 @@ mainPFWidget = mdo
         ]
       tools' <- fixed 10 $ holdToolsWidget $  ToolWidgetConfig {
           _toolWidgetConfig_pfctx = pfctx
-          , _toolWidgetConfig_tool =  _everythingWidget_tool everythingW
+          , _toolWidgetConfig_tool =  _goatWidget_tool everythingW
         }
 
       layers' <- stretch $ holdLayerWidget $ LayerWidgetConfig {
             _layerWidgetConfig_pfctx              = pfctx
-            --_everythingWidget_selection                :: Dynamic t Selection
-            -- , _everythingWidget_layers:: Dynamic t (Seq LayerDisplay)
+            --_goatWidget_selection                :: Dynamic t Selection
+            -- , _goatWidget_layers:: Dynamic t (Seq LayerDisplay)
           }
       params' <- fixed 5 $ holdParamsWidget $ ParamsWidgetConfig {
           _paramsWidgetConfig_pfctx = pfctx
@@ -127,8 +126,8 @@ mainPFWidget = mdo
 
     rightPanel = holdCanvasWidget $ CanvasWidgetConfig {
         _canvasWidgetConfig_pfctx = pfctx
-        , _canvasWidgetConfig_pan = _everythingWidget_pan everythingW
-        , _canvasWidgetConfig_broadPhase = _everythingWidget_broadPhase everythingW
+        , _canvasWidgetConfig_pan = _goatWidget_pan everythingW
+        , _canvasWidgetConfig_broadPhase = _goatWidget_broadPhase everythingW
       }
 
   ((layersW, toolsW, paramsW), canvasW) <- splitHDrag 35 (fill '*') leftPanel rightPanel

@@ -32,13 +32,13 @@ For pkg-config to find icu4c you may need to set:
     -OnClick -> cursor = CSSelecting
       -supresses manipulators
         -how do I do this?
-    -OnClick/Drag -> select_LBox :: Event t LBox
+    -OnClick/Drag -> select_lBox :: Event t LBox
     -OnRelease -> cursor = CSSelect
   -if cursor == CSSelect
     -OnClick ->
       -on element -> begin CSBoundingBox translate
       -off element -> begin LBox selection
-        -OnRelease -> finish LBOx selection -> select_LBox :: Event t LBox
+        -OnRelease -> finish LBOx selection -> select_lBox :: Event t LBox
     -this design matches illustrator behavior
   -broadPhase_cull :: LBox -> [REltId]
 

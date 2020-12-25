@@ -72,10 +72,11 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
     PFWidgetCtx {..} = _canvasWidgetConfig_pfctx
     renderfn (BroadPhaseState boxes bpt cslmap) rc = case boxes of
       [] -> return rc
-      (b:bs) -> case intersect_LBox (renderedCanvas_box rc) (foldl' union_LBox b bs) of
+      (b:bs) -> case intersect_lBox (renderedCanvas_box rc) (foldl' union_lBox b bs) of
         Nothing -> return rc
         Just aabb -> do
-          slmap <- sample . current . _pfo_pFState_directory $ _pFWidgetCtx_pFOutput
+          -- TODO don't use _pFWidgetCtx_pFState since it updates even if directory didn't change
+          slmap <- sample . current . fmap _pFState_directory $ _pFWidgetCtx_pFState
           let
             rids = broadPhase_cull aabb bpt
             seltls = flip fmap rids $ \rid -> case IM.lookup rid cslmap of
@@ -100,6 +101,7 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
 
   -- initialization stuff, wow super annoying ;__;
   let
+    -- TODO call renderWithBroadPhase instead
     initialDir = _pFState_directory _pFWidgetCtx_initialPFState
     initialselts = fmap (\(SEltLabel _ selt) -> selt) $ toList initialDir
     initialCanvasBox = _sCanvas_box $ _pFState_canvas _pFWidgetCtx_initialPFState
@@ -108,7 +110,8 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
 
   -- ::prepare rendered canvas ::
   renderedCanvas <- foldDynM foldCanvasFn initialRenderedCanvas
-    $ alignEventWithMaybe Just (updated _canvasWidgetConfig_broadPhase) (fmap _sCanvas_box . updated . _pfo_pFState_canvas $ _pFWidgetCtx_pFOutput)
+    -- TODO don't use _pFWidgetCtx_pFState since it updates even if canvas didn't actually change
+    $ alignEventWithMaybe Just (updated _canvasWidgetConfig_broadPhase) (fmap (_sCanvas_box . _pFState_canvas) . updated $ _pFWidgetCtx_pFState)
 
   -- ::draw the canvas::
   let
@@ -116,6 +119,9 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
   fill '░'
   pane canvasRegion (constDyn True) $ do
     text $ current (fmap renderedCanvasToText renderedCanvas)
+
+  -- ::draw the manipulators::
+  -- TODO
 
   return CanvasWidget {
       -- TODO

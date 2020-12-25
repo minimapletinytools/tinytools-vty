@@ -79,7 +79,7 @@ holdHandle HandleWidgetConfig {..} = do
         Nothing -> Nothing
         Just lbox -> case dstate of
           -- TODO
-          DragStart -> if does_LBox_contains_XY lbox (V2 fromX fromY)
+          DragStart -> if does_lBox_contains_XY lbox (V2 fromX fromY)
             then Just (ManipJustStart,  Nothing)
             else Nothing
           Dragging | forceDrag || tracking == ManipJustStart ->

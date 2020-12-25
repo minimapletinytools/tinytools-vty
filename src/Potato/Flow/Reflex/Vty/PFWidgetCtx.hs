@@ -19,7 +19,7 @@ import           Reflex.Vty
 data PFWidgetCtx t = PFWidgetCtx {
   _pFWidgetCtx_attr_default       :: Dynamic t V.Attr
   , _pFWidgetCtx_attr_manipulator :: Dynamic t V.Attr
-  , _pFWidgetCtx_pFOutput         :: PFOutput t
+  , _pFWidgetCtx_pFState          :: Dynamic t PFState
 
   , _pFWidgetCtx_initialPFState   :: PFState
 }
