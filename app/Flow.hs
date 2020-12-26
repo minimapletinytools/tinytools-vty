@@ -116,8 +116,9 @@ mainPFWidget = mdo
 
       layers' <- stretch $ holdLayerWidget $ LayerWidgetConfig {
             _layerWidgetConfig_pfctx              = pfctx
-            --_goatWidget_selection                :: Dynamic t Selection
-            -- , _goatWidget_layers:: Dynamic t (Seq LayerDisplay)
+            , _layerWidgetConfig_layers = _goatWidget_layers everythingW
+
+            , _layerWidgetConfig_selection = _goatWidget_selection  everythingW
           }
       params' <- fixed 5 $ holdParamsWidget $ ParamsWidgetConfig {
           _paramsWidgetConfig_pfctx = pfctx
