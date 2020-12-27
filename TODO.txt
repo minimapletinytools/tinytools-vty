@@ -179,7 +179,7 @@ DONE-move dynManipulator into selection
 DONE-cancel event to cancel manipulator drags
 DONE-tool highlighting
 DONE-do proper implementation of shift select in selectionmanager
-DONE-splitHDrag resizing is broken
+DONE-splitHDrag2 resizing is broken
 DONE-move TODO into vty
 
 ::FUTURE::
@@ -194,7 +194,7 @@ DONE-move TODO into vty
 -added splitH and splitHDrag
   -maybe do splitHDrag0 and splitVDrag0 for versions that allow initial size
   -try and combine code, prob not though..
-  -(note splitHDrag is using pane2 right now)
+  -(note splitHDrag2 is using pane2 right now)
 -added pane2, propose to modify pane to use pane2 implementation
 MERGED-fixed an issue in `drag` where mouse down would trigger on wrong button
   - `end && btn == btn'  -> Just $ Drag (x,y) (x,y) btn' mods' False`

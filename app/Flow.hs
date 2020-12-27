@@ -52,7 +52,6 @@ mainPFWidget = mdo
   postBuildEv <- getPostBuild
 
   let
-
     pfctx = PFWidgetCtx {
         _pFWidgetCtx_attr_default = constDyn lg_default
         , _pFWidgetCtx_attr_manipulator = constDyn lg_manip
@@ -61,12 +60,7 @@ mainPFWidget = mdo
         , _pFWidgetCtx_initialPFState = pfstate_basic1
       }
 
-  -- everything
-
-
-  -- potato flow stuff
-  let
-    -- TODO disable when manipulating _canvasWidget_isManipulating
+    -- TODO DELETE prob just let goat handle this
     undoEv = fforMaybe inp $ \case
       V.EvKey (V.KChar 'z') [V.MCtrl] -> Just ()
       _ -> Nothing
@@ -76,6 +70,11 @@ mainPFWidget = mdo
     saveEv = fforMaybe inp $ \case
       V.EvKey (V.KChar 's') [V.MCtrl] -> Just ()
       _ -> Nothing
+
+    -- TODO setup keyboard input
+    -- I guess we need to pass to params and popups first before passing to controller? idk
+
+
 
   -- ::save/load file potato::
   -- TODO
@@ -114,6 +113,7 @@ mainPFWidget = mdo
           , _toolWidgetConfig_tool =  _goatWidget_tool everythingW
         }
 
+      -- TODO pass out layer mouse from here
       layers' <- stretch $ holdLayerWidget $ LayerWidgetConfig {
             _layerWidgetConfig_pfctx              = pfctx
             , _layerWidgetConfig_layers = _goatWidget_layers everythingW
@@ -125,6 +125,7 @@ mainPFWidget = mdo
         }
       return (layers', tools', params')
 
+    -- TODO pass out canvas mouse from here
     rightPanel = holdCanvasWidget $ CanvasWidgetConfig {
         _canvasWidgetConfig_pfctx = pfctx
         , _canvasWidgetConfig_pan = _goatWidget_pan everythingW
