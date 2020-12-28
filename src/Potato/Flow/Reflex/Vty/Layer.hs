@@ -13,6 +13,7 @@ import           Relude
 import           Potato.Flow
 import           Potato.Flow.Controller
 import           Potato.Flow.Reflex.Vty.Attrs
+import           Potato.Flow.Reflex.Vty.Input
 import           Potato.Flow.Reflex.Vty.PFWidgetCtx
 import           Potato.Reflex.Vty.Helpers
 import           Potato.Reflex.Vty.Widget
@@ -64,14 +65,7 @@ data LayerWidgetConfig t = LayerWidgetConfig {
 }
 
 data LayerWidget t = LayerWidget {
-  _layerWidget_select              :: Event t (Bool, LayerPos)
-  , _layerWidget_changeName        :: Event t ControllersWithId
-  -- TODO expand to support multi-move
-  , _layerWidget_move              ::Event t (LayerPos, LayerPos)
-  , _layerWidget_consumingKeyboard :: Behavior t Bool
-
-  -- TODO
-  --, _layerWidget_layerWidgetTestOutput :: LayerWidgetTestOutput t
+  _layerWidget_mouse :: Event t LMouseData
 }
 
 holdLayerWidget :: forall t m. (Adjustable t m, PostBuild t m, NotReady t m,  MonadHold t m, MonadFix m, MonadNodeId m)
@@ -111,5 +105,8 @@ holdLayerWidget LayerWidgetConfig {..} = do
       $ ffor2 regionDyn _layerWidgetConfig_layers $ \(w,h) lentries ->
         map (makeLayerImage w) . L.take (max 0 (h - padBottom)) $ toList lentries
   tellImages layerImages
-
-  return $ LayerWidget never never never (constant False)
+  let
+    -- TODO scrolling?
+    offset = V2 0 0
+  inp <- makeLMouseDataInputEv offset True
+  return $ LayerWidget inp
