@@ -11,6 +11,10 @@ module Potato.Flow.Reflex.Vty.Canvas (
 import           Relude
 
 import           Potato.Flow
+import           Potato.Flow.Controller
+import           Potato.Flow.Controller.Handler
+import           Potato.Flow.Math
+import           Potato.Flow.Reflex.Vty.Input
 import           Potato.Flow.Reflex.Vty.PFWidgetCtx
 import           Potato.Reflex.Vty.Helpers
 import           Potato.Reflex.Vty.Widget
@@ -44,24 +48,19 @@ translate_dynRegion pos dr = dr {
     getx (V2 x _) = x
     gety (V2 _ y) = y
 
+pan_lBox :: XY -> LBox -> LBox
+pan_lBox pan (LBox p s) = LBox (p+pan) s
 
 data CanvasWidgetConfig t = CanvasWidgetConfig {
   _canvasWidgetConfig_pfctx        :: PFWidgetCtx t
   , _canvasWidgetConfig_pan        :: Dynamic t XY
-
-  -- TODO type is wrong
   , _canvasWidgetConfig_broadPhase :: Dynamic t BroadPhaseState
+  , _canvasWidgetConfig_canvas     :: Dynamic t SCanvas
+  , _canvasWidgetConfig_handles    :: Dynamic t HandlerRenderOutput
 }
 
 data CanvasWidget t = CanvasWidget {
-  _canvasWidget_isManipulating      :: Dynamic t Bool
-
-  , _canvasWidget_addSEltLabel      :: Event t (Bool, (LayerPos, SEltLabel))
-  , _canvasWidget_modify            :: Event t (Bool, ControllersWithId)
-
-  , _canvasWidget_consumingKeyboard :: Behavior t Bool
-  , _canvasWidget_select            :: Event t (Bool, Either [REltId] [REltId]) -- ^ (left is select single, right is select many)
-  , _canvasWidget_undo              :: Event t ()
+  _canvasWidget_mouse :: Event t LMouseData
 }
 
 holdCanvasWidget :: forall t m. (MonadWidget t m)
@@ -111,26 +110,18 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
   -- ::prepare rendered canvas ::
   renderedCanvas <- foldDynM foldCanvasFn initialRenderedCanvas
     -- TODO don't use _pFWidgetCtx_pFState since it updates even if canvas didn't actually change
-    $ alignEventWithMaybe Just (updated _canvasWidgetConfig_broadPhase) (fmap (_sCanvas_box . _pFState_canvas) . updated $ _pFWidgetCtx_pFState)
+    $ alignEventWithMaybe Just (updated _canvasWidgetConfig_broadPhase) (fmap _sCanvas_box . updated $ _canvasWidgetConfig_canvas)
 
   -- ::draw the canvas::
   let
-    canvasRegion = translate_dynRegion _canvasWidgetConfig_pan $ dynLBox_to_dynRegion (fmap renderedCanvas_box renderedCanvas)
+    canvasRegion' = ffor2 _canvasWidgetConfig_pan renderedCanvas $ \pan rc -> pan_lBox pan (renderedCanvas_box rc)
+    canvasRegion = dynLBox_to_dynRegion canvasRegion'
+    --canvasRegion = translate_dynRegion _canvasWidgetConfig_pan $ dynLBox_to_dynRegion (fmap renderedCanvas_box renderedCanvas)
   fill '░'
   pane canvasRegion (constDyn True) $ do
     text $ current (fmap renderedCanvasToText renderedCanvas)
+  tellImages $ ffor3 (current _canvasWidgetConfig_handles) (current _pFWidgetCtx_attr_manipulator) (current canvasRegion')
+    $ \(HandlerRenderOutput hs) attr (LBox (V2 px py) _)-> fmap (\(LBox (V2 x y) (V2 w h)) -> V.translate (x+px) (y+py) $ V.charFill attr 'X' w h) hs
 
-  -- ::draw the manipulators::
-  -- TODO
-
-  return CanvasWidget {
-      -- TODO
-      _canvasWidget_isManipulating = constDyn False
-      , _canvasWidget_addSEltLabel = never
-      , _canvasWidget_modify = never
-      , _canvasWidget_select = never
-      -- TODO
-      , _canvasWidget_consumingKeyboard = constant False
-      , _canvasWidget_undo = never
-
-    }
+  inp <- makeLMouseDataInputEv 0 False
+  return $ CanvasWidget inp

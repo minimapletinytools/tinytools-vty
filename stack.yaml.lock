@@ -131,19 +131,19 @@ packages:
   original:
     url: https://github.com/pdlla/reflex-potatoes/archive/ca25ecfcf6a651f7ee91f4c278ac8035fd48d9a5.tar.gz
 - completed:
-    size: 78960
-    url: https://github.com/pdlla/potato-flow/archive/b603dd8fdade071a362d9f78273214715b9f0595.tar.gz
+    size: 79071
+    url: https://github.com/pdlla/potato-flow/archive/a4661e80f8d9c9b2c39b52d9da6411c8fbbba6ab.tar.gz
     cabal-file:
       size: 6736
       sha256: d11b979f6892a892376e1095b968a0d792c16473923ea33ede2309e5802f7a63
     name: potato-flow
     version: 0.1.0.0
-    sha256: daf3f9c53b18e0368de643bac88f41e0c833295713e4135972dbac612c43f37b
+    sha256: 500d4edd244704b23b598bc47c642ef9457b6363a6054cfc5f543e94a0bfcb35
     pantry-tree:
       size: 3766
-      sha256: 34f6ff35ee313039accb0c7579d68c287ad3178a4af8c9de0111f1dc4442f7e7
+      sha256: 6150a38a98ee3809916a50ffeac93d77a7e3ac996fb7dd6778aa105303ccf45d
   original:
-    url: https://github.com/pdlla/potato-flow/archive/b603dd8fdade071a362d9f78273214715b9f0595.tar.gz
+    url: https://github.com/pdlla/potato-flow/archive/a4661e80f8d9c9b2c39b52d9da6411c8fbbba6ab.tar.gz
 snapshots:
 - completed:
     size: 492027

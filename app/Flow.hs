@@ -72,7 +72,7 @@ mainPFWidget = mdo
         , _pFWidgetCtx_attr_manipulator = constDyn lg_manip
         -- TODO don't do this, we need to break out individual changes instead so we can take advantage of holdUniqDyn
         , _pFWidgetCtx_pFState = fmap goatState_pFState $ _goatWidget_DEBUG_goatState everythingW
-        , _pFWidgetCtx_initialPFState = pfstate_basic1
+        , _pFWidgetCtx_initialPFState = pfstate_basic2
       }
 
     keyboardEv = fforMaybe inp $ \case
@@ -96,7 +96,7 @@ mainPFWidget = mdo
         , _goatWidgetConfig_load = never
 
         -- canvas direct input
-        , _goatWidgetConfig_mouse = leftmostWarn "mouse" [_layerWidget_mouse layersW]
+        , _goatWidgetConfig_mouse = leftmostWarn "mouse" [_layerWidget_mouse layersW, _canvasWidget_mouse canvasW]
         , _goatWidgetConfig_keyboard = never
 
         , _goatWidgetConfig_selectTool = _toolWidget_setTool toolsW
@@ -136,29 +136,11 @@ mainPFWidget = mdo
         _canvasWidgetConfig_pfctx = pfctx
         , _canvasWidgetConfig_pan = _goatWidget_pan everythingW
         , _canvasWidgetConfig_broadPhase = _goatWidget_broadPhase everythingW
+        , _canvasWidgetConfig_canvas = _goatWidget_canvas everythingW
+        , _canvasWidgetConfig_handles = _goatWidget_handlerRenderOutput everythingW
       }
 
   ((layersW, toolsW, paramsW), canvasW) <- splitHDrag 35 (fill '*') leftPanel rightPanel
-
-  -- prep consuming keyboard behavior
-  let
-    consumingKeyboard = ffor2 (_canvasWidget_consumingKeyboard canvasW) (_paramsWidget_consumingKeyboard paramsW) (||)
-
-  -- TODO place new elt at end of current selection
-  -- prep newAdd event
-  -- MANY FRAMES
-  let
-    undoBeforeNewAdd = fmapMaybe (\x -> if fst x then Just () else Nothing) $ _canvasWidget_addSEltLabel canvasW
-    doNewElt' = fmap snd $ _canvasWidget_addSEltLabel canvasW
-  doNewElt <- sequenceEvents undoBeforeNewAdd doNewElt'
-
-
-  -- prep manipulate event
-  -- MANY FRAMES via ManipulatorWidget (ok, as undo manipulation currently is 1 frame in potato-flow, and the previous operation to undo is always a manipulate operation)
-  let
-    undoBeforeManipulate = fmapMaybe (\x -> if fst x then Just () else Nothing) $ _canvasWidget_modify canvasW
-    doManipulate' = fmap snd $ _canvasWidget_modify canvasW
-  doManipulate <- sequenceEvents undoBeforeManipulate doManipulate'
 
   -- handle escape events
   return $ fforMaybe inp $ \case
