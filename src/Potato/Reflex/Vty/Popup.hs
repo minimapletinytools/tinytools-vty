@@ -1,7 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE RecursiveDo     #-}
 
--- TODO add tests
 module Potato.Reflex.Vty.Popup (
   popupWidget
   , popupOverrideWidget
@@ -17,6 +16,7 @@ import           Reflex.Network
 import           Reflex.Potato.Helpers
 import           Reflex.Vty
 
+-- TODO rename to popupPane
 -- TODO needs to return some kind of click outside/escape cancel event
 popupWidget :: forall t m a. (MonadWidget t m)
   => Int
@@ -47,7 +47,7 @@ popupOverrideWidget width height widgetEv = mdo
     emptyWidget = return never
     inputEv = leftmost [widgetEv, outputEv $> emptyWidget]
   innerDynEv :: Dynamic t (Event t a)
-    <- networkHold emptyWidget inputEv
+    <- networkHold emptyWidget (fmap (popupWidget width height) inputEv)
   let
     outputEv = switchDyn innerDynEv
   outputStateDyn <- holdDyn False $ leftmostWarn "popupOverride" [widgetEv $> True, outputEv $> False]

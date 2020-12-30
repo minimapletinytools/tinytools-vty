@@ -8,6 +8,7 @@ import           Relude
 
 import           Potato.Flow
 import           Potato.Flow.Controller
+import           Potato.Flow.TestStates
 import           Potato.Flow.Vty.Attrs
 import           Potato.Flow.Vty.Canvas
 import           Potato.Flow.Vty.Input
@@ -15,19 +16,19 @@ import           Potato.Flow.Vty.Layer
 import           Potato.Flow.Vty.Params
 import           Potato.Flow.Vty.PFWidgetCtx
 import           Potato.Flow.Vty.Tools
-import           Potato.Flow.TestStates
 import           Potato.Reflex.Vty.Helpers
+import           Potato.Reflex.Vty.Popup
 import           Potato.Reflex.Vty.Widget
 
 
 import           Control.Monad.Fix
 import           Control.Monad.NodeId
-import qualified Data.Aeson                         as Aeson
-import qualified Data.Text.Encoding                 as T
+import qualified Data.Aeson                  as Aeson
+import qualified Data.Text.Encoding          as T
 import           Data.Time.Clock
 
-import qualified Graphics.Vty                       as V
-import qualified Graphics.Vty.Input.Events          as V
+import qualified Graphics.Vty                as V
+import qualified Graphics.Vty.Input.Events   as V
 import           Reflex
 import           Reflex.Potato.Helpers
 import           Reflex.Vty
@@ -141,6 +142,15 @@ mainPFWidget = mdo
       }
 
   ((layersW, toolsW, paramsW), canvasW) <- splitHDrag 35 (fill '*') leftPanel rightPanel
+
+  let
+    welcomeWidget = boxTitle (constant def) "potato" $ do
+      textButton def (constant "bye")
+
+
+  -- render various popups
+  (_, popupStateDyn1) <- popupOverrideWidget 20 10 (postBuildEv $> welcomeWidget)
+
 
   -- handle escape events
   return $ fforMaybe inp $ \case
