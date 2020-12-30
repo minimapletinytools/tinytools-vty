@@ -67,7 +67,6 @@ fetchMOTD = do
   resp <- httpLBS "https://raw.githubusercontent.com/pdlla/potato-flow-vty/refactor-single/MOTD.txt"
   return $ LT.toStrict $ LT.decodeUtf8 (getResponseBody resp)
 
-
 fetchMOTDAsync :: forall t m. (MonadWidget t m) => Event t () -> VtyWidget t m (Event t Text)
 fetchMOTDAsync ev = performEventAsync $ ffor ev $ const $ \f -> liftIO $ do
     forkIO $ do
@@ -75,6 +74,17 @@ fetchMOTDAsync ev = performEventAsync $ ffor ev $ const $ \f -> liftIO $ do
       f motd
     return ()
 
+-- NOTE, this will query welcome message each time you recreate this
+welcomeWidget :: forall t m. (MonadWidget t m)
+  => VtyWidget t m (Event t ())
+welcomeWidget = do
+  postBuildEv <- getPostBuild
+  welcomeMessageEv <- fetchMOTDAsync postBuildEv
+  welcomeMessageDyn <- holdDyn "loading..." welcomeMessageEv
+  boxTitle (constant def) "potato" $ do
+    col $ do
+      fixed 10 $ text (current welcomeMessageDyn)
+      fixed 3 $ textButton def (constant "bye")
 
 
 mainPFWidget :: forall t m. (MonadWidget t m)
@@ -86,9 +96,6 @@ mainPFWidget = mdo
   ticks <- foldDyn (+) (0 :: Int) (fmap (const 1) tickEv)
   inp <- input
   postBuildEv <- getPostBuild
-
-  welcomeMessageEv <- fetchMOTDAsync postBuildEv
-  welcomeMessageDyn <- holdDyn "loading..." welcomeMessageEv
 
   let
     pfctx = PFWidgetCtx {
@@ -165,12 +172,6 @@ mainPFWidget = mdo
       }
 
   ((layersW, toolsW, paramsW), canvasW) <- splitHDrag 35 (fill '*') leftPanel rightPanel
-
-  let
-    welcomeWidget = boxTitle (constant def) "potato" $ do
-      col $ do
-        fixed 10 $ text (current welcomeMessageDyn)
-        fixed 3 $ textButton def (constant "bye")
 
 
   -- render various popups
