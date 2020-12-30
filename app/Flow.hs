@@ -25,11 +25,16 @@ import           Control.Monad.Fix
 import           Control.Monad.NodeId
 import qualified Data.Aeson                  as Aeson
 import qualified Data.Text.Encoding          as T
+import qualified Data.Text.Lazy              as LT
+import qualified Data.Text.Lazy.Encoding     as LT
 import           Data.Time.Clock
+
+import           Network.HTTP.Simple
 
 import qualified Graphics.Vty                as V
 import qualified Graphics.Vty.Input.Events   as V
 import           Reflex
+import           Reflex.Host.Class
 import           Reflex.Potato.Helpers
 import           Reflex.Vty
 
@@ -56,8 +61,13 @@ verifyInput ev = do
   -- TODO check for invalid key presses based on mouse state
 -}
 
+fetchMOTD :: IO Text
+fetchMOTD = do
+  resp <- httpLBS "https://raw.githubusercontent.com/pdlla/potato-flow-vty/refactor-single/MOTD.txt"
+  return $ LT.toStrict $ LT.decodeUtf8 (getResponseBody resp)
 
-mainPFWidget :: forall t m. (Reflex t, MonadHold t m, MonadFix m, NotReady t m, Adjustable t m, PostBuild t m, PerformEvent t m, TriggerEvent t m, MonadNodeId m, MonadIO (Performable m), MonadIO m)
+
+mainPFWidget :: forall t m. (MonadWidget t m)
   => VtyWidget t m (Event t ())
 mainPFWidget = mdo
   -- external inputs
@@ -66,6 +76,9 @@ mainPFWidget = mdo
   ticks <- foldDyn (+) (0 :: Int) (fmap (const 1) tickEv)
   inp <- input
   postBuildEv <- getPostBuild
+
+  welcomeMessageEv <- performEvent $ postBuildEv $> (liftIO fetchMOTD)
+  welcomeMessageDyn <- holdDyn "" welcomeMessageEv
 
   let
     pfctx = PFWidgetCtx {
@@ -145,11 +158,13 @@ mainPFWidget = mdo
 
   let
     welcomeWidget = boxTitle (constant def) "potato" $ do
-      textButton def (constant "bye")
+      col $ do
+        fixed 10 $ text (current welcomeMessageDyn)
+        fixed 3 $ textButton def (constant "bye")
 
 
   -- render various popups
-  (_, popupStateDyn1) <- popupOverrideWidget 20 10 (postBuildEv $> welcomeWidget)
+  (_, popupStateDyn1) <- popupOverrideWidget 40 15 (postBuildEv $> welcomeWidget)
 
 
   -- handle escape events

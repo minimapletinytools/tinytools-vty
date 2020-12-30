@@ -85,6 +85,8 @@ dependencies:
 - data-default
 - aeson
 - ilist
+- primitive
+- http-conduit
 
 - reflex-test-host
 - ref-tf
