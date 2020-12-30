@@ -49,7 +49,7 @@ instance (MonadVtyApp t (TestGuestT t m), TestGuestConstraints t m) => ReflexVty
       someWidget = fmap (const 123) <$> key V.KEnter
       someWidgetEv = fmap (const someWidget) _basicNetworkTest1_InputEvents_makePopup
     -- popup that closes when you press enter
-    (popupEv, popupStateDyn) <- popupOverrideWidget 10 10 someWidgetEv
+    (popupEv, popupStateDyn) <- popupOverrideWidget 50 50 someWidgetEv
     -- gotta make the popup look pretty :D
     fill '#'
     return $ BasicNetworkTest1_Output never popupEv popupStateDyn
@@ -60,12 +60,12 @@ instance (MonadVtyApp t (TestGuestT t m), TestGuestConstraints t m) => ReflexVty
 checkSingle :: (HasCallStack, Eq a, Show a) => [a] -> a -> Assertion
 checkSingle values a = case nonEmpty values of
   Nothing -> assertFailure "empty list"
-  Just x  -> head x @=? a
+  Just x  -> a @=? head x
 
 checkSingleMaybe :: (HasCallStack, Eq a, Show a) => [Maybe a] -> a -> Assertion
 checkSingleMaybe values a = case nonEmpty values of
   Nothing -> assertFailure "empty list"
-  Just x  -> head x @=? Just a
+  Just x  -> Just a @=? head x
 
 test_basic :: Test
 test_basic = TestLabel "basic" $ TestCase $ runSpiderHost $
@@ -84,22 +84,53 @@ test_basic = TestLabel "basic" $ TestCase $ runSpiderHost $
       readPopupStateEv = sequence =<< readEvent popupStateH
 
     -- fire an empty event and ensure there is no popup
-    a1 :: [Bool] <- fireQueuedEventsAndRead readPopupState
-    liftIO $ checkSingle a1 False
+    fireQueuedEventsAndRead readPopupState >>= \a -> liftIO (checkSingle a False)
 
     -- enable the popup
     queueEventTriggerRef _basicNetworkTest1_InputTriggerRefs_makePopup ()
-    a2 :: [(Maybe Bool)] <- fireQueuedEventsAndRead readPopupStateEv
-    liftIO $ checkSingleMaybe a2 True
+    fireQueuedEventsAndRead readPopupStateEv >>= \a -> liftIO (checkSingleMaybe a True)
 
     -- fire an empty event and ensure popup is still there
-    a1 :: [Bool] <- fireQueuedEventsAndRead readPopupState
-    liftIO $ checkSingle a1 True
+    fireQueuedEventsAndRead readPopupState >>= \a -> liftIO (checkSingle a True)
 
     -- close the popup
-    --queueVtyEvent $ V.EvKey V.KEnter []
-    --a3 :: [(Maybe Bool)] <- fireQueuedEventsAndRead readPopupStateEv
-    --liftIO $ checkSingleMaybe a3 False
+    queueVtyEvent $ V.EvKey V.KEnter []
+    fireQueuedEventsAndRead readPopupStateEv >>= \a -> liftIO (checkSingleMaybe a False)
+
+    -- enable the popup
+    queueEventTriggerRef _basicNetworkTest1_InputTriggerRefs_makePopup ()
+    fireQueuedEventsAndRead readPopupStateEv >>= \a -> liftIO (checkSingleMaybe a True)
+
+    -- click within the popup and ensure it's still there
+    queueVtyEvent $ V.EvMouseDown 50 50 V.BLeft []
+    fireQueuedEventsAndRead readPopupState >>= \a -> liftIO (checkSingle a True)
+
+    -- drag off and ensure popup is still there
+    queueVtyEvent $ V.EvMouseDown 100 100 V.BLeft []
+    fireQueuedEventsAndRead readPopupState >>= \a -> liftIO (checkSingle a True)
+
+    -- release the mouse
+    queueVtyEvent $ V.EvMouseUp 100 100 Nothing
+    fireQueuedEventsAndRead readPopupState >>= \a -> liftIO (checkSingle a True)
+
+    -- click off the popup and check that it got cancelled
+    queueVtyEvent $ V.EvMouseDown 100 100 V.BLeft []
+    fireQueuedEventsAndRead readPopupStateEv >>= \a -> liftIO (checkSingleMaybe a False)
+
+    -- enable the popup
+    queueEventTriggerRef _basicNetworkTest1_InputTriggerRefs_makePopup ()
+    fireQueuedEventsAndRead readPopupStateEv >>= \a -> liftIO (checkSingleMaybe a True)
+
+    -- re-enable the popup
+    queueEventTriggerRef _basicNetworkTest1_InputTriggerRefs_makePopup ()
+    fireQueuedEventsAndRead readPopupStateEv >>= \a -> liftIO (checkSingleMaybe a True)
+
+    -- escape cancel the popup
+    queueVtyEvent $ V.EvKey V.KEsc []
+    fireQueuedEventsAndRead readPopupStateEv >>= \a -> liftIO (checkSingleMaybe a False)
+
+
+
 
 spec :: Spec
 spec = do
