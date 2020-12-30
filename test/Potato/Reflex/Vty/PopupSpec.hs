@@ -49,7 +49,7 @@ instance (MonadVtyApp t (TestGuestT t m), TestGuestConstraints t m) => ReflexVty
       someWidget = fmap (const 123) <$> key V.KEnter
       someWidgetEv = fmap (const someWidget) _basicNetworkTest1_InputEvents_makePopup
     -- popup that closes when you press enter
-    (popupEv, popupStateDyn) <- popupOverrideWidget 50 50 someWidgetEv
+    (popupEv, popupStateDyn) <- popupPaneSimple 50 50 someWidgetEv
     -- gotta make the popup look pretty :D
     fill '#'
     return $ BasicNetworkTest1_Output never popupEv popupStateDyn
