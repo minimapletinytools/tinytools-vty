@@ -21,6 +21,7 @@ import           Potato.Reflex.Vty.Popup
 import           Potato.Reflex.Vty.Widget
 
 
+import           Control.Concurrent
 import           Control.Monad.Fix
 import           Control.Monad.NodeId
 import qualified Data.Aeson                  as Aeson
@@ -67,6 +68,15 @@ fetchMOTD = do
   return $ LT.toStrict $ LT.decodeUtf8 (getResponseBody resp)
 
 
+fetchMOTDAsync :: forall t m. (MonadWidget t m) => Event t () -> VtyWidget t m (Event t Text)
+fetchMOTDAsync ev = performEventAsync $ ffor ev $ const $ \f -> liftIO $ do
+    forkIO $ do
+      motd <- fetchMOTD
+      f motd
+    return ()
+
+
+
 mainPFWidget :: forall t m. (MonadWidget t m)
   => VtyWidget t m (Event t ())
 mainPFWidget = mdo
@@ -77,8 +87,8 @@ mainPFWidget = mdo
   inp <- input
   postBuildEv <- getPostBuild
 
-  welcomeMessageEv <- performEvent $ postBuildEv $> (liftIO fetchMOTD)
-  welcomeMessageDyn <- holdDyn "" welcomeMessageEv
+  welcomeMessageEv <- fetchMOTDAsync postBuildEv
+  welcomeMessageDyn <- holdDyn "loading..." welcomeMessageEv
 
   let
     pfctx = PFWidgetCtx {
