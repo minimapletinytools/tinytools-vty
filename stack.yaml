@@ -56,7 +56,7 @@ extra-deps:
 - bimap-0.3.3@sha256:232518c0410990665b9c8677eb9318ee355c001d58945ddcbedec3baa30b4160,1475
 
 - github: pdlla/reflex-test-host
-  commit: d4ce1977f6cd7926bada650e9ae773fe182004b3
+  commit: 8b12d1963162dda636afac0551768d2e00f34c8a
 - github: pdlla/reflex-dynamic-containers
   commit: 4ca36f1122576ec42723315f3124d3ca3e321a16
 - github: pdlla/reflex-potatoes

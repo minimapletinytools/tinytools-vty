@@ -89,19 +89,19 @@ packages:
   original:
     hackage: bimap-0.3.3@sha256:232518c0410990665b9c8677eb9318ee355c001d58945ddcbedec3baa30b4160,1475
 - completed:
-    size: 11167
-    url: https://github.com/pdlla/reflex-test-host/archive/d4ce1977f6cd7926bada650e9ae773fe182004b3.tar.gz
+    size: 11213
+    url: https://github.com/pdlla/reflex-test-host/archive/8b12d1963162dda636afac0551768d2e00f34c8a.tar.gz
     cabal-file:
-      size: 3125
-      sha256: 738726a7b5e45fb695322f07988637d14abe32a5e15a58622a97740e627c8ab6
+      size: 3160
+      sha256: 99c71424d7e35fb6ab9ec66bcf6bc836a8e931545cdd7d83a15f2140aa222d67
     name: reflex-test-host
-    version: 0.1.1.0
-    sha256: 2e2a99433aac6cc98c19abcaeb156b94ca593daf09fb9985a85daee5a9530b58
+    version: 0.1.2.1
+    sha256: c7c545207c50b509426c02a2842bc39d54d62cd0e0fe54bf57ce07d46fc65e1a
     pantry-tree:
-      size: 743
-      sha256: c768d956be5714a260eea2177db40a7b8344f152aa6d0638f06ab163166a4978
+      size: 818
+      sha256: 1bb43fdf8af8dc2430dafd40f38e4ba0d3408b134ee47ce9ffba60fab41869b4
   original:
-    url: https://github.com/pdlla/reflex-test-host/archive/d4ce1977f6cd7926bada650e9ae773fe182004b3.tar.gz
+    url: https://github.com/pdlla/reflex-test-host/archive/8b12d1963162dda636afac0551768d2e00f34c8a.tar.gz
 - completed:
     size: 19409
     url: https://github.com/pdlla/reflex-dynamic-containers/archive/4ca36f1122576ec42723315f3124d3ca3e321a16.tar.gz
