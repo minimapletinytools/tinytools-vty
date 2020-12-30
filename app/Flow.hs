@@ -175,7 +175,7 @@ mainPFWidget = mdo
 
 
   -- render various popups
-  (_, popupStateDyn1) <- popupPaneSimple 40 15 (postBuildEv $> welcomeWidget)
+  (_, popupStateDyn1) <- popupPaneSimple def (postBuildEv $> welcomeWidget)
 
 
   -- handle escape events

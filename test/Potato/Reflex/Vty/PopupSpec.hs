@@ -17,6 +17,7 @@ import           Potato.Reflex.Vty.Popup
 
 import           Control.Monad.IO.Class     (liftIO)
 import           Control.Monad.Ref
+import           Data.Default
 import           Data.Kind
 import qualified Data.List                  as L
 
@@ -49,7 +50,7 @@ instance (MonadVtyApp t (TestGuestT t m), TestGuestConstraints t m) => ReflexVty
       someWidget = fmap (const 123) <$> key V.KEnter
       someWidgetEv = fmap (const someWidget) _basicNetworkTest1_InputEvents_makePopup
     -- popup that closes when you press enter
-    (popupEv, popupStateDyn) <- popupPaneSimple 50 50 someWidgetEv
+    (popupEv, popupStateDyn) <- popupPaneSimple def someWidgetEv
     -- gotta make the popup look pretty :D
     fill '#'
     return $ BasicNetworkTest1_Output never popupEv popupStateDyn

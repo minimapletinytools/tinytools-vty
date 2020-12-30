@@ -16,19 +16,31 @@ import           Reflex.Network
 import           Reflex.Potato.Helpers
 import           Reflex.Vty
 
--- TODO rename to popupPaneInternal
--- TODO needs to return some kind of click outside/escape cancel event
+import           Data.Default
+
+data PopupPaneSize = PopupPaneSize {
+    _popupPaneSize_minWidth      :: Int
+    ,_popupPaneSize_minHeight    :: Int
+    , _popupPaneSize_widthRatio  :: Float
+    , _popupPaneSize_heightRatio :: Float
+  }
+
+instance Default PopupPaneSize where
+  def = PopupPaneSize 0 0 0.5 0.5
+
+mulRatio :: Int -> Float -> Int
+mulRatio i r =  ceiling . (*r) . fromIntegral $ i
+
 popupPaneSimpleInternal :: forall t m a. (MonadWidget t m)
-  => Int
-  -> Int
+  => PopupPaneSize
   -> VtyWidget t m (Event t a)
   -> VtyWidget t m (Event t a, Event t ()) -- ^ (inner widget event, canceled event)
-popupPaneSimpleInternal width height widget = do
+popupPaneSimpleInternal PopupPaneSize {..} widget = do
   screenWidthDyn <- displayWidth
   screenHeightDyn <- displayHeight
   let
-    widthDyn = constDyn width
-    heightDyn = constDyn height
+    widthDyn = ffor screenWidthDyn (\sw -> max (mulRatio sw _popupPaneSize_widthRatio) _popupPaneSize_minWidth)
+    heightDyn = ffor screenHeightDyn (\sh -> max (mulRatio sh _popupPaneSize_heightRatio) _popupPaneSize_minHeight)
     regionDyn = DynRegion {
         _dynRegion_left = fmap (flip div 2) $ liftA2 (-) screenWidthDyn widthDyn
         , _dynRegion_top = fmap (flip div 2) $ liftA2 (-) screenHeightDyn heightDyn
@@ -48,15 +60,14 @@ popupPaneSimpleInternal width height widget = do
 
 -- | popupPane can only emit a single event before closing itself
 popupPaneSimple :: forall t m a. (MonadWidget t m)
-  => Int
-  -> Int
+  => PopupPaneSize
   -> Event t (VtyWidget t m (Event t a)) -- ^ when inner event fires, popup is disabled
   -> VtyWidget t m (Event t a, Dynamic t Bool) -- ^ (inner widget event, popup state)
-popupPaneSimple width height widgetEv = mdo
+popupPaneSimple size widgetEv = mdo
   let
     inputEv = leftmost [widgetEv, innerWidgetEv $> return never, canceledEv $> return never]
   innerDynEv :: Dynamic t (Event t a, Event t ())
-    <- networkHold (return (never, never)) (fmap (popupPaneSimpleInternal width height) inputEv)
+    <- networkHold (return (never, never)) (fmap (popupPaneSimpleInternal size) inputEv)
   let
     innerWidgetEv = switchDyn (fmap fst innerDynEv)
     canceledEv = switchDyn (fmap snd innerDynEv)
