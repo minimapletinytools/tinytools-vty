@@ -1,7 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE RecursiveDo     #-}
 
-module Potato.Flow.Reflex.Vty.Canvas (
+module Potato.Flow.Vty.Canvas (
   CanvasWidgetConfig(..)
   , CanvasWidget(..)
   , holdCanvasWidget
@@ -14,17 +14,17 @@ import           Potato.Flow
 import           Potato.Flow.Controller
 import           Potato.Flow.Controller.Handler
 import           Potato.Flow.Math
-import           Potato.Flow.Reflex.Vty.Input
-import           Potato.Flow.Reflex.Vty.PFWidgetCtx
+import           Potato.Flow.Vty.Input
+import           Potato.Flow.Vty.PFWidgetCtx
 import           Potato.Reflex.Vty.Helpers
 import           Potato.Reflex.Vty.Widget
 import           Reflex.Potato.Helpers
 
 import           Control.Lens
-import qualified Data.IntMap.Strict                 as IM
+import qualified Data.IntMap.Strict             as IM
 import           Data.These
 
-import qualified Graphics.Vty                       as V
+import qualified Graphics.Vty                   as V
 import           Reflex
 import           Reflex.Vty
 

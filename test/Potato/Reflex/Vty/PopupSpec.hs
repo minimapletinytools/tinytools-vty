@@ -29,6 +29,9 @@ import           Reflex.Vty.Test.Monad.Host
 data BasicNetworkTest1 t (m :: Type -> Type)
 
 instance (MonadVtyApp t (TestGuestT t m), TestGuestConstraints t m) => ReflexVtyTestApp (BasicNetworkTest1 t m) t m where
+
+  -- I just wanted to try using VtyAppInputEvents/VtyAppInputTriggerRefs
+  -- it would have been a lot easier to use a vty event to trigger the popup
   data VtyAppInputTriggerRefs (BasicNetworkTest1 t m) = BasicNetworkTest1_InputTriggerRefs {
       _basicNetworkTest1_InputTriggerRefs_makePopup :: Ref m (Maybe (EventTrigger t ()))
     }

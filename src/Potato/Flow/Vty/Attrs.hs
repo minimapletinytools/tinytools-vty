@@ -1,4 +1,4 @@
-module Potato.Flow.Reflex.Vty.Attrs (
+module Potato.Flow.Vty.Attrs (
   -- * light color scheme
   lg_default
   , lg_layer_selected

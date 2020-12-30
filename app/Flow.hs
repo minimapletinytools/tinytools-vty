@@ -8,13 +8,13 @@ import           Relude
 
 import           Potato.Flow
 import           Potato.Flow.Controller
-import           Potato.Flow.Reflex.Vty.Attrs
-import           Potato.Flow.Reflex.Vty.Canvas
-import           Potato.Flow.Reflex.Vty.Input
-import           Potato.Flow.Reflex.Vty.Layer
-import           Potato.Flow.Reflex.Vty.Params
-import           Potato.Flow.Reflex.Vty.PFWidgetCtx
-import           Potato.Flow.Reflex.Vty.Tools
+import           Potato.Flow.Vty.Attrs
+import           Potato.Flow.Vty.Canvas
+import           Potato.Flow.Vty.Input
+import           Potato.Flow.Vty.Layer
+import           Potato.Flow.Vty.Params
+import           Potato.Flow.Vty.PFWidgetCtx
+import           Potato.Flow.Vty.Tools
 import           Potato.Flow.TestStates
 import           Potato.Reflex.Vty.Helpers
 import           Potato.Reflex.Vty.Widget

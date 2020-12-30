@@ -1,7 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE RecursiveDo     #-}
 
-module Potato.Flow.Reflex.Vty.Tools (
+module Potato.Flow.Vty.Tools (
   Tool(..)
   , ToolWidgetConfig(..)
   , ToolWidget(..)
@@ -11,9 +11,9 @@ module Potato.Flow.Reflex.Vty.Tools (
 import           Relude
 
 import           Potato.Flow.Controller
-import           Potato.Flow.Reflex.Vty.Attrs
-import           Potato.Flow.Reflex.Vty.Common
-import           Potato.Flow.Reflex.Vty.PFWidgetCtx
+import           Potato.Flow.Vty.Attrs
+import           Potato.Flow.Vty.Common
+import           Potato.Flow.Vty.PFWidgetCtx
 import           Potato.Reflex.Vty.Helpers
 
 import           Control.Monad.Fix

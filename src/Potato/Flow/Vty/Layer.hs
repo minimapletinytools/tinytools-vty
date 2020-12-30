@@ -2,7 +2,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE RecursiveDo     #-}
 
-module Potato.Flow.Reflex.Vty.Layer (
+module Potato.Flow.Vty.Layer (
   LayerWidgetConfig(..)
   , LayerWidget(..)
   , holdLayerWidget
@@ -12,25 +12,25 @@ import           Relude
 
 import           Potato.Flow
 import           Potato.Flow.Controller
-import           Potato.Flow.Reflex.Vty.Attrs
-import           Potato.Flow.Reflex.Vty.Input
-import           Potato.Flow.Reflex.Vty.PFWidgetCtx
+import           Potato.Flow.Vty.Attrs
+import           Potato.Flow.Vty.Input
+import           Potato.Flow.Vty.PFWidgetCtx
 import           Potato.Reflex.Vty.Helpers
 import           Potato.Reflex.Vty.Widget
 
 
 import           Control.Monad.Fix
 import           Data.Align
-import           Data.Dependent.Sum                 (DSum ((:=>)))
-import qualified Data.IntMap.Strict                 as IM
-import qualified Data.List                          as L
-import qualified Data.Sequence                      as Seq
-import qualified Data.Text                          as T
+import           Data.Dependent.Sum          (DSum ((:=>)))
+import qualified Data.IntMap.Strict          as IM
+import qualified Data.List                   as L
+import qualified Data.Sequence               as Seq
+import qualified Data.Text                   as T
 import           Data.Text.Zipper
-import qualified Data.Text.Zipper                   as TZ
+import qualified Data.Text.Zipper            as TZ
 import           Data.These
 
-import qualified Graphics.Vty                       as V
+import qualified Graphics.Vty                as V
 import           Reflex
 import           Reflex.Network
 import           Reflex.Potato.Helpers

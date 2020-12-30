@@ -1,13 +1,13 @@
 {-# LANGUAGE UndecidableInstances #-}
 
-module Potato.Flow.Reflex.Vty.PFWidgetCtx (
+module Potato.Flow.Vty.PFWidgetCtx (
   PFWidgetCtx(..)
 ) where
 
 import           Relude
 
 import           Potato.Flow
-import qualified Potato.Flow.Reflex.Vty.Attrs as PFA
+import qualified Potato.Flow.Vty.Attrs as PFA
 
 import qualified Graphics.Vty                 as V
 import           Reflex

@@ -1,4 +1,4 @@
-module Potato.Flow.Reflex.Vty.Manipulator.Types (
+module Potato.Flow.Vty.Manipulator.Types (
   ManipState(..)
   , ManipSelectionType(..)
   , ManipOutput(..)

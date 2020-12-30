@@ -1,25 +1,25 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE RecursiveDo     #-}
 
-module Potato.Flow.Reflex.Vty.Common (
+module Potato.Flow.Vty.Common (
   radioList
   , radioListSimple
 ) where
 
 import           Relude
-import qualified Relude.Unsafe                      as Unsafe
+import qualified Relude.Unsafe               as Unsafe
 
 import           Potato.Flow.Controller
-import           Potato.Flow.Reflex.Vty.Attrs
-import           Potato.Flow.Reflex.Vty.PFWidgetCtx
+import           Potato.Flow.Vty.Attrs
+import           Potato.Flow.Vty.PFWidgetCtx
 import           Potato.Reflex.Vty.Helpers
 
 import           Control.Monad.Fix
 import           Control.Monad.NodeId
-import qualified Data.List.Index                    as L
-import qualified Data.Text                          as T
+import qualified Data.List.Index             as L
+import qualified Data.Text                   as T
 
-import qualified Graphics.Vty                       as V
+import qualified Graphics.Vty                as V
 import           Reflex
 import           Reflex.Vty
 

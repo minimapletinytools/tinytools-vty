@@ -1,5 +1,5 @@
 
-module Potato.Flow.Reflex.Vty.Input (
+module Potato.Flow.Vty.Input (
   convertModifiers
   , convertKey
   , convertButton

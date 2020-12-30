@@ -1,7 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE RecursiveDo     #-}
 
-module Potato.Flow.Reflex.Vty.Manipulator.Handle (
+module Potato.Flow.Vty.Manipulator.Handle (
   ManipState(..)
   , needUndoFirst
   , isManipulating
@@ -13,8 +13,8 @@ module Potato.Flow.Reflex.Vty.Manipulator.Handle (
 import           Relude
 
 import           Potato.Flow
-import           Potato.Flow.Reflex.Vty.Manipulator.Types
-import           Potato.Flow.Reflex.Vty.PFWidgetCtx
+import           Potato.Flow.Vty.Manipulator.Types
+import           Potato.Flow.Vty.PFWidgetCtx
 import           Potato.Reflex.Vty.Helpers
 import           Potato.Reflex.Vty.Widget
 

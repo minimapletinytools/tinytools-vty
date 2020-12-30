@@ -1,7 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE RecursiveDo     #-}
 
-module Potato.Flow.Reflex.Vty.Params (
+module Potato.Flow.Vty.Params (
   ParamsWidgetConfig(..)
   , ParamsWidget(..)
   , holdParamsWidget
@@ -10,16 +10,16 @@ module Potato.Flow.Reflex.Vty.Params (
 import           Relude
 
 import           Potato.Flow
-import           Potato.Flow.Reflex.Vty.Common
-import           Potato.Flow.Reflex.Vty.Manipulator.Types
-import           Potato.Flow.Reflex.Vty.PFWidgetCtx
+import           Potato.Flow.Vty.Common
+import           Potato.Flow.Vty.Manipulator.Types
+import           Potato.Flow.Vty.PFWidgetCtx
 import           Potato.Reflex.Vty.Helpers
 
 import           Control.Monad.Fix
 import           Control.Monad.NodeId
-import qualified Data.Text                                as T
+import qualified Data.Text                         as T
 
-import qualified Graphics.Vty                             as V
+import qualified Graphics.Vty                      as V
 import           Reflex
 import           Reflex.Network
 import           Reflex.Vty
