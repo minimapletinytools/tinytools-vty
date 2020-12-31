@@ -25,6 +25,7 @@ import           Control.Concurrent
 import           Control.Monad.Fix
 import           Control.Monad.NodeId
 import qualified Data.Aeson                  as Aeson
+import           Data.Monoid                 (Any)
 import qualified Data.Text.Encoding          as T
 import qualified Data.Text.Lazy              as LT
 import qualified Data.Text.Lazy.Encoding     as LT
@@ -87,6 +88,25 @@ welcomeWidget = do
       fixed 3 $ textButton def (constant "bye")
 
 
+-- | toggle the focus of a widget
+-- also forces unfocused widget to ignore mouse inputs
+focusWidgetNoMouse :: forall t m a. (MonadWidget t m)
+  => Dynamic t Bool -- ^ whether widget should be focused or not, note events that change focus are not captured!
+  -> VtyWidget t m a
+  -> VtyWidget t m a
+focusWidgetNoMouse focus child = VtyWidget $ do
+  ctx <- lift ask
+  let ctx' = VtyWidgetCtx {
+      _vtyWidgetCtx_input = gate (current focus) (_vtyWidgetCtx_input ctx)
+      , _vtyWidgetCtx_focus = liftA2 (&&) (_vtyWidgetCtx_focus ctx) focus
+      , _vtyWidgetCtx_width = _vtyWidgetCtx_width ctx
+      , _vtyWidgetCtx_height = _vtyWidgetCtx_height ctx
+    }
+  (result, images) <- lift . lift $ runVtyWidget ctx' child
+  tellImages images
+  return result
+
+
 mainPFWidget :: forall t m. (MonadWidget t m)
   => VtyWidget t m (Event t ())
 mainPFWidget = mdo
@@ -104,6 +124,7 @@ mainPFWidget = mdo
         -- TODO don't do this, we need to break out individual changes instead so we can take advantage of holdUniqDyn
         , _pFWidgetCtx_pFState = fmap goatState_pFState $ _goatWidget_DEBUG_goatState everythingW
         , _pFWidgetCtx_initialPFState = pfstate_basic2
+        , _pFWidgetCtx_inputCapturedByPopupDyn = inputCapturedByPopupDyn
       }
 
     keyboardEv = fforMaybe inp $ \case
@@ -150,7 +171,6 @@ mainPFWidget = mdo
           , _toolWidgetConfig_tool =  _goatWidget_tool everythingW
         }
 
-      -- TODO pass out layer mouse from here
       layers' <- stretch $ holdLayerWidget $ LayerWidgetConfig {
             _layerWidgetConfig_pfctx              = pfctx
             , _layerWidgetConfig_layers = _goatWidget_layers everythingW
@@ -162,7 +182,6 @@ mainPFWidget = mdo
         }
       return (layers', tools', params')
 
-    -- TODO pass out canvas mouse from here
     rightPanel = holdCanvasWidget $ CanvasWidgetConfig {
         _canvasWidgetConfig_pfctx = pfctx
         , _canvasWidgetConfig_pan = _goatWidget_pan everythingW
@@ -171,11 +190,15 @@ mainPFWidget = mdo
         , _canvasWidgetConfig_handles = _goatWidget_handlerRenderOutput everythingW
       }
 
-  ((layersW, toolsW, paramsW), canvasW) <- splitHDrag 35 (fill '*') leftPanel rightPanel
+  ((layersW, toolsW, paramsW), canvasW) <- focusWidgetNoMouse inputCapturedByPopupDyn $ splitHDrag 35 (fill '*') leftPanel rightPanel
 
 
   -- render various popups
   (_, popupStateDyn1) <- popupPaneSimple def (postBuildEv $> welcomeWidget)
+
+  let
+    inputCapturedByPopupDyn = fmap not . fmap getAny . mconcat . fmap (fmap Any) $ [popupStateDyn1]
+
 
 
   -- handle escape events

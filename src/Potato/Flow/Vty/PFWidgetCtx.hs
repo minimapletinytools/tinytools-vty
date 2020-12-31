@@ -9,7 +9,7 @@ import           Relude
 import           Potato.Flow
 import qualified Potato.Flow.Vty.Attrs as PFA
 
-import qualified Graphics.Vty                 as V
+import qualified Graphics.Vty          as V
 import           Reflex
 import           Reflex.Vty
 
@@ -17,9 +17,9 @@ import           Reflex.Vty
 -- TODO rename
 -- we don't use 'Reader' for this because it doesn't play well with 'Layout' taking a 'VtyWidget'
 data PFWidgetCtx t = PFWidgetCtx {
-  _pFWidgetCtx_attr_default       :: Dynamic t V.Attr
-  , _pFWidgetCtx_attr_manipulator :: Dynamic t V.Attr
-  , _pFWidgetCtx_pFState          :: Dynamic t PFState
-
-  , _pFWidgetCtx_initialPFState   :: PFState
+  _pFWidgetCtx_attr_default              :: Dynamic t V.Attr
+  , _pFWidgetCtx_attr_manipulator        :: Dynamic t V.Attr
+  , _pFWidgetCtx_pFState                 :: Dynamic t PFState
+  , _pFWidgetCtx_inputCapturedByPopupDyn :: Dynamic t Bool
+  , _pFWidgetCtx_initialPFState          :: PFState
 }
