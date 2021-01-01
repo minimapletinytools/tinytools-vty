@@ -52,11 +52,13 @@ pan_lBox :: XY -> LBox -> LBox
 pan_lBox pan (LBox p s) = LBox (p+pan) s
 
 data CanvasWidgetConfig t = CanvasWidgetConfig {
-  _canvasWidgetConfig_pfctx        :: PFWidgetCtx t
-  , _canvasWidgetConfig_pan        :: Dynamic t XY
-  , _canvasWidgetConfig_broadPhase :: Dynamic t BroadPhaseState
-  , _canvasWidgetConfig_canvas     :: Dynamic t SCanvas
-  , _canvasWidgetConfig_handles    :: Dynamic t HandlerRenderOutput
+  _canvasWidgetConfig_pfctx            :: PFWidgetCtx t
+  , _canvasWidgetConfig_pan            :: Dynamic t XY
+  -- TODO DELETE
+  , _canvasWidgetConfig_broadPhase     :: Dynamic t BroadPhaseState
+  , _canvasWidgetConfig_renderedCanvas :: Dynamic t RenderedCanvas
+  , _canvasWidgetConfig_canvas         :: Dynamic t SCanvas
+  , _canvasWidgetConfig_handles        :: Dynamic t HandlerRenderOutput
 }
 
 data CanvasWidget t = CanvasWidget {
@@ -69,51 +71,10 @@ holdCanvasWidget :: forall t m. (MonadWidget t m)
 holdCanvasWidget CanvasWidgetConfig {..} = mdo
   let
     PFWidgetCtx {..} = _canvasWidgetConfig_pfctx
-    renderfn (BroadPhaseState boxes bpt cslmap) rc = case boxes of
-      [] -> return rc
-      (b:bs) -> case intersect_lBox (renderedCanvas_box rc) (foldl' union_lBox b bs) of
-        Nothing -> return rc
-        Just aabb -> do
-          -- TODO don't use _pFWidgetCtx_pFState since it updates even if directory didn't change
-          slmap <- sample . current . fmap _pFState_directory $ _pFWidgetCtx_pFState
-          let
-            rids = broadPhase_cull aabb bpt
-            seltls = flip fmap rids $ \rid -> case IM.lookup rid cslmap of
-              Nothing -> case IM.lookup rid slmap of
-                Nothing -> error "this should never happen, because broadPhase_cull should only give existing seltls"
-                Just seltl -> seltl
-              Just mseltl -> case mseltl of
-                Nothing -> error "this should never happen, because deleted seltl would have been culled in broadPhase_cull"
-                Just seltl -> seltl
-            -- TODO need to order seltls by layer position oops
-            newrc = render aabb (map _sEltLabel_sElt seltls) rc
-          return $ newrc
-    --foldCanvasFn :: (These ([LBox], BPTree, REltIdMap (Maybe SEltLabel)) LBox) -> RenderedCanvas -> PushM t RenderedCanvas
-    foldCanvasFn (This x) rc = renderfn x rc
-    foldCanvasFn (That lbx) _ = do
-      BroadPhaseState _ bpt _ <- sample . current $ _canvasWidgetConfig_broadPhase
-      -- TODO only redo what's needed
-      let renderBoxes = [lbx]
-      renderfn (BroadPhaseState renderBoxes bpt IM.empty) (emptyRenderedCanvas lbx)
-    foldCanvasFn (These _ _) _ = error "resize and change events should never occur simultaneously"
-
-
-  -- initialization stuff, wow super annoying ;__;
-  let
-    -- TODO call renderWithBroadPhase instead
-    initialDir = _pFState_directory _pFWidgetCtx_initialPFState
-    initialselts = fmap (\(SEltLabel _ selt) -> selt) $ toList initialDir
-    initialCanvasBox = _sCanvas_box $ _pFState_canvas _pFWidgetCtx_initialPFState
-    -- TODO render entire screen area rather than just canvas portion
-    initialRenderedCanvas =  render initialCanvasBox initialselts (emptyRenderedCanvas initialCanvasBox)
-
-  -- ::prepare rendered canvas ::
-  renderedCanvas <- foldDynM foldCanvasFn initialRenderedCanvas
-    -- TODO don't use _pFWidgetCtx_pFState since it updates even if canvas didn't actually change
-    $ alignEventWithMaybe Just (updated _canvasWidgetConfig_broadPhase) (fmap _sCanvas_box . updated $ _canvasWidgetConfig_canvas)
 
   -- ::draw the canvas::
   let
+    renderedCanvas = _canvasWidgetConfig_renderedCanvas
     canvasRegion' = ffor2 _canvasWidgetConfig_pan renderedCanvas $ \pan rc -> pan_lBox pan (renderedCanvas_box rc)
     canvasRegion = dynLBox_to_dynRegion canvasRegion'
     --canvasRegion = translate_dynRegion _canvasWidgetConfig_pan $ dynLBox_to_dynRegion (fmap renderedCanvas_box renderedCanvas)

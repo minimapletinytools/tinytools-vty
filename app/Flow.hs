@@ -114,7 +114,7 @@ mainPFWidget = mdo
   currentTime <- liftIO $ getCurrentTime
   tickEv <- tickLossy 1 currentTime
   ticks <- foldDyn (+) (0 :: Int) (fmap (const 1) tickEv)
-  inp <- input
+  flowInput <- input
   postBuildEv <- getPostBuild
 
   let
@@ -126,12 +126,6 @@ mainPFWidget = mdo
         , _pFWidgetCtx_initialPFState = pfstate_basic2
         , _pFWidgetCtx_inputCapturedByPopupDyn = inputCapturedByPopupDyn
       }
-
-    keyboardEv = fforMaybe inp $ \case
-      V.EvKey k mods -> convertKey k >>= (\kbd -> return $ KeyboardData kbd (convertModifiers mods))
-      V.EvPaste bs -> Just $ KeyboardData (KeyboardKey_Paste (T.decodeUtf8 bs)) []
-      _ -> Nothing
-
 
 
   -- ::save/load file potato::
@@ -186,11 +180,20 @@ mainPFWidget = mdo
         _canvasWidgetConfig_pfctx = pfctx
         , _canvasWidgetConfig_pan = _goatWidget_pan everythingW
         , _canvasWidgetConfig_broadPhase = _goatWidget_broadPhase everythingW
+        , _canvasWidgetConfig_renderedCanvas = _goatWidget_renderedCanvas everythingW
         , _canvasWidgetConfig_canvas = _goatWidget_canvas everythingW
         , _canvasWidgetConfig_handles = _goatWidget_handlerRenderOutput everythingW
       }
 
-  ((layersW, toolsW, paramsW), canvasW) <- focusWidgetNoMouse inputCapturedByPopupDyn $ splitHDrag 35 (fill '*') leftPanel rightPanel
+  (keyboardEv, ((layersW, toolsW, paramsW), canvasW)) <- focusWidgetNoMouse inputCapturedByPopupDyn $ do
+    inp <- input
+    let
+      kb = fforMaybe inp $ \case
+        V.EvKey k mods -> convertKey k >>= (\kbd -> return $ KeyboardData kbd (convertModifiers mods))
+        V.EvPaste bs -> Just $ KeyboardData (KeyboardKey_Paste (T.decodeUtf8 bs)) []
+        _ -> Nothing
+    stuff <- splitHDrag 35 (fill '*') leftPanel rightPanel
+    return (kb, stuff)
 
 
   -- render various popups
@@ -202,6 +205,6 @@ mainPFWidget = mdo
 
 
   -- handle escape events
-  return $ fforMaybe inp $ \case
+  return $ fforMaybe flowInput $ \case
     V.EvKey (V.KChar 'c') [V.MCtrl] -> Just ()
     _ -> Nothing

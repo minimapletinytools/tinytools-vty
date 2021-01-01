@@ -107,3 +107,4 @@ makeLMouseDataInputEv offset isLayerMouse = do
         , _lMouseData_modifiers    = convertModifiers mods
         , _lMouseData_isLayerMouse = isLayerMouse
       }
+    _ -> Nothing
