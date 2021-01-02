@@ -11,6 +11,7 @@ import           Potato.Flow.Controller
 import           Potato.Flow.TestStates
 import           Potato.Flow.Vty.Attrs
 import           Potato.Flow.Vty.Canvas
+import           Potato.Flow.Vty.Info
 import           Potato.Flow.Vty.Input
 import           Potato.Flow.Vty.Layer
 import           Potato.Flow.Vty.Params
@@ -143,7 +144,7 @@ mainPFWidget = mdo
 
         -- canvas direct input
         , _goatWidgetConfig_mouse = leftmostWarn "mouse" [_layerWidget_mouse layersW, _canvasWidget_mouse canvasW]
-        , _goatWidgetConfig_keyboard = never
+        , _goatWidgetConfig_keyboard = keyboardEv
 
         , _goatWidgetConfig_selectTool = _toolWidget_setTool toolsW
 
@@ -171,6 +172,9 @@ mainPFWidget = mdo
 
             , _layerWidgetConfig_selection = _goatWidget_selection  everythingW
           }
+      _ <- fixed 5 $ holdInfoWidget $ InfoWidgetConfig {
+          _infoWidgetConfig_selection = _goatWidget_selection everythingW
+        }
       params' <- fixed 5 $ holdParamsWidget $ ParamsWidgetConfig {
           _paramsWidgetConfig_pfctx = pfctx
         }
