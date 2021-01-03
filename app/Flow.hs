@@ -66,7 +66,7 @@ verifyInput ev = do
 
 fetchMOTD :: IO Text
 fetchMOTD = do
-  resp <- httpLBS "https://raw.githubusercontent.com/pdlla/potato-flow-vty/refactor-single/MOTD.txt"
+  resp <- httpLBS "https://raw.githubusercontent.com/pdlla/potato-flow-vty/potato/MOTD.txt"
   return $ LT.toStrict $ LT.decodeUtf8 (getResponseBody resp)
 
 fetchMOTDAsync :: forall t m. (MonadWidget t m) => Event t () -> VtyWidget t m (Event t Text)
@@ -147,6 +147,7 @@ mainPFWidget = mdo
         , _goatWidgetConfig_keyboard = keyboardEv
 
         , _goatWidgetConfig_selectTool = _toolWidget_setTool toolsW
+        , _goatWidgetConfig_paramsEvent = never
 
         -- debugging/deprecated stuff
         , _goatWidgetConfig_setDebugLabel = never
@@ -208,7 +209,7 @@ mainPFWidget = mdo
 
 
 
-  -- handle escape events
+  -- handle escape event
   return $ fforMaybe flowInput $ \case
-    V.EvKey (V.KChar 'c') [V.MCtrl] -> Just ()
+    V.EvKey (V.KChar 'q') [V.MCtrl] -> Just ()
     _ -> Nothing

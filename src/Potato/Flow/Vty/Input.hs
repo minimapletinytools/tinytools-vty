@@ -46,10 +46,10 @@ convertKey = \case
   V.KPause -> Nothing
   V.KIns -> Nothing
   V.KHome -> Just KeyboardKey_Home
-  V.KPageUp -> Nothing
+  V.KPageUp -> Just KeyboardKey_PageUp
   V.KDel -> Just KeyboardKey_Delete
   V.KEnd -> Just KeyboardKey_End
-  V.KPageDown -> Nothing
+  V.KPageDown -> Just KeyboardKey_PageDown
   V.KBegin -> Nothing
   V.KMenu -> Nothing
 
