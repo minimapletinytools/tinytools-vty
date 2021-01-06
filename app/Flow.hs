@@ -25,26 +25,51 @@ import           Potato.Reflex.Vty.Widget
 import           Control.Concurrent
 import           Control.Monad.Fix
 import           Control.Monad.NodeId
-import qualified Data.Aeson                  as Aeson
-import           Data.Monoid                 (Any)
-import qualified Data.Text.Encoding          as T
-import qualified Data.Text.Lazy              as LT
-import qualified Data.Text.Lazy.Encoding     as LT
+import qualified Data.Aeson                        as Aeson
+import           Data.Maybe
+import           Data.Monoid                       (Any)
+import qualified Data.Text.Encoding                as T
+import qualified Data.Text.Lazy                    as LT
+import qualified Data.Text.Lazy.Encoding           as LT
 import           Data.Time.Clock
 
 import           Network.HTTP.Simple
 
-import qualified Graphics.Vty                as V
-import qualified Graphics.Vty.Input.Events   as V
+import qualified Graphics.Vty                      as V
+import qualified Graphics.Vty.Input.Events         as V
+import qualified Graphics.Vty.UnicodeWidthTable.IO as V
 import           Reflex
 import           Reflex.Host.Class
 import           Reflex.Potato.Helpers
 import           Reflex.Vty
 
 
+-- | run a VtyWidget using term width map written to disk with write-term-width for the current terminal
+-- uses default if the file does not exist
+potatoMainWidget
+  :: (forall t m. (MonadVtyApp t m, MonadNodeId m) => VtyWidget t m (Event t ()))
+  -> IO ()
+potatoMainWidget child = do
+  cfg'' <- V.standardIOConfig
+  let
+    mTermName = V.termName cfg''
+    widthMapFile = fromJust mTermName <> "_termwidthfile"
+  putStrLn $ "setting up vty for term: " <> show mTermName
+  let
+    cfg' = cfg'' { V.mouseMode = Just True }
+    cfg = case mTermName of
+      Nothing -> cfg'
+      Just termName -> cfg' {
+          V.allowCustomUnicodeWidthTables = Just True
+          , V.termWidthMaps = [(fromJust mTermName, widthMapFile)]
+        }
+  vty <- V.mkVty cfg
+  mainWidgetWithHandle vty child
+
 flowMain :: IO ()
 flowMain = do
-  mainWidget mainPFWidget
+  --mainWidget mainPFWidget
+  potatoMainWidget mainPFWidget
 
 -- TODO
 data MainPFTestOutput t = MainPFTestOutput {
@@ -83,7 +108,7 @@ welcomeWidget = do
   postBuildEv <- getPostBuild
   welcomeMessageEv <- fetchMOTDAsync postBuildEv
   welcomeMessageDyn <- holdDyn "loading..." welcomeMessageEv
-  boxTitle (constant def) "potato" $ do
+  boxTitle (constant def) "😱😱😱" $ do
     col $ do
       fixed 10 $ text (current welcomeMessageDyn)
       fixed 3 $ textButton def (constant "bye")

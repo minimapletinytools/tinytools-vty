@@ -107,6 +107,16 @@ executables:
     dependencies:
     - potato-flow-vty
 
+  write-term-width:
+    main:                termwidth.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - potato-flow-vty
+
 tests:
   potato-flow-vty-test:
     main:                Spec.hs
