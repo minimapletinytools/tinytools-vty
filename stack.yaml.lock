@@ -128,17 +128,6 @@ packages:
       sha256: a2ecdb2122ec11105216c97ecdf7e0f939cd3f4aec93cea2300b197b2e89d7b8
   original:
     url: https://github.com/pdlla/reflex-potatoes/archive/ca25ecfcf6a651f7ee91f4c278ac8035fd48d9a5.tar.gz
-- completed:
-    size: 97938
-    url: https://github.com/pdlla/potato-flow/archive/2c5864c6c413793638e15f7b0bf8edcd417e95b0.tar.gz
-    name: potato-flow
-    version: 0.1.0.0
-    sha256: 54155bd2987f51b99ef7ee21c8353e4ccdb3cae0101f0417468a552ae029672b
-    pantry-tree:
-      size: 4068
-      sha256: 1e7827c91e76ba7266a70800fe892b7728f44872825288a9c1315fd7c456f3f6
-  original:
-    url: https://github.com/pdlla/potato-flow/archive/2c5864c6c413793638e15f7b0bf8edcd417e95b0.tar.gz
 snapshots:
 - completed:
     size: 492027

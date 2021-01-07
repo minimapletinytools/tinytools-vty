@@ -17,6 +17,9 @@ import           Potato.Reflex.Vty.Helpers
 
 import           Control.Monad.Fix
 import           Control.Monad.NodeId
+import           Data.Dependent.Sum                (DSum ((:=>)))
+import qualified Data.IntMap                       as IM
+import qualified Data.Maybe
 import qualified Data.Text                         as T
 
 import qualified Graphics.Vty                      as V
@@ -35,10 +38,7 @@ data ParamsWidgetConfig t = ParamsWidgetConfig {
 }
 
 data ParamsWidget t = ParamsWidget {
-  _paramsWidget_consumingKeyboard :: Behavior t Bool
-  , _paramsWidget_modify          :: Event t ControllersWithId
-
-  , _paramsWidget_defaults        :: Behavior t ()
+  _paramsWidget_paramsEvent :: Event t ControllersWithId
 }
 
 presetStyles = ["╔╗╚╝║═█","****|-*"]
@@ -48,21 +48,40 @@ holdParamsWidget :: forall t m. (MonadWidget t m)
   => ParamsWidgetConfig t
   -> VtyWidget t m (ParamsWidget t)
 holdParamsWidget ParamsWidgetConfig {..} = do
-  let
-    -- TODO read canvasSelection and figure out what the preset is
-
+  -- TODO read canvasSelection and figure out what the preset is
 
   typeChoice <- radioListSimple 0 ["presets", "custom"]
-  networkView $ ffor typeChoice $ \case
-    0 -> fmap (const ()) $ col $ do
-      fixed 1 (return ())
-      forM presetStyles $ \s -> fixed 1 $ row $ stretch $ (text (constant (T.pack s)))
-    1 -> return ()
-  --fill '#'
 
+  -- this is just a potato implementation to get us started
+  setStyleEvEv <- networkView $ ffor typeChoice $ \case
+    0 -> do
+      setStyleEv' <- col $ do
+        fixed 1 (return ())
+        presetClicks <- forM presetStyles $ \s -> fixed 1 $ row $ stretch $ do
+          -- TODO highlight if style matches selection
+          text (constant (T.pack s))
+          fmap (fmap (\_ -> s)) (mouseDown V.BLeft)
+        return $ fmap superStyle_fromListFormat (leftmost presetClicks)
+      return setStyleEv'
+    1 -> return never
 
+  setStyleEv <- switchHold never setStyleEvEv
+
+  let
+    pushfn :: SuperStyle -> PushM t (Maybe ControllersWithId)
+    pushfn ss = do
+      selection <- sample . current $ _goatWidget_selection (_pFWidgetCtx_goatWidget _paramsWidgetConfig_pfctx)
+      let
+        fmapfn (rid,_,seltl) = case getSEltLabelSuperStyle seltl of
+          Nothing -> Nothing
+          Just oldss -> if oldss == ss
+            then Nothing
+            else Just (rid, CTagSuperStyle :=> Identity (CSuperStyle (DeltaSuperStyle (oldss, ss))))
+      return $ case Data.Maybe.mapMaybe fmapfn . toList $ selection of
+        [] -> Nothing
+        x  -> Just $ IM.fromList x
+    paramsEv = push pushfn setStyleEv
 
   return ParamsWidget {
-    -- TODO
-    _paramsWidget_consumingKeyboard = constant False
+    _paramsWidget_paramsEvent = paramsEv
   }

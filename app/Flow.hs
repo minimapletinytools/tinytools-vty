@@ -148,6 +148,7 @@ mainPFWidget = mdo
         _pFWidgetCtx_attr_default = constDyn lg_default
         , _pFWidgetCtx_attr_manipulator = constDyn lg_manip
         -- TODO don't do this, we need to break out individual changes instead so we can take advantage of holdUniqDyn
+        , _pFWidgetCtx_goatWidget = everythingW
         , _pFWidgetCtx_pFState = fmap goatState_pFState $ _goatWidget_DEBUG_goatState everythingW
         , _pFWidgetCtx_initialPFState = pfstate_basic2
         , _pFWidgetCtx_inputCapturedByPopupDyn = inputCapturedByPopupDyn
@@ -172,7 +173,7 @@ mainPFWidget = mdo
         , _goatWidgetConfig_keyboard = keyboardEv
 
         , _goatWidgetConfig_selectTool = _toolWidget_setTool toolsW
-        , _goatWidgetConfig_paramsEvent = never
+        , _goatWidgetConfig_paramsEvent = _paramsWidget_paramsEvent paramsW
 
         -- debugging/deprecated stuff
         , _goatWidgetConfig_setDebugLabel = never
