@@ -29,6 +29,9 @@ data WindowsAttrs t = WindowsAttrs {
 data Window = Window {
   _window_name :: Text
   , _window_widgetId :: WidgetId
+  , _window_allowClose :: Bool
+  , _window_allowMove :: Bool
+  , _window_allowResize :: Bool
 }
 
 -- note, OneWindow can not have tabs added to it
@@ -142,6 +145,9 @@ windowManager WindowManagerConfig {..} = mdo
       }
 
   wmsDyn <- foldDyn foldfn initialState cmdev
+
+  -- TODO fmap through wmsDyn window stack and render them
+  -- TODO fanMap out window events (close/moved)
   return never
 
 -- TODO monad for making initial configuration
