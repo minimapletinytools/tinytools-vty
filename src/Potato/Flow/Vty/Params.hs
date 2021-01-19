@@ -21,6 +21,7 @@ import           Data.Dependent.Sum                (DSum ((:=>)))
 import qualified Data.IntMap                       as IM
 import qualified Data.Maybe
 import qualified Data.Text                         as T
+import qualified Potato.Data.Text.Zipper as TZ
 
 import qualified Graphics.Vty                      as V
 import           Reflex
@@ -50,10 +51,39 @@ holdParamsWidget :: forall t m. (MonadWidget t m)
 holdParamsWidget ParamsWidgetConfig {..} = do
   -- TODO read canvasSelection and figure out what the preset is
 
-  typeChoice <- radioListSimple 0 ["presets", "custom"]
+
+  -- tepm alignment stuff
+  setAlignmentDyn <- radioListSimple 0 ["left","center","right"]
+  let
+    setAlignmentEv = fmap (\case
+        0 -> TextAlign_Left
+        1 -> TextAlign_Center
+        2 -> TextAlign_Right
+      ) $ updated setAlignmentDyn
+
+  let
+    pushAlignmentFn :: TextAlign -> PushM t (Maybe ControllersWithId)
+    pushAlignmentFn ta = do
+      selection <- sample . current $ _goatWidget_selection (_pFWidgetCtx_goatWidget _paramsWidgetConfig_pfctx)
+      let
+        fmapfn (rid,_,seltl) = case getSEltLabelBoxTextStyle seltl of
+          Nothing -> Nothing
+          Just oldts -> if oldts == TextStyle ta
+            then Nothing
+            else Just (rid, CTagBoxTextStyle :=> Identity (CTextStyle (DeltaTextStyle (oldts, TextStyle ta))))
+      return $ case Data.Maybe.mapMaybe fmapfn . toList $ selection of
+        [] -> Nothing
+        x  -> Just $ IM.fromList x
+    alignmentParamsEv = push pushAlignmentFn setAlignmentEv
+
+
+  -- TODO insert a space here D:
+
+
+  typeChoiceDyn <- radioListSimple 0 ["presets", "custom"]
 
   -- this is just a potato implementation to get us started
-  setStyleEvEv <- networkView $ ffor typeChoice $ \case
+  setStyleEvEv <- networkView $ ffor typeChoiceDyn $ \case
     0 -> do
       setStyleEv' <- col $ do
         fixed 1 (return ())
@@ -68,8 +98,8 @@ holdParamsWidget ParamsWidgetConfig {..} = do
   setStyleEv <- switchHold never setStyleEvEv
 
   let
-    pushfn :: SuperStyle -> PushM t (Maybe ControllersWithId)
-    pushfn ss = do
+    pushSuperStyleFn :: SuperStyle -> PushM t (Maybe ControllersWithId)
+    pushSuperStyleFn ss = do
       selection <- sample . current $ _goatWidget_selection (_pFWidgetCtx_goatWidget _paramsWidgetConfig_pfctx)
       let
         fmapfn (rid,_,seltl) = case getSEltLabelSuperStyle seltl of
@@ -80,8 +110,8 @@ holdParamsWidget ParamsWidgetConfig {..} = do
       return $ case Data.Maybe.mapMaybe fmapfn . toList $ selection of
         [] -> Nothing
         x  -> Just $ IM.fromList x
-    paramsEv = push pushfn setStyleEv
+    ssparamsEv = push pushSuperStyleFn setStyleEv
 
   return ParamsWidget {
-    _paramsWidget_paramsEvent = paramsEv
+    _paramsWidget_paramsEvent = leftmost [ssparamsEv, alignmentParamsEv]
   }

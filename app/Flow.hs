@@ -150,7 +150,7 @@ mainPFWidget = mdo
         -- TODO don't do this, we need to break out individual changes instead so we can take advantage of holdUniqDyn
         , _pFWidgetCtx_goatWidget = everythingW
         , _pFWidgetCtx_pFState = fmap goatState_pFState $ _goatWidget_DEBUG_goatState everythingW
-        , _pFWidgetCtx_initialPFState = pfstate_basic2
+        , _pFWidgetCtx_initialPFState = pfstate_basic1
         , _pFWidgetCtx_inputCapturedByPopupDyn = inputCapturedByPopupDyn
       }
 
@@ -193,6 +193,7 @@ mainPFWidget = mdo
           , _toolWidgetConfig_tool =  _goatWidget_tool everythingW
         }
 
+      -- TODO Layout stuff messes up your mouse assumptions. You need to switch Layout to use pane2 D:
       layers' <- stretch $ holdLayerWidget $ LayerWidgetConfig {
             _layerWidgetConfig_pfctx              = pfctx
             , _layerWidgetConfig_layers = _goatWidget_layers everythingW

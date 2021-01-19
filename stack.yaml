@@ -17,7 +17,7 @@
 #
 # resolver: ./custom-snapshot.yaml
 # resolver: https://example.com/snapshots/2018-01-01.yaml
-resolver: lts-15.9
+resolver: lts-16.27
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -55,6 +55,11 @@ extra-deps:
 - reflex-vty-0.1.4.0@sha256:46dcb043c39532e85c08e7098ac2e1237d5f7d018183b3f758f5ef87e06f51d4,2377
 - bimap-0.3.3@sha256:232518c0410990665b9c8677eb9318ee355c001d58945ddcbedec3baa30b4160,1475
 - vty-5.28.2@sha256:8cffce1f4f92eec70b5c3763bb6437852fd3fa7546869496f7667a5abc3f07d7,20859
+- constraints-0.11.2@sha256:d028005d93f891b48b61ff0c82c6f868859eb728010dea3e355b0c55d0f57cf9,2219
+- haskell-src-exts-1.22.0@sha256:f558923a9c8f57402c33a8cc871b934027a5c65414404c87239f6cbd7357d54e,4541
+- these-1.0.1@sha256:58dba2446b57dde711c5e7f63910d18bc28b9a5831a89772986bb184a3e7851b,3266
+
+
 
 
 - github: pdlla/reflex-test-host
@@ -64,7 +69,7 @@ extra-deps:
 - github: pdlla/reflex-potatoes
   commit: ca25ecfcf6a651f7ee91f4c278ac8035fd48d9a5
 - github: pdlla/potato-flow
-  commit: 50c5449959888e527c57f1dd2db2a1b96ee6e06a
+  commit: 75869e768b0467517c7fb186410b028daa9c87ac
 
 # - /Users/user/kitchen/faucet/reflex-vty
 # - github: pdlla/reflex-vty

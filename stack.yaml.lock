@@ -96,6 +96,27 @@ packages:
   original:
     hackage: vty-5.28.2@sha256:8cffce1f4f92eec70b5c3763bb6437852fd3fa7546869496f7667a5abc3f07d7,20859
 - completed:
+    hackage: constraints-0.11.2@sha256:d028005d93f891b48b61ff0c82c6f868859eb728010dea3e355b0c55d0f57cf9,2219
+    pantry-tree:
+      size: 867
+      sha256: 3c71f74be6758642190c7d116d43eb980f4128e1595a849af4295610f752745c
+  original:
+    hackage: constraints-0.11.2@sha256:d028005d93f891b48b61ff0c82c6f868859eb728010dea3e355b0c55d0f57cf9,2219
+- completed:
+    hackage: haskell-src-exts-1.22.0@sha256:f558923a9c8f57402c33a8cc871b934027a5c65414404c87239f6cbd7357d54e,4541
+    pantry-tree:
+      size: 96940
+      sha256: 597b6f48bd409a4d0da013c4e356945c42e0d098966035d3aa68cd4a3ccd66c9
+  original:
+    hackage: haskell-src-exts-1.22.0@sha256:f558923a9c8f57402c33a8cc871b934027a5c65414404c87239f6cbd7357d54e,4541
+- completed:
+    hackage: these-1.0.1@sha256:58dba2446b57dde711c5e7f63910d18bc28b9a5831a89772986bb184a3e7851b,3266
+    pantry-tree:
+      size: 351
+      sha256: dd785882a522b6c76ee97fdd5e0e8cbca15b2fc951985bbecc76d0dd6e456aae
+  original:
+    hackage: these-1.0.1@sha256:58dba2446b57dde711c5e7f63910d18bc28b9a5831a89772986bb184a3e7851b,3266
+- completed:
     size: 11213
     url: https://github.com/pdlla/reflex-test-host/archive/8b12d1963162dda636afac0551768d2e00f34c8a.tar.gz
     name: reflex-test-host
@@ -130,7 +151,7 @@ packages:
     url: https://github.com/pdlla/reflex-potatoes/archive/ca25ecfcf6a651f7ee91f4c278ac8035fd48d9a5.tar.gz
 snapshots:
 - completed:
-    size: 492027
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/15/9.yaml
-    sha256: 11394dc975e96c2fea90f7f2b3229630d46351a092ebcec78f0a56403930b429
-  original: lts-15.9
+    size: 533252
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/16/27.yaml
+    sha256: c2aaae52beeacf6a5727c1010f50e89d03869abfab6d2c2658ade9da8ed50c73
+  original: lts-16.27
