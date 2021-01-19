@@ -16,7 +16,7 @@ import           Reflex.Network
 import           Reflex.Potato.Helpers
 import           Reflex.Vty
 
-import qualified Data.Map as Map (empty)
+import qualified Data.Map as Map
 import           Data.Default
 import Control.Monad.Fix
 
@@ -56,11 +56,12 @@ data FreeWindow = FreeWindow {
   , _freeWindow_size :: (Int, Int)
 }
 
+type WindowWidgetMap t m a = Map WidgetId (VtyWidget t m a)
 data WindowManagerState t m a = WindowManagerState {
   _windowManagerState_docked :: [DockedTab]
   , _windowManagerState_free :: [FreeWindow]
   , _windowManagerState_size :: Dimension
-  , _windowManagerState_widgetMap :: Map WidgetId (VtyWidget t m a)
+  , _windowManagerState_widgetMap :: WindowWidgetMap t m a
 }
 
 emptyWindowManagerState :: WindowManagerState t m a
@@ -75,6 +76,14 @@ emptyWindowManagerState = WindowManagerState {
 type Position = (Int, Int)
 type Dimension = (Int, Int)
 type PosDim = (Position, Dimension)
+
+makeDynRegion :: (Reflex t) => Dynamic t Position -> Dynamic t Dimension -> DynRegion t
+makeDynRegion dp dd = DynRegion {
+    _dynRegion_left = fmap fst dp
+    , _dynRegion_top = fmap snd dp
+    , _dynRegion_width = fmap fst dd
+    , _dynRegion_height = fmap snd dd
+  }
 
 --(:+) :: (Int, Int) -> (Int, Int) -> (Int, Int)
 --(a,b) :+ (x,y) = (a+x, b+y)
@@ -123,9 +132,9 @@ data WindowManagerConfig t m a = WindowManagerConfig {
 data WMCmd = WMCmd_None
 
 windowManager ::
-  forall t m a. (Reflex t, MonadFix m, MonadHold t m, Monad m)
+  forall t m a. (Reflex t, Adjustable t m, NotReady t m, PostBuild t m, MonadFix m, MonadHold t m, MonadNodeId m, Monad m)
   => WindowManagerConfig t m a
-  ->  VtyWidget t m (Event t a)
+  ->  VtyWidget t m (Event t (NonEmpty a))
 windowManager WindowManagerConfig {..} = mdo
 
   inpEv <- input
@@ -145,6 +154,34 @@ windowManager WindowManagerConfig {..} = mdo
       }
 
   wmsDyn <- foldDyn foldfn initialState cmdev
+
+  -- TODO wrap everything in a VtyWidget so you can capture mouse input for dock manipulation
+
+  -- TODO first render docked widgets
+
+  -- next render floating widgets
+  let
+    freeWindowFn :: WindowWidgetMap t m a -> Dynamic t Bool -> Dynamic t FreeWindow -> VtyWidget t m a
+    freeWindowFn wwm focussedDyn freeWindowDyn  = do
+      -- TODO change return type to Dynamic t (VtyWidget t m a) so that these params can change too
+      Window {..} <- sample . current $ fmap _freeWindow_window freeWindowDyn
+      let
+        child = case Map.lookup _window_widgetId wwm of
+          -- TODO pretty sure you should just change to VtyWidget t m ()
+          Nothing -> return undefined
+          Just w -> w
+        dynRegion = makeDynRegion (_freeWindow_position <$> freeWindowDyn) (_freeWindow_size <$> freeWindowDyn)
+      pane dynRegion focussedDyn $ do
+        -- TODO add close button
+        -- TODO proper window widget, this is just temp render for testing
+        boxTitle (constant roundedBoxStyle) _window_name child
+
+  let
+    freeWindowsDyn = fmap _windowManagerState_free wmsDyn
+    -- TODO figure out how to pass in focussedDyn
+    fmapFnFreeWindow wms = simpleList freeWindowsDyn (freeWindowFn (_windowManagerState_widgetMap wms) (constDyn False))
+  outputEvs <- networkView $ fmap fmapFnFreeWindow wmsDyn
+
 
   -- TODO fmap through wmsDyn window stack and render them
   -- TODO fanMap out window events (close/moved)
