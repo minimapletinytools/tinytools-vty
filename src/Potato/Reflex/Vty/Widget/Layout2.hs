@@ -151,9 +151,9 @@ runLayout ddir focus0 focusShift (Layout child) = mdo
 -- on its size and ability to grow and on whether it can be focused. It also allows its child
 -- widget to request focus.
 tile
-  :: forall t b x m a. (Reflex t, LayoutReturn t b a, Monad m, MonadFix m, MonadNodeId m)
+  :: forall t b widget x m a. (Reflex t, LayoutReturn t b a, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
   => TileConfig t -- ^ The tile's configuration
-  -> VtyWidget t m (Event t x, b) -- ^ A child widget. The 'Event' that it returns is used to request that it be focused.
+  -> widget t m (Event t x, b) -- ^ A child widget. The 'Event' that it returns is used to request that it be focused.
   -> Layout t b m a
 tile (TileConfig con focusable) child = mdo
   nodeId <- getNextNodeId
@@ -183,7 +183,7 @@ tile (TileConfig con focusable) child = mdo
         }
   focussed <- Layout $ asks _layoutCtx_focusDemux
   (focusReq, b) <- Layout $ lift $ lift $ lift $
-    pane reg (demuxed focussed $ Just nodeId) $ child
+    pane reg (demuxed focussed $ Just nodeId) $ runIsLayoutVtyWidget child never
   Layout $ tellEvent $ First nodeId <$ focusReq
   return $ getLayoutResult @ t b
 
@@ -202,17 +202,17 @@ instance Reflex t => Default (TileConfig t) where
 
 -- | A 'tile' of a fixed size that is focusable and gains focus on click
 fixed
-  :: (Reflex t, LayoutReturn t b a, Monad m, MonadFix m, MonadNodeId m)
+  :: (Reflex t, LayoutReturn t b a, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
   => Dynamic t Int
-  -> VtyWidget t m b
+  -> widget t m b
   -> Layout t b m a
 fixed sz = tile (def { _tileConfig_constraint =  Constraint_Fixed <$> sz }) . clickable
 
 -- | A 'tile' that can stretch (i.e., has no fixed size) and has a minimum size of 0.
 -- This tile is focusable and gains focus on click.
 stretch
-  :: (Reflex t, LayoutReturn t b a, Monad m, MonadFix m, MonadNodeId m)
-  => VtyWidget t m b
+  :: (Reflex t, LayoutReturn t b a, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
+  => widget t m b
   -> Layout t b m a
 stretch = tile def . clickable
 
@@ -247,12 +247,12 @@ tabNavigation = do
 -- | Captures the click event in a 'VtyWidget' context and returns it. Useful for
 -- requesting focus when using 'tile'.
 clickable
-  :: (Reflex t, Monad m)
-  => VtyWidget t m a
-  -> VtyWidget t m (Event t (), a)
-clickable child = do
+  :: (Reflex t, IsLayoutVtyWidget widget t m, Monad m)
+  => widget t m a
+  -> LayoutVtyWidget t m (Event t (), a)
+clickable child = LayoutVtyWidget . ReaderT $ \focusEv -> do
   click <- mouseDown V.BLeft
-  a <- child
+  a <- runIsLayoutVtyWidget child focusEv
   return (() <$ click, a)
 
 -- | Retrieve the current orientation of a 'Layout'
@@ -327,24 +327,76 @@ instance Reflex t => LayoutReturn t a a where
   getLayoutDoneWithFocus _ = never
   getLayoutTree _ = emptyLayoutDebugTree
 
+data Layout2Ctx t = LayoutCtx2
+  { _layout2Ctx_regions     :: Dynamic t (Map NodeId LayoutSegment)
+  , _layout2Ctx_focusDemux  :: Demux t (Maybe NodeId)
+  , _layout2Ctx_orientation :: Dynamic t Orientation
+  }
 
-runLayoutWithDebugInternal
+-- | The Layout monad transformer keeps track of the configuration (e.g., 'Orientation') and
+-- 'Constraint's of its child widgets, apportions vty real estate to each, and acts as a
+-- switchboard for focus requests. See 'tile' and 'runLayout'.
+newtype Layout2 t b m a = Layout2
+  { unLayout2 :: EventWriterT t (First NodeId)
+      (DynamicWriterT t (Endo [(NodeId, (Bool, Constraint), b)])
+        (ReaderT (Layout2Ctx t)
+          (VtyWidget t m))) a
+  } deriving
+    ( Functor
+    , Applicative
+    , Monad
+    , MonadHold t
+    , MonadSample t
+    , MonadFix
+    , TriggerEvent t
+    , PerformEvent t
+    , NotReady t
+    , MonadReflexCreateTrigger t
+    , HasDisplaySize t
+    , MonadNodeId
+    , PostBuild t
+    )
+
+instance MonadTrans (Layout2 t b) where
+  lift x = Layout2 $ lift $ lift $ lift $ lift x
+
+instance (Adjustable t m, MonadFix m, MonadHold t m) => Adjustable t (Layout2 t b m) where
+  runWithReplace (Layout2 a) e = Layout2 $ runWithReplace a $ fmap unLayout2 e
+  traverseIntMapWithKeyWithAdjust f m e = Layout2 $ traverseIntMapWithKeyWithAdjust (\k v -> unLayout2 $ f k v) m e
+  traverseDMapWithKeyWithAdjust f m e = Layout2 $ traverseDMapWithKeyWithAdjust (\k v -> unLayout2 $ f k v) m e
+  traverseDMapWithKeyWithAdjustWithMove f m e = Layout2 $ traverseDMapWithKeyWithAdjustWithMove (\k v -> unLayout2 $ f k v) m e
+
+class IsLayoutVtyWidget l t (m :: * -> *) where
+  runIsLayoutVtyWidget :: l t m a -> Event t Int -> VtyWidget t m a
+
+newtype LayoutVtyWidget t m a = LayoutVtyWidget { unLayoutVtyWidget :: ReaderT (Event t Int) (VtyWidget t m) a }
+
+instance IsLayoutVtyWidget VtyWidget t m where
+  runIsLayoutVtyWidget w _ = w
+
+instance IsLayoutVtyWidget LayoutVtyWidget t m where
+  runIsLayoutVtyWidget = runReaderT . unLayoutVtyWidget
+
+
+
+
+runLayout2WithDebugInternal
   :: forall t b m a. (MonadFix m, MonadHold t m, PostBuild t m, Monad m, MonadNodeId m)
   => Dynamic t Orientation -- ^ The main-axis 'Orientation' of this 'Layout'
   -> Int -- ^ The positional index of the initially focused tile
   -> Event t Int -- ^ An event that shifts focus by a given number of tiles
-  -> Layout t b m a -- ^ The 'Layout' widget
-  -> VtyWidget t m (LayoutDebugTree t, Event t Bool, a)
-runLayoutWithDebugInternal ddir focus0 focusShift (Layout child) = undefined
+  -> Layout2 t b m a -- ^ The 'Layout' widget
+  -> VtyWidget t m (LayoutDebugTree t, Event t Bool, a) -- ^ (debug tree, event for when we are done with focus, return value)
+runLayout2WithDebugInternal ddir focus0 focusShift (Layout2 child) = undefined
 
 
 -- | A version of 'runLayout' that arranges tiles in a column and uses 'tabNavigation' to
 -- change tile focus.
 col2
   :: forall t b m a. (MonadFix m, MonadHold t m, PostBuild t m, MonadNodeId m)
-  => Layout t b m a
+  => Layout2 t b m a
   -> VtyWidget t m a
 col2 child = do
   nav <- tabNavigation
-  rslt <- runLayoutWithDebugInternal (pure Orientation_Column) 0 nav child
+  rslt <- runLayout2WithDebugInternal (pure Orientation_Column) 0 nav child
   return $ getLayoutResult @ t rslt
