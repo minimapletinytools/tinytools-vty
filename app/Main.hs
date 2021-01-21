@@ -10,6 +10,7 @@ import           Relude
 import           Example
 import           Flow
 import           Potato
+import           Layout2Test
 
 import           GHC.IO.Handle
 import           GHC.IO.Handle.FD
@@ -20,7 +21,8 @@ import           System.IO
 main :: IO ()
 --main = exampleMain
 --main = potatoMain
-main = mainWithDebug
+--main = mainWithDebug
+main = layoutTestMain
 
 
 mainWithDebug :: IO ()
