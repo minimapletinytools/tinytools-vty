@@ -209,20 +209,51 @@ instance Reflex t => Default (TileConfig t) where
   def = TileConfig (pure $ Constraint_Min 0) (pure True)
 
 -- | A 'tile' of a fixed size that is focusable and gains focus on click
-fixed
+fixed'
   :: (Reflex t, LayoutReturn t b a, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
   => Dynamic t Int
   -> widget t m b
   -> Layout t m a
-fixed sz = tile (def { _tileConfig_constraint =  Constraint_Fixed <$> sz }) . clickable
+fixed' sz = tile (def { _tileConfig_constraint =  Constraint_Fixed <$> sz }) . clickable
+
+-- | A 'tile' that can stretch (i.e., has no fixed size) and has a minimum size of 0.
+-- This tile is focusable and gains focus on click.
+stretch'
+  :: (Reflex t, LayoutReturn t b a, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
+  => widget t m b
+  -> Layout t m a
+stretch' = tile def . clickable
+
+fixedD
+  :: (Reflex t, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
+  => Dynamic t Int
+  -> widget t m (LayoutDebugTree t, Event t Bool, a) -- TODO you may as well change this to LayoutVtyWidget
+  -> Layout t m a
+fixedD = fixed'
+
+stretchD
+  :: (Reflex t, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
+  => widget t m (LayoutDebugTree t, Event t Bool, a) -- TODO you may as well change this to LayoutVtyWidget
+  -> Layout t m a
+stretchD = stretch'
+
+-- | A 'tile' of a fixed size that is focusable and gains focus on click
+fixed
+  :: (Reflex t, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
+  => Dynamic t Int
+  -> widget t m a
+  -> Layout t m a
+fixed = fixed'
 
 -- | A 'tile' that can stretch (i.e., has no fixed size) and has a minimum size of 0.
 -- This tile is focusable and gains focus on click.
 stretch
-  :: (Reflex t, LayoutReturn t b a, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
-  => widget t m b
+  :: (Reflex t, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
+  => widget t m a
   -> Layout t m a
-stretch = tile def . clickable
+stretch = stretch'
+
+
 
 -- | A version of 'runLayout' that arranges tiles in a column and uses 'tabNavigation' to
 -- change tile focus.
