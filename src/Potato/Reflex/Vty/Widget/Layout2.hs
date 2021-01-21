@@ -267,18 +267,18 @@ clickable child = LayoutVtyWidget . ReaderT $ \focusEv -> do
 
 -- |
 beginLayoutWithDebugging ::
-  forall m t b a. (MonadFix m, LayoutReturn t b a, MonadHold t m, PostBuild t m, MonadNodeId m)
-  => LayoutVtyWidget t m b
+  forall m t a. (MonadFix m, MonadHold t m, PostBuild t m, MonadNodeId m)
+  => LayoutVtyWidget t m a
   -> VtyWidget t m (LayoutDebugTree t, a)
 beginLayoutWithDebugging child = do
   tab <- tabNavigation
-  b <- runIsLayoutVtyWidget child tab
-  return (getLayoutTree @t @b @a b, getLayoutResult @t b)
+  a <- runIsLayoutVtyWidget child tab
+  return (LayoutDebugTree, a)
 
 -- |
 beginLayout ::
-  forall m t b a. (MonadFix m, LayoutReturn t b a, MonadHold t m, PostBuild t m, MonadNodeId m)
-  => LayoutVtyWidget t m b
+  forall m t a. (MonadFix m, MonadHold t m, PostBuild t m, MonadNodeId m)
+  => LayoutVtyWidget t m a
   -> VtyWidget t m a
 beginLayout = fmap snd . beginLayoutWithDebugging
 
