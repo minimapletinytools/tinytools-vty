@@ -227,13 +227,13 @@ stretch' = tile def . clickable
 fixedD
   :: (Reflex t, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
   => Dynamic t Int
-  -> widget t m (LayoutDebugTree t, Event t Bool, a) -- TODO you may as well change this to LayoutVtyWidget
+  -> widget t m (LayoutDebugTree t, Dynamic t Int, a) -- TODO you may as well change this to LayoutVtyWidget
   -> Layout t m a
 fixedD = fixed'
 
 stretchD
   :: (Reflex t, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
-  => widget t m (LayoutDebugTree t, Event t Bool, a) -- TODO you may as well change this to LayoutVtyWidget
+  => widget t m (LayoutDebugTree t, Dynamic t Int, a) -- TODO you may as well change this to LayoutVtyWidget
   -> Layout t m a
 stretchD = stretch'
 
@@ -355,10 +355,6 @@ computeEdges = fst . Map.foldlWithKey' (\(m, offset) k (a, sz) ->
 
 
 
-
-
-
-
 data LayoutDebugTree t = LayoutDebugTree
 
 emptyLayoutDebugTree :: LayoutDebugTree t
@@ -367,26 +363,24 @@ emptyLayoutDebugTree = LayoutDebugTree
 class LayoutReturn t l a where
   getLayoutResult :: l -> a
 
-  -- TODO prob need to change to getLayoutNumChildren :: l -> Dynamic t Int
-  -- TODO may need to be (Maybe (Event t Bool))
-  getLayoutDoneWithFocus :: l -> Event t Bool -- true means move focus to next object
-
+  getLayoutNumChildren :: l -> Dynamic t Int
 
   getLayoutTree :: l -> LayoutDebugTree t
 
-instance LayoutReturn t (LayoutDebugTree t, Event t Bool, a) a where
+instance LayoutReturn t (LayoutDebugTree t, Dynamic t Int, a) a where
   getLayoutResult (_,_,a) = a
-  getLayoutDoneWithFocus (_,ev,_) = ev
+  getLayoutNumChildren (_,d,_) = d
   getLayoutTree (tree,_,_) = tree
 
-instance LayoutReturn t (Event t Bool, a) a where
+-- TODO DELETE
+instance LayoutReturn t (Dynamic t Int, a) a where
   getLayoutResult (_,a) = a
-  getLayoutDoneWithFocus (ev,_) = ev
+  getLayoutNumChildren (d,_) = d
   getLayoutTree _ = emptyLayoutDebugTree
 
 instance Reflex t => LayoutReturn t a a where
   getLayoutResult = id
-  getLayoutDoneWithFocus _ = never
+  getLayoutNumChildren _ = constDyn 0
   getLayoutTree _ = emptyLayoutDebugTree
 
 class IsLayoutVtyWidget l t (m :: * -> *) where
