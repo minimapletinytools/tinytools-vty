@@ -58,6 +58,8 @@ data LayoutCtx t = LayoutCtx
   { _layoutCtx_regions     :: Dynamic t (Map NodeId LayoutSegment)
   , _layoutCtx_focusDemux  :: Demux t (Maybe NodeId)
   , _layoutCtx_orientation :: Dynamic t Orientation
+
+  --, _layoutCtx_focusChild :: Event t Int
   }
 
 -- | The Layout monad transformer keeps track of the configuration (e.g., 'Orientation') and
@@ -100,8 +102,8 @@ runLayout
   -> Int -- ^ The positional index of the initially focused tile
   -> Event t Int -- ^ An event that shifts focus by a given number of tiles
   -> Layout t b m a -- ^ The 'Layout' widget
-  -> VtyWidget t m a
-runLayout ddir focus0 focusShift (Layout child) = mdo
+  -> LayoutVtyWidget t m a
+runLayout ddir focus0 focusShift (Layout child) = LayoutVtyWidget . ReaderT $ \focusChildEv -> mdo
   dw <- displayWidth
   dh <- displayHeight
   pb <- getPostBuild
@@ -221,20 +223,22 @@ stretch = tile def . clickable
 col
   :: (MonadFix m, LayoutReturn t b a, MonadHold t m, PostBuild t m, MonadNodeId m)
   => Layout t b m a
-  -> VtyWidget t m a
+  -> LayoutVtyWidget t m a
 col child = do
-  nav <- tabNavigation
-  runLayout (pure Orientation_Column) 0 nav child
+  let
+    navigateToEv = never
+  runLayout (pure Orientation_Column) 0 navigateToEv child
 
 -- | A version of 'runLayout' that arranges tiles in a row and uses 'tabNavigation' to
 -- change tile focus.
 row
   :: (MonadFix m, LayoutReturn t b a, MonadHold t m, PostBuild t m, MonadNodeId m)
   => Layout t b m a
-  -> VtyWidget t m a
+  -> LayoutVtyWidget t m a
 row child = do
-  nav <- tabNavigation
-  runLayout (pure Orientation_Row) 0 nav child
+  let
+    navigateToEv = never
+  runLayout (pure Orientation_Row) 0 navigateToEv child
 
 -- | Produces an 'Event' that navigates forward one tile when the Tab key is pressed
 -- and backward one tile when Shift+Tab is pressed.
@@ -254,6 +258,24 @@ clickable child = LayoutVtyWidget . ReaderT $ \focusEv -> do
   click <- mouseDown V.BLeft
   a <- runIsLayoutVtyWidget child focusEv
   return (() <$ click, a)
+
+
+-- |
+beginLayoutWithDebugging ::
+  forall m t b a. (MonadFix m, LayoutReturn t b a, MonadHold t m, PostBuild t m, MonadNodeId m)
+  => LayoutVtyWidget t m b
+  -> VtyWidget t m (LayoutDebugTree t, a)
+beginLayoutWithDebugging child = do
+  tab <- tabNavigation
+  b <- runIsLayoutVtyWidget child tab
+  return (getLayoutTree @t @b @a b, getLayoutResult @t b)
+
+-- |
+beginLayout ::
+  forall m t b a. (MonadFix m, LayoutReturn t b a, MonadHold t m, PostBuild t m, MonadNodeId m)
+  => LayoutVtyWidget t m b
+  -> VtyWidget t m a
+beginLayout = fmap snd . beginLayoutWithDebugging
 
 -- | Retrieve the current orientation of a 'Layout'
 askOrientation :: Monad m => Layout t b m (Dynamic t Orientation)
@@ -369,7 +391,26 @@ instance (Adjustable t m, MonadFix m, MonadHold t m) => Adjustable t (Layout2 t 
 class IsLayoutVtyWidget l t (m :: * -> *) where
   runIsLayoutVtyWidget :: l t m a -> Event t Int -> VtyWidget t m a
 
-newtype LayoutVtyWidget t m a = LayoutVtyWidget { unLayoutVtyWidget :: ReaderT (Event t Int) (VtyWidget t m) a }
+newtype LayoutVtyWidget t m a = LayoutVtyWidget {
+    unLayoutVtyWidget :: ReaderT (Event t Int) (VtyWidget t m) a
+  } deriving
+    ( Functor
+    , Applicative
+    , Monad
+    , MonadHold t
+    , MonadSample t
+    , MonadFix
+    , TriggerEvent t
+    , PerformEvent t
+    , NotReady t
+    , MonadReflexCreateTrigger t
+    , HasDisplaySize t
+    , MonadNodeId
+    , PostBuild t
+    )
+
+instance MonadTrans (LayoutVtyWidget t) where
+  lift x = LayoutVtyWidget $ lift $ lift x
 
 instance IsLayoutVtyWidget VtyWidget t m where
   runIsLayoutVtyWidget w _ = w
