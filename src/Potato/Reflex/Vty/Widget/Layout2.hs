@@ -389,45 +389,6 @@ instance Reflex t => LayoutReturn t a a where
   getLayoutDoneWithFocus _ = never
   getLayoutTree _ = emptyLayoutDebugTree
 
-data Layout2Ctx t = LayoutCtx2
-  { _layout2Ctx_regions     :: Dynamic t (Map NodeId LayoutSegment)
-  , _layout2Ctx_focusDemux  :: Demux t (Maybe NodeId)
-  , _layout2Ctx_orientation :: Dynamic t Orientation
-  }
-
--- | The Layout monad transformer keeps track of the configuration (e.g., 'Orientation') and
--- 'Constraint's of its child widgets, apportions vty real estate to each, and acts as a
--- switchboard for focus requests. See 'tile' and 'runLayout'.
-newtype Layout2 t b m a = Layout2
-  { unLayout2 :: EventWriterT t (First NodeId)
-      (DynamicWriterT t (Endo [(NodeId, (Bool, Constraint), b)])
-        (ReaderT (Layout2Ctx t)
-          (VtyWidget t m))) a
-  } deriving
-    ( Functor
-    , Applicative
-    , Monad
-    , MonadHold t
-    , MonadSample t
-    , MonadFix
-    , TriggerEvent t
-    , PerformEvent t
-    , NotReady t
-    , MonadReflexCreateTrigger t
-    , HasDisplaySize t
-    , MonadNodeId
-    , PostBuild t
-    )
-
-instance MonadTrans (Layout2 t b) where
-  lift x = Layout2 $ lift $ lift $ lift $ lift x
-
-instance (Adjustable t m, MonadFix m, MonadHold t m) => Adjustable t (Layout2 t b m) where
-  runWithReplace (Layout2 a) e = Layout2 $ runWithReplace a $ fmap unLayout2 e
-  traverseIntMapWithKeyWithAdjust f m e = Layout2 $ traverseIntMapWithKeyWithAdjust (\k v -> unLayout2 $ f k v) m e
-  traverseDMapWithKeyWithAdjust f m e = Layout2 $ traverseDMapWithKeyWithAdjust (\k v -> unLayout2 $ f k v) m e
-  traverseDMapWithKeyWithAdjustWithMove f m e = Layout2 $ traverseDMapWithKeyWithAdjustWithMove (\k v -> unLayout2 $ f k v) m e
-
 class IsLayoutVtyWidget l t (m :: * -> *) where
   runIsLayoutVtyWidget :: l t m a -> Event t Int -> VtyWidget t m a
 
@@ -457,27 +418,3 @@ instance IsLayoutVtyWidget VtyWidget t m where
 
 instance IsLayoutVtyWidget LayoutVtyWidget t m where
   runIsLayoutVtyWidget = runReaderT . unLayoutVtyWidget
-
-
-
-
-runLayout2WithDebugInternal
-  :: forall t b m a. (MonadFix m, MonadHold t m, PostBuild t m, Monad m, MonadNodeId m)
-  => Dynamic t Orientation -- ^ The main-axis 'Orientation' of this 'Layout'
-  -> Int -- ^ The positional index of the initially focused tile
-  -> Event t Int -- ^ An event that shifts focus by a given number of tiles
-  -> Layout2 t b m a -- ^ The 'Layout' widget
-  -> VtyWidget t m (LayoutDebugTree t, Event t Bool, a) -- ^ (debug tree, event for when we are done with focus, return value)
-runLayout2WithDebugInternal ddir focus0 focusShift (Layout2 child) = undefined
-
-
--- | A version of 'runLayout' that arranges tiles in a column and uses 'tabNavigation' to
--- change tile focus.
-col2
-  :: forall t b m a. (MonadFix m, MonadHold t m, PostBuild t m, MonadNodeId m)
-  => Layout2 t b m a
-  -> VtyWidget t m a
-col2 child = do
-  nav <- tabNavigation
-  rslt <- runLayout2WithDebugInternal (pure Orientation_Column) 0 nav child
-  return $ getLayoutResult @ t rslt
