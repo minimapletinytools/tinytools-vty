@@ -20,6 +20,7 @@ module Potato.Reflex.Vty.Widget.Layout2
   , stretch
   , col
   , row
+  , dummy
   , beginLayout
   , beginLayoutD
   , tabNavigation
@@ -27,6 +28,8 @@ module Potato.Reflex.Vty.Widget.Layout2
   ) where
 
 import           Prelude
+
+import qualified Relude as R
 
 import           Control.Monad.NodeId (MonadNodeId (..), NodeId)
 import           Control.Monad.Reader
@@ -73,7 +76,7 @@ data LayoutCtx t = LayoutCtx
 -- switchboard for focus requests. See 'tile' and 'runLayout'.
 newtype Layout t m a = Layout
   { unLayout :: EventWriterT t (First NodeId)
-      (DynamicWriterT t (Endo [(NodeId, (Bool, Constraint), LayoutDebugTree t)])
+      (DynamicWriterT t (Endo [(NodeId, (Bool, Constraint), LayoutDebugTree t, Int)])
         (ReaderT (LayoutCtx t)
           (VtyWidget t m))) a
   } deriving
@@ -108,7 +111,7 @@ runLayoutD
   -> Int -- ^ The positional index of the initially focused tile
   -> Event t Int -- ^ An event that shifts focus by a given number of tiles
   -> Layout t m a -- ^ The 'Layout' widget
-  -> LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t Int, a)
+  -> LayoutVtyWidget t m (LayoutDebugTree t, Int, a)
 runLayoutD ddir focus0 focusShift (Layout child) = LayoutVtyWidget . ReaderT $ \focusChildEv -> mdo
   dw <- displayWidth
   dh <- displayHeight
@@ -122,7 +125,7 @@ runLayoutD ddir focus0 focusShift (Layout child) = LayoutVtyWidget . ReaderT $ \
         . Map.elems
         . computeEdges
         . computeSizes sz
-        . fmap (\(nodeid,(_,constraint),_) -> (nodeid,constraint))
+        . fmap (\(nodeid,(_,constraint),_,_) -> (nodeid,constraint))
         . Map.fromList
         . zip [0::Integer ..]
         $ qs
@@ -131,7 +134,7 @@ runLayoutD ddir focus0 focusShift (Layout child) = LayoutVtyWidget . ReaderT $ \
         , _layoutSegment_size = sz
         }
       focusable = fmap (Bimap.fromList . zip [0..]) $
-        ffor queries $ \qs -> fforMaybe qs $ \(nodeId, (f, _), _) ->
+        ffor queries $ \qs -> fforMaybe qs $ \(nodeId, (f, _), _, _) ->
           if f then Just nodeId else Nothing
       adjustFocus
         :: (Bimap Int NodeId, (Int, Maybe NodeId))
@@ -147,13 +150,16 @@ runLayoutD ddir focus0 focusShift (Layout child) = LayoutVtyWidget . ReaderT $ \
         adjustFocus
         (current $ (,) <$> focusable <*> focussed)
         $ leftmost [Left <$> focusShift, Left 0 <$ pb, Right . getFirst <$> focusReq]
+  totalKiddos <- sample . current $ fmap (sum . fmap (\(_,_,_,k) -> k)) queries
+
+      --ldt = ffor2 solutionMap (fmap (fmap thd3) qs) zip -- something like this
   -- A pair (Int, Maybe NodeId) which represents the index
   -- that we're trying to focus, and the node that actually gets
   -- focused (at that index) if it exists
   focussed <- holdDyn (focus0, Nothing) focusChange
   let focusDemux = demux $ snd <$> focussed
   -- TODO populate correct values
-  return (LayoutDebugTree, constDyn 0, a)
+  R.traceShow totalKiddos $ return (emptyLayoutDebugTree, totalKiddos, a)
 
 -- | Run a 'Layout' action
 runLayout
@@ -175,9 +181,9 @@ tile
   -> Layout t m a
 tile (TileConfig con focusable) child = mdo
   nodeId <- getNextNodeId
-  -- by calling getLayoutTree here, we store the children's layout tree inside the DynamicWriter
-  -- runLayoutD will extract this later
-  Layout $ tellDyn $ ffor2 con focusable $ \c f -> Endo ((nodeId, (f, c), getLayoutTree @t @b @a b):)
+  -- by calling getLayoutTree/getLayoutNumChildren here, we store the children's layout info inside the DynamicWriter
+  -- runLayoutD will extract this info later
+  Layout $ tellDyn $ ffor2 con focusable $ \c f -> Endo ((nodeId, (f, c), getLayoutTree @t @b @a b, getLayoutNumChildren @t @b @a b):)
   seg <- Layout $ asks $
     fmap (Map.findWithDefault (LayoutSegment 0 0) nodeId) . _layoutCtx_regions
   dw <- displayWidth
@@ -242,7 +248,7 @@ stretch = tile def . clickable
 col
   :: (MonadFix m, MonadHold t m, PostBuild t m, MonadNodeId m)
   => Layout t m a
-  -> LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t Int, a)
+  -> LayoutVtyWidget t m (LayoutDebugTree t, Int, a)
 col child = do
   let
     navigateToEv = never -- TODO
@@ -253,11 +259,15 @@ col child = do
 row
   :: (MonadFix m, MonadHold t m, PostBuild t m, MonadNodeId m)
   => Layout t m a
-  -> LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t Int, a)
+  -> LayoutVtyWidget t m (LayoutDebugTree t, Int, a)
 row child = do
   let
     navigateToEv = never -- TODO
   runLayoutD (pure Orientation_Row) 0 navigateToEv child
+
+-- | Use this if you need a placeholder
+dummy :: (Monad m) => LayoutVtyWidget t m (LayoutDebugTree t, Int, ())
+dummy = return (emptyLayoutDebugTree, 0, ())
 
 -- | Produces an 'Event' that navigates forward one tile when the Tab key is pressed
 -- and backward one tile when Shift+Tab is pressed.
@@ -280,22 +290,18 @@ clickable child = LayoutVtyWidget . ReaderT $ \focusEv -> do
 
 beginLayoutD ::
   forall m t a. (MonadHold t m, PostBuild t m, MonadFix m, MonadNodeId m)
-  => LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t Int, a)
+  => LayoutVtyWidget t m (LayoutDebugTree t, Int, a)
   -> VtyWidget t m (LayoutDebugTree t, a)
 beginLayoutD child = mdo
   tabEv <- tabNavigation
-  let
-    indexDynFoldFn shift cur = do
-      totalChildren <- sample . current $ numChildrenDyn
-      return $ (cur + shift) `mod` totalChildren
-  indexDyn <- foldDynM indexDynFoldFn 0 tabEv
-  (ldt, numChildrenDyn, a) <- runIsLayoutVtyWidget child (updated indexDyn)
+  indexDyn <- foldDyn (\shift cur -> (shift + cur) `mod` totalKiddos) 0 tabEv
+  (ldt, totalKiddos, a) <- runIsLayoutVtyWidget child (updated indexDyn)
   return (ldt, a)
 
 -- |
 beginLayout ::
   forall m t b a. (MonadHold t m, PostBuild t m, MonadFix m, MonadNodeId m)
-  => LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t Int, a)
+  => LayoutVtyWidget t m (LayoutDebugTree t, Int, a)
   -> VtyWidget t m a
 beginLayout = fmap snd . beginLayoutD
 
@@ -340,33 +346,29 @@ computeEdges = fst . Map.foldlWithKey' (\(m, offset) k (a, sz) ->
 
 
 
-
-data LayoutDebugTree t = LayoutDebugTree
+-- TODO should prob be (Branch [LayoutDebugTree] | Leaf PosDim
+-- but it's weird cuz a leaf node won't know it's PosDim until combined with a Region...
+data LayoutDebugTree t = LayoutDebugTree_Branch [LayoutDebugTree t] | LayoutDebugTree_Leaf
 
 emptyLayoutDebugTree :: LayoutDebugTree t
-emptyLayoutDebugTree = LayoutDebugTree
+emptyLayoutDebugTree = LayoutDebugTree_Leaf
 
+-- TODO rename to IsLayoutReturn?
 class LayoutReturn t b a where
   getLayoutResult :: b -> a
 
-  getLayoutNumChildren :: b -> Dynamic t Int
+  getLayoutNumChildren :: b -> Int
 
   getLayoutTree :: b -> LayoutDebugTree t
 
-instance LayoutReturn t (LayoutDebugTree t, Dynamic t Int, a) a where
+instance LayoutReturn t (LayoutDebugTree t, Int, a) a where
   getLayoutResult (_,_,a) = a
   getLayoutNumChildren (_,d,_) = d
   getLayoutTree (tree,_,_) = tree
 
--- TODO DELETE
-instance LayoutReturn t (Dynamic t Int, a) a where
-  getLayoutResult (_,a) = a
-  getLayoutNumChildren (d,_) = d
-  getLayoutTree _ = emptyLayoutDebugTree
-
 instance Reflex t => LayoutReturn t a a where
   getLayoutResult = id
-  getLayoutNumChildren _ = constDyn 0
+  getLayoutNumChildren _ = 1
   getLayoutTree _ = emptyLayoutDebugTree
 
 class IsLayoutVtyWidget l t (m :: * -> *) where

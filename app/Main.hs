@@ -19,11 +19,11 @@ import           System.IO
 
 
 main :: IO ()
+main = mainWithDebug
 --main = exampleMain
 --main = potatoMain
---main = mainWithDebug
 --main = layoutTestMain
-main = easyExample
+--main = easyExample
 
 
 mainWithDebug :: IO ()
@@ -32,5 +32,6 @@ mainWithDebug = do
   fd <- openFile "stderr.txt" WriteMode
   hDuplicateTo fd stderr  -- redirect stdout to file
   hPutStrLn stderr "STDERR" -- will print to stderr
-  flowMain
+  --flowMain
+  easyExample
   hClose fd
