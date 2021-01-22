@@ -11,6 +11,7 @@
 
 module Layout2Test (
   layoutTestMain
+  , easyExample
 ) where
 import           Relude
 
@@ -35,6 +36,30 @@ import           Reflex.Network
 import           Reflex.Vty hiding (row, col, fixed, stretch, tile, Orientation (..), Constraint (..))
 import Potato.Reflex.Vty.Widget.Layout2
 
+
+easyExample :: IO ()
+easyExample = mainWidget $ do
+  beginLayoutD $ col $ do
+    (a1,b1,c1) <- fixed 3 $ row $ do
+      a <- stretch $ textButtonStatic def "POTATO"
+      b <- stretch $ textButtonStatic def "TOMATO"
+      c <- stretch $ textButtonStatic def "EGGPLANT"
+      return (a,b,c)
+    (a2,b2,c2) <- fixed 3 $ row $ do
+      a <- stretch $ textButtonStatic def "CHEESE"
+      b <- stretch $ textButtonStatic def "BEES"
+      c <- stretch $ textButtonStatic def "ARROW IN MY KNEE"
+      return (a,b,c)
+    (a3,b3,c3) <- fixed 3 $ row $ do
+      a <- stretch $ textButtonStatic def "TIME"
+      b <- stretch $ textButtonStatic def "RHYME"
+      c <- stretch $ textButtonStatic def "A BIG CRIME"
+      return (a,b,c)
+    return ()
+  inp <- input
+  return $ fforMaybe inp $ \case
+    V.EvKey (V.KChar 'c') [V.MCtrl] -> Just ()
+    _ -> Nothing
 
 data Example = Example_TextEditor
              | Example_Todo

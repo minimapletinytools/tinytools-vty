@@ -21,6 +21,7 @@ module Potato.Reflex.Vty.Widget.Layout2
   , col
   , row
   , beginLayout
+  , beginLayoutD
   , tabNavigation
   , askOrientation
   ) where
@@ -101,14 +102,14 @@ instance (Adjustable t m, MonadFix m, MonadHold t m) => Adjustable t (Layout t m
   traverseDMapWithKeyWithAdjustWithMove f m e = Layout $ traverseDMapWithKeyWithAdjustWithMove (\k v -> unLayout $ f k v) m e
 
 -- | Run a 'Layout' action
-runLayout
+runLayoutD
   :: (MonadFix m, MonadHold t m, PostBuild t m, Monad m, MonadNodeId m)
   => Dynamic t Orientation -- ^ The main-axis 'Orientation' of this 'Layout'
   -> Int -- ^ The positional index of the initially focused tile
   -> Event t Int -- ^ An event that shifts focus by a given number of tiles
   -> Layout t m a -- ^ The 'Layout' widget
-  -> LayoutVtyWidget t m a -- TODO output other stuff
-runLayout ddir focus0 focusShift (Layout child) = LayoutVtyWidget . ReaderT $ \focusChildEv -> mdo
+  -> LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t Int, a)
+runLayoutD ddir focus0 focusShift (Layout child) = LayoutVtyWidget . ReaderT $ \focusChildEv -> mdo
   dw <- displayWidth
   dh <- displayHeight
   pb <- getPostBuild
@@ -151,8 +152,18 @@ runLayout ddir focus0 focusShift (Layout child) = LayoutVtyWidget . ReaderT $ \f
   -- focused (at that index) if it exists
   focussed <- holdDyn (focus0, Nothing) focusChange
   let focusDemux = demux $ snd <$> focussed
-  return a
+  -- TODO populate correct values
+  return (LayoutDebugTree, constDyn 0, a)
 
+-- | Run a 'Layout' action
+runLayout
+  :: (MonadFix m, MonadHold t m, PostBuild t m, Monad m, MonadNodeId m)
+  => Dynamic t Orientation -- ^ The main-axis 'Orientation' of this 'Layout'
+  -> Int -- ^ The positional index of the initially focused tile
+  -> Event t Int -- ^ An event that shifts focus by a given number of tiles
+  -> Layout t m a -- ^ The 'Layout' widget
+  -> LayoutVtyWidget t m a
+runLayout ddir focus0 focusShift layout = fmap thd3 $ runLayoutD ddir focus0 focusShift layout
 
 -- | Tiles are the basic building blocks of 'Layout' widgets. Each tile has a constraint
 -- on its size and ability to grow and on whether it can be focused. It also allows its child
@@ -164,7 +175,8 @@ tile
   -> Layout t m a
 tile (TileConfig con focusable) child = mdo
   nodeId <- getNextNodeId
-  -- TODO hope there's no infinite loop here D:
+  -- by calling getLayoutTree here, we store the children's layout tree inside the DynamicWriter
+  -- runLayoutD will extract this later
   Layout $ tellDyn $ ffor2 con focusable $ \c f -> Endo ((nodeId, (f, c), getLayoutTree @t @b @a b):)
   seg <- Layout $ asks $
     fmap (Map.findWithDefault (LayoutSegment 0 0) nodeId) . _layoutCtx_regions
@@ -208,41 +220,12 @@ instance Reflex t => Default (TileConfig t) where
   def = TileConfig (pure $ Constraint_Min 0) (pure True)
 
 -- | A 'tile' of a fixed size that is focusable and gains focus on click
-fixed_
-  :: (Reflex t, LayoutReturn t b a, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
-  => Dynamic t Int
-  -> widget t m b
-  -> Layout t m a
-fixed_ sz = tile (def { _tileConfig_constraint =  Constraint_Fixed <$> sz }) . clickable
-
--- | A 'tile' that can stretch (i.e., has no fixed size) and has a minimum size of 0.
--- This tile is focusable and gains focus on click.
-stretch_
-  :: (Reflex t, LayoutReturn t b a, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
-  => widget t m b
-  -> Layout t m a
-stretch_ = tile def . clickable
-
-fixedD
-  :: (Reflex t, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
-  => Dynamic t Int
-  -> widget t m (LayoutDebugTree t, Dynamic t Int, a) -- TODO you may as well change this to LayoutVtyWidget
-  -> Layout t m a
-fixedD = fixed_
-
-stretchD
-  :: (Reflex t, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
-  => widget t m (LayoutDebugTree t, Dynamic t Int, a) -- TODO you may as well change this to LayoutVtyWidget
-  -> Layout t m a
-stretchD = stretch_
-
--- | A 'tile' of a fixed size that is focusable and gains focus on click
 fixed
   :: (Reflex t, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
   => Dynamic t Int
   -> widget t m a
   -> Layout t m a
-fixed = fixed_
+fixed sz = tile (def { _tileConfig_constraint =  Constraint_Fixed <$> sz }) . clickable
 
 -- | A 'tile' that can stretch (i.e., has no fixed size) and has a minimum size of 0.
 -- This tile is focusable and gains focus on click.
@@ -250,7 +233,7 @@ stretch
   :: (Reflex t, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
   => widget t m a
   -> Layout t m a
-stretch = stretch_
+stretch = tile def . clickable
 
 
 
@@ -259,22 +242,22 @@ stretch = stretch_
 col
   :: (MonadFix m, MonadHold t m, PostBuild t m, MonadNodeId m)
   => Layout t m a
-  -> LayoutVtyWidget t m a
+  -> LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t Int, a)
 col child = do
   let
     navigateToEv = never -- TODO
-  runLayout (pure Orientation_Column) 0 navigateToEv child
+  runLayoutD (pure Orientation_Column) 0 navigateToEv child
 
 -- | A version of 'runLayout' that arranges tiles in a row and uses 'tabNavigation' to
 -- change tile focus.
 row
   :: (MonadFix m, MonadHold t m, PostBuild t m, MonadNodeId m)
   => Layout t m a
-  -> LayoutVtyWidget t m a
+  -> LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t Int, a)
 row child = do
   let
     navigateToEv = never -- TODO
-  runLayout (pure Orientation_Row) 0 navigateToEv child
+  runLayoutD (pure Orientation_Row) 0 navigateToEv child
 
 -- | Produces an 'Event' that navigates forward one tile when the Tab key is pressed
 -- and backward one tile when Shift+Tab is pressed.
@@ -295,37 +278,26 @@ clickable child = LayoutVtyWidget . ReaderT $ \focusEv -> do
   a <- runIsLayoutVtyWidget child focusEv
   return (() <$ click, a)
 
--- |
-beginLayout_ ::
-  forall m t b a. (LayoutReturn t b a, MonadHold t m, PostBuild t m, MonadFix m, MonadNodeId m)
-  => LayoutVtyWidget t m b
+beginLayoutD ::
+  forall m t a. (MonadHold t m, PostBuild t m, MonadFix m, MonadNodeId m)
+  => LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t Int, a)
   -> VtyWidget t m (LayoutDebugTree t, a)
-beginLayout_ child = mdo
+beginLayoutD child = mdo
   tabEv <- tabNavigation
   let
     indexDynFoldFn shift cur = do
       totalChildren <- sample . current $ numChildrenDyn
       return $ (cur + shift) `mod` totalChildren
   indexDyn <- foldDynM indexDynFoldFn 0 tabEv
-  b <- runIsLayoutVtyWidget child (updated indexDyn)
-  let
-    ldt = getLayoutTree @t @b @a b
-    numChildrenDyn = getLayoutNumChildren @t @b @a b
-    a = getLayoutResult @t @b @a b
+  (ldt, numChildrenDyn, a) <- runIsLayoutVtyWidget child (updated indexDyn)
   return (ldt, a)
-
-beginLayoutD ::
-  forall m t a. (MonadHold t m, PostBuild t m, MonadFix m, MonadNodeId m)
-  => LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t Int, a)
-  -> VtyWidget t m (LayoutDebugTree t, a)
-beginLayoutD = beginLayout_
 
 -- |
 beginLayout ::
   forall m t b a. (MonadHold t m, PostBuild t m, MonadFix m, MonadNodeId m)
-  => LayoutVtyWidget t m a
+  => LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t Int, a)
   -> VtyWidget t m a
-beginLayout = fmap snd . beginLayout_
+beginLayout = fmap snd . beginLayoutD
 
 -- | Retrieve the current orientation of a 'Layout'
 askOrientation :: Monad m => Layout t m (Dynamic t Orientation)

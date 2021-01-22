@@ -22,7 +22,8 @@ main :: IO ()
 --main = exampleMain
 --main = potatoMain
 --main = mainWithDebug
-main = layoutTestMain
+--main = layoutTestMain
+main = easyExample
 
 
 mainWithDebug :: IO ()
