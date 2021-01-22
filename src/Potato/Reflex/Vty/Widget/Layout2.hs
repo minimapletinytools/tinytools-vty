@@ -20,7 +20,6 @@ module Potato.Reflex.Vty.Widget.Layout2
   , stretch
   , col
   , row
-  , beginLayoutWithDebugging
   , beginLayout
   , tabNavigation
   , askOrientation
@@ -297,21 +296,36 @@ clickable child = LayoutVtyWidget . ReaderT $ \focusEv -> do
   return (() <$ click, a)
 
 -- |
-beginLayoutWithDebugging ::
-  forall m t a. (MonadFix m, MonadHold t m, PostBuild t m, MonadNodeId m)
-  => LayoutVtyWidget t m a
+beginLayout' ::
+  forall m t b a. (LayoutReturn t b a, MonadHold t m, PostBuild t m, MonadFix m, MonadNodeId m)
+  => LayoutVtyWidget t m b
   -> VtyWidget t m (LayoutDebugTree t, a)
-beginLayoutWithDebugging child = do
-  tab <- tabNavigation
-  a <- runIsLayoutVtyWidget child tab
-  return (LayoutDebugTree, a)
+beginLayout' child = mdo
+  tabEv <- tabNavigation
+  let
+    indexDynFoldFn shift cur = do
+      totalChildren <- sample . current $ numChildrenDyn
+      return $ (cur + shift) `mod` totalChildren
+  indexDyn <- foldDynM indexDynFoldFn 0 tabEv
+  b <- runIsLayoutVtyWidget child (updated indexDyn)
+  let
+    ldt = getLayoutTree @t @b @a b
+    numChildrenDyn = getLayoutNumChildren @t @b @a b
+    a = getLayoutResult @t @b @a b
+  return (ldt, a)
+
+beginLayoutD ::
+  forall m t a. (MonadHold t m, PostBuild t m, MonadFix m, MonadNodeId m)
+  => LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t Int, a)
+  -> VtyWidget t m (LayoutDebugTree t, a)
+beginLayoutD = beginLayout'
 
 -- |
 beginLayout ::
-  forall m t a. (MonadFix m, MonadHold t m, PostBuild t m, MonadNodeId m)
+  forall m t b a. (MonadHold t m, PostBuild t m, MonadFix m, MonadNodeId m)
   => LayoutVtyWidget t m a
   -> VtyWidget t m a
-beginLayout = fmap snd . beginLayoutWithDebugging
+beginLayout = fmap snd . beginLayout'
 
 -- | Retrieve the current orientation of a 'Layout'
 askOrientation :: Monad m => Layout t m (Dynamic t Orientation)
@@ -360,12 +374,12 @@ data LayoutDebugTree t = LayoutDebugTree
 emptyLayoutDebugTree :: LayoutDebugTree t
 emptyLayoutDebugTree = LayoutDebugTree
 
-class LayoutReturn t l a where
-  getLayoutResult :: l -> a
+class LayoutReturn t b a where
+  getLayoutResult :: b -> a
 
-  getLayoutNumChildren :: l -> Dynamic t Int
+  getLayoutNumChildren :: b -> Dynamic t Int
 
-  getLayoutTree :: l -> LayoutDebugTree t
+  getLayoutTree :: b -> LayoutDebugTree t
 
 instance LayoutReturn t (LayoutDebugTree t, Dynamic t Int, a) a where
   getLayoutResult (_,_,a) = a
