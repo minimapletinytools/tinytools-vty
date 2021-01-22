@@ -208,33 +208,33 @@ instance Reflex t => Default (TileConfig t) where
   def = TileConfig (pure $ Constraint_Min 0) (pure True)
 
 -- | A 'tile' of a fixed size that is focusable and gains focus on click
-fixed'
+fixed_
   :: (Reflex t, LayoutReturn t b a, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
   => Dynamic t Int
   -> widget t m b
   -> Layout t m a
-fixed' sz = tile (def { _tileConfig_constraint =  Constraint_Fixed <$> sz }) . clickable
+fixed_ sz = tile (def { _tileConfig_constraint =  Constraint_Fixed <$> sz }) . clickable
 
 -- | A 'tile' that can stretch (i.e., has no fixed size) and has a minimum size of 0.
 -- This tile is focusable and gains focus on click.
-stretch'
+stretch_
   :: (Reflex t, LayoutReturn t b a, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
   => widget t m b
   -> Layout t m a
-stretch' = tile def . clickable
+stretch_ = tile def . clickable
 
 fixedD
   :: (Reflex t, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
   => Dynamic t Int
   -> widget t m (LayoutDebugTree t, Dynamic t Int, a) -- TODO you may as well change this to LayoutVtyWidget
   -> Layout t m a
-fixedD = fixed'
+fixedD = fixed_
 
 stretchD
   :: (Reflex t, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
   => widget t m (LayoutDebugTree t, Dynamic t Int, a) -- TODO you may as well change this to LayoutVtyWidget
   -> Layout t m a
-stretchD = stretch'
+stretchD = stretch_
 
 -- | A 'tile' of a fixed size that is focusable and gains focus on click
 fixed
@@ -242,7 +242,7 @@ fixed
   => Dynamic t Int
   -> widget t m a
   -> Layout t m a
-fixed = fixed'
+fixed = fixed_
 
 -- | A 'tile' that can stretch (i.e., has no fixed size) and has a minimum size of 0.
 -- This tile is focusable and gains focus on click.
@@ -250,7 +250,7 @@ stretch
   :: (Reflex t, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
   => widget t m a
   -> Layout t m a
-stretch = stretch'
+stretch = stretch_
 
 
 
@@ -296,11 +296,11 @@ clickable child = LayoutVtyWidget . ReaderT $ \focusEv -> do
   return (() <$ click, a)
 
 -- |
-beginLayout' ::
+beginLayout_ ::
   forall m t b a. (LayoutReturn t b a, MonadHold t m, PostBuild t m, MonadFix m, MonadNodeId m)
   => LayoutVtyWidget t m b
   -> VtyWidget t m (LayoutDebugTree t, a)
-beginLayout' child = mdo
+beginLayout_ child = mdo
   tabEv <- tabNavigation
   let
     indexDynFoldFn shift cur = do
@@ -318,14 +318,14 @@ beginLayoutD ::
   forall m t a. (MonadHold t m, PostBuild t m, MonadFix m, MonadNodeId m)
   => LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t Int, a)
   -> VtyWidget t m (LayoutDebugTree t, a)
-beginLayoutD = beginLayout'
+beginLayoutD = beginLayout_
 
 -- |
 beginLayout ::
   forall m t b a. (MonadHold t m, PostBuild t m, MonadFix m, MonadNodeId m)
   => LayoutVtyWidget t m a
   -> VtyWidget t m a
-beginLayout = fmap snd . beginLayout'
+beginLayout = fmap snd . beginLayout_
 
 -- | Retrieve the current orientation of a 'Layout'
 askOrientation :: Monad m => Layout t m (Dynamic t Orientation)
