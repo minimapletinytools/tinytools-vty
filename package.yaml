@@ -87,6 +87,7 @@ dependencies:
 - ilist
 - primitive
 - http-conduit
+- dependent-map
 
 - reflex-test-host
 - ref-tf

@@ -31,16 +31,22 @@ import           Prelude
 
 import qualified Relude as R
 
+import Control.Monad.Identity (Identity(..))
 import           Control.Monad.NodeId (MonadNodeId (..), NodeId)
 import           Control.Monad.Reader
+import Data.Functor.Misc
 import           Data.Bimap           (Bimap)
 import qualified Data.Bimap           as Bimap
+import Data.Dependent.Map (DMap, DSum((:=>)))
+import qualified Data.Dependent.Map as DMap
 import           Data.Default         (Default (..))
-import           Data.Map             (Map)
-import qualified Data.Map             as Map
-import           Data.Maybe           (fromMaybe)
+-- TODO you only need Bin/Tip from Internal
+import           Data.Map.Internal             (Map)
+import qualified Data.Map.Internal as Map
+import           Data.Maybe           (fromMaybe, isJust)
 import           Data.Monoid          hiding (First (..))
 import           Data.Ratio           ((%))
+import Data.Traversable (mapAccumL)
 import           Data.Semigroup       (First (..))
 import qualified Graphics.Vty         as V
 import Data.Tuple.Extra
@@ -48,6 +54,8 @@ import Data.Tuple.Extra
 import           Reflex
 import           Reflex.Host.Class    (MonadReflexCreateTrigger)
 import           Reflex.Vty.Widget
+
+import Control.Exception (assert)
 
 -- | The main-axis orientation of a 'Layout' widget
 data Orientation = Orientation_Column
@@ -62,11 +70,11 @@ data LayoutSegment = LayoutSegment
 data LayoutCtx t = LayoutCtx
   { _layoutCtx_regions     :: Dynamic t (Map NodeId LayoutSegment)
 
-  -- TODO DELETE this :)
-  , _layoutCtx_focusDemux  :: Demux t (Maybe NodeId)
+  , _layoutCtx_focusDemux  :: EventSelector t (Const2 NodeId (Maybe Int))
 
   , _layoutCtx_orientation :: Dynamic t Orientation
 
+  -- TODO you can delete this
   , _layoutCtx_focusAt :: Event t Int
   }
 
@@ -75,7 +83,7 @@ data LayoutCtx t = LayoutCtx
 -- 'Constraint's of its child widgets, apportions vty real estate to each, and acts as a
 -- switchboard for focus requests. See 'tile' and 'runLayout'.
 newtype Layout t m a = Layout
-  { unLayout :: EventWriterT t (First NodeId)
+  { unLayout :: EventWriterT t (First (NodeId, Int))
       (DynamicWriterT t (Endo [(NodeId, (Bool, Constraint), LayoutDebugTree t, Int)])
         (ReaderT (LayoutCtx t)
           (VtyWidget t m))) a
@@ -104,22 +112,87 @@ instance (Adjustable t m, MonadFix m, MonadHold t m) => Adjustable t (Layout t m
   traverseDMapWithKeyWithAdjust f m e = Layout $ traverseDMapWithKeyWithAdjust (\k v -> unLayout $ f k v) m e
   traverseDMapWithKeyWithAdjustWithMove f m e = Layout $ traverseDMapWithKeyWithAdjustWithMove (\k v -> unLayout $ f k v) m e
 
+
+--------------------------------------------------------------------------------
+-- Demux
+--------------------------------------------------------------------------------
+
+
+data DemuxKV t k v = DemuxKV { demuxKVValue :: Behavior t (Maybe (k, v)), demuxKVSelector :: EventSelector t (Const2 k (Maybe v)) }
+
+demuxKV :: (Reflex t, Ord k) => Dynamic t (Maybe (k,v)) -> DemuxKV t k v
+demuxKV d = DemuxKV (current d) (fan $ attachWith attachfn (current d) (updated d)) where
+  attachfn mkv0 mkv1 = case mkv1 of
+    Nothing -> case mkv0 of
+      Nothing -> DMap.empty
+      Just (k0,v0) -> DMap.fromList [Const2 k0 :=> Identity Nothing]
+    Just (k1,v1) -> case mkv0 of
+      Nothing -> DMap.fromList [Const2 k1 :=> Identity (Just v1)]
+      Just (k0,v0) | k0 == k1 && v0 == v1 -> DMap.empty
+      Just (k0,v0) | k0 == k1 -> DMap.fromList [Const2 k0 :=> Identity (Just v0)]
+      Just (k0,v0) -> DMap.fromList [Const2 k0 :=> Identity Nothing,
+                          Const2 k1 :=> Identity (Just v1)]
+
+demuxedKV :: (Reflex t, Eq k) => DemuxKV t k v -> k -> Dynamic t (Maybe v)
+demuxedKV d k = r where
+  e = select (demuxKVSelector d) (Const2 k)
+  fmapfn mkv = case mkv of
+    Nothing -> Nothing
+    Just (k',v) -> if k' == k then Just v else Nothing
+  r = unsafeBuildDynamic (fmap fmapfn . sample $ demuxKVValue d) e
+
+
+{-
+demuxEvWithValue :: (Reflex t, Ord k) => Event t (k,v) -> EventSelector t (Const2 k (Maybe v))
+demuxEvWithValue d = fan $ attachWith (\(k0,v0) (k1,v1) -> if k0 == k1
+                                            then if v0 == v1
+                                              then DMap.empty
+                                              else DMap.fromList [Const2 k0 :=> Identity v0]
+                                            else DMap.fromList [Const2 k0 :=> Identity v0,
+                                                                Const2 k1 :=> Identity v1])
+                              (current d) (updated d)
+
+demuxedEvWithValue :: (Reflex t, Eq k) => EventSelector t (Const2 k (Maybe v)) -> k -> Event t (Maybe v)
+demuxedEvWithValue d k = select d (Const2 k)
+-}
+
+------
+differenceDynamic :: (Reflex t) => Dynamic t a -> Event t b -> Dynamic t a
+differenceDynamic
+
+
+findNearestFloor_ :: (Ord k) => k -> (k, a) -> (k, a) -> Map k a -> Maybe (k, a)
+findNearestFloor_ target leftmost parent Map.Tip = if target < fst leftmost
+  then Nothing -- error $ "Map.findNearestFloorSure: map has no element <= " <> show target
+  else if target < fst parent
+    then Just leftmost
+    else Just parent
+findNearestFloor_ target leftmost _ (Map.Bin _ k a l r) = if target == k
+  then Just (k, a)
+  else if target < k
+    then findNearestFloor_ target leftmost (k, a) l
+    else findNearestFloor_ target (k, a) (k, a) r
+
+findNearestFloor :: (Ord k) => k -> Map k a -> Maybe (k,a)
+findNearestFloor _ Map.Tip = Nothing
+findNearestFloor target m@(Map.Bin _ k x _ _) = findNearestFloor_ target (k, x) (k, x) m
+
+
 -- | Run a 'Layout' action
 runLayoutD
-  :: (MonadFix m, MonadHold t m, PostBuild t m, Monad m, MonadNodeId m)
+  :: forall t m a. (MonadFix m, MonadHold t m, Monad m, MonadNodeId m)
   => Dynamic t Orientation -- ^ The main-axis 'Orientation' of this 'Layout'
-  -> Int -- ^ The positional index of the initially focused tile
+  -> Maybe Int -- ^ The positional index of the initially focused tile
   -> Event t Int -- ^ An event that shifts focus by a given number of tiles
   -> Layout t m a -- ^ The 'Layout' widget
-  -> LayoutVtyWidget t m (LayoutDebugTree t, Int, a)
-runLayoutD ddir focus0 focusShift (Layout child) = LayoutVtyWidget . ReaderT $ \focusChildEv -> mdo
+  -> LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t Int, Int, a)
+runLayoutD ddir mfocus0 focusShift (Layout child) = LayoutVtyWidget . ReaderT $ \focusReqIx -> mdo
   dw <- displayWidth
   dh <- displayHeight
-  pb <- getPostBuild
   let main = ffor3 ddir dw dh $ \d w h -> case d of
         Orientation_Column -> h
         Orientation_Row    -> w
-  ((a, focusReq), queriesEndo) <- runReaderT (runDynamicWriterT $ runEventWriterT child) $ LayoutCtx solutionMap focusDemux ddir focusChildEv
+  ((a, focusReq), queriesEndo) <- runReaderT (runDynamicWriterT $ runEventWriterT child) $ LayoutCtx solutionMap focusDemux ddir undefined
   let queries = flip appEndo [] <$> queriesEndo
       solution = ffor2 main queries $ \sz qs -> Map.fromList
         . Map.elems
@@ -133,43 +206,83 @@ runLayoutD ddir focus0 focusShift (Layout child) = LayoutVtyWidget . ReaderT $ \
         { _layoutSegment_offset = offset
         , _layoutSegment_size = sz
         }
-      focusable = fmap (Bimap.fromList . zip [0..]) $
-        ffor queries $ \qs -> fforMaybe qs $ \(nodeId, (f, _), _, _) ->
-          if f then Just nodeId else Nothing
+
+
+      focusableMapAccumFn acc (nodeId, (_, _), _, nKiddos) = (nextAcc, value) where
+        nextAcc = acc + nKiddos
+        value = (acc, nodeId)
+      focusable = fmap (Bimap.fromList . snd . mapAccumL focusableMapAccumFn 0) $
+        ffor queries $ \qs -> fforMaybe qs $ \n@(_, (f, _), _, _) ->
+          if f then Just n else Nothing
+
+      -- ix is focus in self index space
+      -- fst of return value is child node id to focus
+      -- snd of return value is focus in child's index space
+      findChildFocus :: Bimap Int NodeId -> Int -> Maybe (NodeId, Int)
+      findChildFocus fm ix = findNearestFloor ix (Bimap.toMap fm) >>= \(ixl, t) -> Just (t, ix-ixl)
+
       adjustFocus
-        :: (Bimap Int NodeId, (Int, Maybe NodeId))
-        -> Either Int NodeId
-        -> (Int, Maybe NodeId)
-      adjustFocus (fm, (cur, _)) (Left shift) =
-        let ix = (cur + shift) `mod` (max 1 $ Bimap.size fm)
-        in (ix, Bimap.lookup ix fm)
-      adjustFocus (fm, (cur, _)) (Right goto) =
-        let ix = fromMaybe cur $ Bimap.lookupR goto fm
-        in (ix, Just goto)
-      focusChange = attachWith
-        adjustFocus
-        (current $ (,) <$> focusable <*> focussed)
-        $ leftmost [Left <$> focusShift, Left 0 <$ pb, Right . getFirst <$> focusReq]
+        :: (Bimap Int NodeId)
+        -> Either Int (NodeId, Int) -- left is self index, right is (child id, child index)
+        -> Maybe (Int, (NodeId, Int)) -- fst is self index, snd is (child id, child index)
+      adjustFocus (fm, _) (Left ix) = Just (ix, findChildFocus fm ix)
+      adjustFocus (fm, _) (Right (goto, ixrel)) = do
+        ix <- Bimap.lookupR goto fm
+        return (ix+ixrel, (goto, ixrel))
+
+      focusChange = attachWith adjustFocus (current focusable)
+        -- TODO handle Nothing case in focusReqIx (so that event produces Nothing in this case)
+        $ leftmost [Right . getFirst <$> focusReq, Left <$> (fmapMaybe id focusReqIx)]
+
+  fm0 <- sample . current $ focusable
   totalKiddos <- sample . current $ fmap (sum . fmap (\(_,_,_,k) -> k)) queries
 
-      --ldt = ffor2 solutionMap (fmap (fmap thd3) qs) zip -- something like this
-  -- A pair (Int, Maybe NodeId) which represents the index
-  -- that we're trying to focus, and the node that actually gets
-  -- focused (at that index) if it exists
-  focussed <- holdDyn (focus0, Nothing) focusChange
-  let focusDemux = demux $ snd <$> focussed
-  -- TODO populate correct values
-  R.traceShow totalKiddos $ return (emptyLayoutDebugTree, totalKiddos, a)
+  -- fst is index we want to focus in self index space
+  -- fst . snd is node id we want to focus
+  -- snd . snd is index we want to focus in child node's index space
+  focussed :: Dynamic t (Maybe (Int, (NodeId, Int))) <- holdDyn (mfocus0 >>= (\f0 -> findChildFocus fm0 f0 >>= \cf0 -> (f0, cf0))) focusChange
+
+
+
+  data DemuxKV t k v = DemuxKV { demuxKVValue :: Behavior t (Maybe (k, v)), demuxKVSelector :: EventSelector t (Const2 k (Maybe v)) }
+
+  demuxKV :: (Reflex t, Ord k) => Dynamic t (Maybe (k,v)) -> DemuxKV t k v
+  demuxKV d = DemuxKV (current d) (fan $ attachWith attachfn (current d) (updated d)) where
+    attachfn mkv0 mkv1 = case mkv1 of
+      Nothing -> case mkv0 of
+        Nothing -> DMap.empty
+        Just (k0,v0) -> DMap.fromList [Const2 k0 :=> Identity Nothing]
+      Just (k1,v1) -> case mkv0 of
+        Nothing -> DMap.fromList [Const2 k1 :=> Identity (Just v1)]
+        Just (k0,v0) | k0 == k1 && v0 == v1 -> DMap.empty
+        Just (k0,v0) | k0 == k1 -> DMap.fromList [Const2 k0 :=> Identity (Just v0)]
+        Just (k0,v0) -> DMap.fromList [Const2 k0 :=> Identity Nothing,
+                            Const2 k1 :=> Identity (Just v1)]
+
+  demuxedKV :: (Reflex t, Eq k) => DemuxKV t k v -> k -> Dynamic t (Maybe v)
+  demuxedKV d k = r where
+    e = select (demuxKVSelector d) (Const2 k)
+    fmapfn mkv = case mkv of
+      Nothing -> Nothing
+      Just (k',v) -> if k' == k then Just v else Nothing
+    r = unsafeBuildDynamic (fmap fmapfn . sample $ demuxKVValue d) e
+
+
+
+  -- a focusReq comes from below, so don't propogate it back down
+  let focusDemux = demuxEvWithValue $ difference (fmapMaybe snd $ updated focussed) focusReq
+
+  R.traceShow totalKiddos $ return (emptyLayoutDebugTree, fmap fst focussed, totalKiddos, a)
 
 -- | Run a 'Layout' action
 runLayout
   :: (MonadFix m, MonadHold t m, PostBuild t m, Monad m, MonadNodeId m)
   => Dynamic t Orientation -- ^ The main-axis 'Orientation' of this 'Layout'
-  -> Int -- ^ The positional index of the initially focused tile
+  -> Maybe Int -- ^ The positional index of the initially focused tile
   -> Event t Int -- ^ An event that shifts focus by a given number of tiles
   -> Layout t m a -- ^ The 'Layout' widget
   -> LayoutVtyWidget t m a
-runLayout ddir focus0 focusShift layout = fmap thd3 $ runLayoutD ddir focus0 focusShift layout
+runLayout ddir mfocus0 focusShift layout = fmap (\(_,_,_,a)->a) $ runLayoutD ddir mfocus0 focusShift layout
 
 -- | Tiles are the basic building blocks of 'Layout' widgets. Each tile has a constraint
 -- on its size and ability to grow and on whether it can be focused. It also allows its child
@@ -206,10 +319,12 @@ tile (TileConfig con focusable) child = mdo
             Orientation_Column -> _layoutSegment_size s
             Orientation_Row -> c
         }
-  focussed <- Layout $ asks _layoutCtx_focusDemux
+  focusChildEvSelector <- Layout $ asks _layoutCtx_focusDemux
+  let focusChildEv = demuxedEvWithValue focusChildEvSelector nodeId
+  focussed <- foldDyn (\mi _ -> isJust mi) False $ focusChildEv
   (focusReq, b) <- Layout $ lift $ lift $ lift $
-    pane reg (demuxed focussed $ Just nodeId) $ runIsLayoutVtyWidget child never
-  Layout $ tellEvent $ First nodeId <$ focusReq
+    pane reg focussed $ runIsLayoutVtyWidget child focusChildEv
+  Layout $ tellEvent $ fmap (First . swap) $ attachPromptlyDyn (getLayoutFocussedDyn @t b) (nodeId <$ focusReq)
   return $ getLayoutResult @t b
 
 
@@ -241,14 +356,12 @@ stretch
   -> Layout t m a
 stretch = tile def . clickable
 
-
-
 -- | A version of 'runLayout' that arranges tiles in a column and uses 'tabNavigation' to
 -- change tile focus.
 col
   :: (MonadFix m, MonadHold t m, PostBuild t m, MonadNodeId m)
   => Layout t m a
-  -> LayoutVtyWidget t m (LayoutDebugTree t, Int, a)
+  -> LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t Int, Int, a)
 col child = do
   let
     navigateToEv = never -- TODO
@@ -259,7 +372,7 @@ col child = do
 row
   :: (MonadFix m, MonadHold t m, PostBuild t m, MonadNodeId m)
   => Layout t m a
-  -> LayoutVtyWidget t m (LayoutDebugTree t, Int, a)
+  -> LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t Int, Int, a)
 row child = do
   let
     navigateToEv = never -- TODO
@@ -290,18 +403,20 @@ clickable child = LayoutVtyWidget . ReaderT $ \focusEv -> do
 
 beginLayoutD ::
   forall m t a. (MonadHold t m, PostBuild t m, MonadFix m, MonadNodeId m)
-  => LayoutVtyWidget t m (LayoutDebugTree t, Int, a)
+  => LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t Int, Int, a)
   -> VtyWidget t m (LayoutDebugTree t, a)
 beginLayoutD child = mdo
+  focussed <- focus
   tabEv <- tabNavigation
   indexDyn <- foldDyn (\shift cur -> (shift + cur) `mod` totalKiddos) 0 tabEv
-  (ldt, totalKiddos, a) <- runIsLayoutVtyWidget child (updated indexDyn)
+  let focusDyn = ffor2 focussed indexDyn $ \f index -> if f then Just index else Nothing
+  (ldt, _, totalKiddos, a) <- runIsLayoutVtyWidget child (updated focusDyn)
   return (ldt, a)
 
 -- |
 beginLayout ::
   forall m t b a. (MonadHold t m, PostBuild t m, MonadFix m, MonadNodeId m)
-  => LayoutVtyWidget t m (LayoutDebugTree t, Int, a)
+  => LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t Int, Int, a)
   -> VtyWidget t m a
 beginLayout = fmap snd . beginLayoutD
 
@@ -359,23 +474,28 @@ class LayoutReturn t b a where
 
   getLayoutNumChildren :: b -> Int
 
+  getLayoutFocussedDyn :: b -> Dynamic t Int
+
   getLayoutTree :: b -> LayoutDebugTree t
 
-instance LayoutReturn t (LayoutDebugTree t, Int, a) a where
-  getLayoutResult (_,_,a) = a
-  getLayoutNumChildren (_,d,_) = d
-  getLayoutTree (tree,_,_) = tree
+
+instance LayoutReturn t (LayoutDebugTree t, Dynamic t Int, Int, a) a where
+  getLayoutResult (_,_,_,a) = a
+  getLayoutNumChildren (_,_,d,_) = d
+  getLayoutFocussedDyn (_,d,_,_) = d
+  getLayoutTree (tree,_,_,_) = tree
 
 instance Reflex t => LayoutReturn t a a where
   getLayoutResult = id
   getLayoutNumChildren _ = 1
+  getLayoutFocussedDyn _ = constDyn 0
   getLayoutTree _ = emptyLayoutDebugTree
 
 class IsLayoutVtyWidget l t (m :: * -> *) where
-  runIsLayoutVtyWidget :: l t m a -> Event t Int -> VtyWidget t m a
+  runIsLayoutVtyWidget :: l t m a -> Event t (Maybe Int) -> VtyWidget t m a
 
 newtype LayoutVtyWidget t m a = LayoutVtyWidget {
-    unLayoutVtyWidget :: ReaderT (Event t Int) (VtyWidget t m) a
+    unLayoutVtyWidget :: ReaderT (Event t (Maybe Int)) (VtyWidget t m) a
   } deriving
     ( Functor
     , Applicative
