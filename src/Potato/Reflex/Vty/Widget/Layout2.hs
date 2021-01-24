@@ -251,7 +251,7 @@ runLayout ddir mfocus0 layout = fmap (\(_,_,_,a)->a) $ runLayoutD ddir mfocus0 l
 -- on its size and ability to grow and on whether it can be focused. It also allows its child
 -- widget to request focus.
 tile
-  :: forall t b widget x m a. (Reflex t, LayoutReturn t b a, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
+  :: forall t b widget x m a. (Reflex t, IsLayoutReturn t b a, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
   => TileConfig t -- ^ The tile's configuration
   -> widget t m (Event t x, b) -- ^ A child widget. The 'Event' that it returns is used to request that it be focused.
   -> Layout t m a
@@ -309,7 +309,7 @@ instance Reflex t => Default (TileConfig t) where
 
 -- | A 'tile' of a fixed size that is focusable and gains focus on click
 fixed'
-  :: (Reflex t, LayoutReturn t b a, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
+  :: (Reflex t, IsLayoutReturn t b a, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
   => Dynamic t Int
   -> widget t m b
   -> Layout t m a
@@ -332,7 +332,7 @@ fixed = fixed'
 -- | A 'tile' that can stretch (i.e., has no fixed size) and has a minimum size of 0.
 -- This tile is focusable and gains focus on click.
 stretch'
-  :: (Reflex t, LayoutReturn t b a, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
+  :: (Reflex t, IsLayoutReturn t b a, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
   => widget t m b
   -> Layout t m a
 stretch' = tile def . clickable
@@ -393,6 +393,8 @@ beginLayoutD ::
   => LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t (Maybe Int), Int, a)
   -> VtyWidget t m (LayoutDebugTree t, a)
 beginLayoutD child = mdo
+  -- TODO consider unfocusing if this loses focus
+  --focussed <- focus
   tabEv <- tabNavigation
   let focusChildEv = fmap (\(mcur, shift) -> maybe (Just 0) (\cur -> Just $ (shift + cur) `mod` totalKiddos) mcur) (attach (current indexDyn) tabEv)
   (ldt, indexDyn, totalKiddos, a) <- runIsLayoutVtyWidget child focusChildEv
@@ -453,8 +455,7 @@ data LayoutDebugTree t = LayoutDebugTree_Branch [LayoutDebugTree t] | LayoutDebu
 emptyLayoutDebugTree :: LayoutDebugTree t
 emptyLayoutDebugTree = LayoutDebugTree_Leaf
 
--- TODO rename to IsLayoutReturn?
-class LayoutReturn t b a where
+class IsLayoutReturn t b a where
   getLayoutResult :: b -> a
 
   getLayoutNumChildren :: b -> Int
@@ -464,13 +465,13 @@ class LayoutReturn t b a where
   getLayoutTree :: b -> LayoutDebugTree t
 
 
-instance LayoutReturn t (LayoutDebugTree t, Dynamic t (Maybe Int), Int, a) a where
+instance IsLayoutReturn t (LayoutDebugTree t, Dynamic t (Maybe Int), Int, a) a where
   getLayoutResult (_,_,_,a) = a
   getLayoutNumChildren (_,_,d,_) = d
   getLayoutFocussedDyn (_,d,_,_) = d
   getLayoutTree (tree,_,_,_) = tree
 
-instance Reflex t => LayoutReturn t a a where
+instance Reflex t => IsLayoutReturn t a a where
   getLayoutResult = id
   getLayoutNumChildren _ = 1
   getLayoutFocussedDyn _ = constDyn Nothing
