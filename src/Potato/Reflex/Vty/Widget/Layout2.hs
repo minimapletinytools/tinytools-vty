@@ -131,7 +131,8 @@ findNearestFloor_ target leftmost _ (Map.Bin _ k a l r) = if target == k
 
 findNearestFloor :: (Ord k) => k -> Map k a -> Maybe (k,a)
 findNearestFloor _ Map.Tip = Nothing
-findNearestFloor target m@(Map.Bin _ k x _ _) = findNearestFloor_ target (k, x) (k, x) m
+-- TODO I don't think we need to do findMin here, just pass in (k,x) as a placeholder value
+findNearestFloor target m@(Map.Bin _ k x _ _) = findNearestFloor_ target (Map.findMin m) (k, x) m
 
 
 
@@ -144,7 +145,7 @@ fanFocusEv focussed focusReqIx = fan $ attachWith attachfn focussed focusReqIx w
     Just (k1,v1) -> case mkv0 of
       Nothing -> DMap.fromList [Const2 k1 :=> Identity (Just v1)]
       Just (k0,v0) | k0 == k1 && v0 == v1 -> DMap.empty
-      Just (k0,v0) | k0 == k1 -> DMap.fromList [Const2 k0 :=> Identity (Just v0)]
+      Just (k0,v0) | k0 == k1 -> DMap.fromList [Const2 k1 :=> Identity (Just v1)]
       Just (k0,v0) -> DMap.fromList [Const2 k0 :=> Identity Nothing,
                           Const2 k1 :=> Identity (Just v1)]
 
@@ -153,10 +154,9 @@ runLayoutD
   :: forall t m a. (Reflex t, MonadFix m, MonadHold t m, Monad m, MonadNodeId m)
   => Dynamic t Orientation -- ^ The main-axis 'Orientation' of this 'Layout'
   -> Maybe Int -- ^ The positional index of the initially focused tile
-  -> Event t Int -- ^ An event that shifts focus by a given number of tiles
   -> Layout t m a -- ^ The 'Layout' widget
   -> LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t (Maybe Int), Int, a)
-runLayoutD ddir mfocus0 focusShift (Layout child) = LayoutVtyWidget . ReaderT $ \focusReqIx -> mdo
+runLayoutD ddir mfocus0 (Layout child) = LayoutVtyWidget . ReaderT $ \focusReqIx -> mdo
   dw <- displayWidth
   dh <- displayHeight
   let main = ffor3 ddir dw dh $ \d w h -> case d of
@@ -181,14 +181,17 @@ runLayoutD ddir mfocus0 focusShift (Layout child) = LayoutVtyWidget . ReaderT $ 
       focusableMapAccumFn acc (nodeId, (_, _), _, nKiddos) = (nextAcc, value) where
         nextAcc = acc + nKiddos
         value = (acc, nodeId)
-      focusable = fmap (Bimap.fromList . snd . mapAccumL focusableMapAccumFn 0) $
+      focusable' = fmap (Bimap.fromList . snd . mapAccumL focusableMapAccumFn 0) $
         ffor queries $ \qs -> fforMaybe qs $ \n@(_, (f, _), _, nc) ->
           if f && nc > 0 then Just n else Nothing
+      --focusable = fmap (\fm -> R.traceShow (fmap (flip findNearestFloor (Bimap.toMap fm)) [0..15]) fm) focusable'
+      focusable = focusable'
 
       -- ix is focus in self index space
       -- fst of return value is child node id to focus
       -- snd of return value is focus in child's index space
       findChildFocus :: Bimap Int NodeId -> Int -> Maybe (NodeId, Int)
+      --findChildFocus fm ix = R.trace "looking " $ R.traceShow ix $ R.traceShow fm $ R.traceShowId $ findNearestFloor ix (Bimap.toMap fm) >>= \(ixl, t) -> Just (t, ix-ixl)
       findChildFocus fm ix = findNearestFloor ix (Bimap.toMap fm) >>= \(ixl, t) -> Just (t, ix-ixl)
 
       adjustFocus
@@ -204,7 +207,7 @@ runLayoutD ddir mfocus0 focusShift (Layout child) = LayoutVtyWidget . ReaderT $ 
 
       focusChange = attachWith adjustFocus (current focusable)
         -- TODO handle Nothing case in both places (so that event produces Nothing in this case)
-        $ leftmost [ fmap Right . fmap getFirst $ traceEvent "fcr" focusReq, traceEvent "fcl" $ Left <$> (fmapMaybe id focusReqIx)]
+        $ leftmost [ fmap Right . fmap getFirst $ focusReq, Left <$> (fmapMaybe id focusReqIx)]
 
 
   fm0 <- sample . current $ focusable
@@ -218,7 +221,7 @@ runLayoutD ddir mfocus0 focusShift (Layout child) = LayoutVtyWidget . ReaderT $ 
   -- focusDemux is used to pass the 'pane's of immediate children
 
   -- fst is index we want to focus in self index space, snd is node id we want to focus
-  focussed :: Dynamic t (Maybe (Int, (NodeId, Int))) <- holdDyn initialFocus (traceEvent "fc" focusChange)
+  focussed :: Dynamic t (Maybe (Int, (NodeId, Int))) <- holdDyn initialFocus (focusChange)
   let
     initialFocus :: Maybe (Int, (NodeId, Int)) = do
       f0 <- mfocus0
@@ -229,9 +232,9 @@ runLayoutD ddir mfocus0 focusShift (Layout child) = LayoutVtyWidget . ReaderT $ 
     focusDemux :: Demux t (Maybe NodeId) = demux focussedForDemux
 
     focusReqWithNodeId :: Event t (Maybe (NodeId, Int))
-    focusReqWithNodeId = attachWith (\fm mix -> mix >>= \ix -> findChildFocus fm ix) (current focusable) focusReqIx
+    focusReqWithNodeId = attachWith (\fm mix -> mix >>= \ix -> findChildFocus fm ix) (current focusable) (focusReqIx)
     -- TODO rename to focusChildEventSelector
-    focusChildDemux = fanFocusEv (current $ fmap (fmap snd) focussed) focusReqWithNodeId
+    focusChildDemux = fanFocusEv (current $ fmap (fmap snd) focussed) (focusReqWithNodeId)
 
   return (emptyLayoutDebugTree, (fmap (fmap fst)) focussed, totalKiddos, a)
 
@@ -240,10 +243,9 @@ runLayout
   :: (MonadFix m, MonadHold t m, PostBuild t m, Monad m, MonadNodeId m)
   => Dynamic t Orientation -- ^ The main-axis 'Orientation' of this 'Layout'
   -> Maybe Int -- ^ The positional index of the initially focused tile
-  -> Event t Int -- ^ An event that shifts focus by a given number of tiles
   -> Layout t m a -- ^ The 'Layout' widget
   -> LayoutVtyWidget t m a
-runLayout ddir mfocus0 focusShift layout = fmap (\(_,_,_,a)->a) $ runLayoutD ddir mfocus0 focusShift layout
+runLayout ddir mfocus0 layout = fmap (\(_,_,_,a)->a) $ runLayoutD ddir mfocus0 layout
 
 -- | Tiles are the basic building blocks of 'Layout' widgets. Each tile has a constraint
 -- on its size and ability to grow and on whether it can be focused. It also allows its child
@@ -286,8 +288,8 @@ tile (TileConfig con focusable) child = mdo
   let focusChildEv = select focusChildSelector (Const2 nodeId)
   focussed <- Layout $ asks _layoutCtx_focusDemux
   (focusReq, b) <- Layout $ lift $ lift $ lift $
-    pane reg (demuxed focussed $ Just nodeId) $ runIsLayoutVtyWidget child focusChildEv
-  Layout $ tellEvent $ traceEvent "meow" $ if nKiddos > 0
+    pane reg (demuxed focussed $ Just nodeId) $ runIsLayoutVtyWidget child (focusChildEv)
+  Layout $ tellEvent $ if nKiddos > 0
     then fmap (First . swap) $ attachPromptlyDyn (fmap (fromMaybe 0) $ getLayoutFocussedDyn @t @b @a b) (nodeId <$ focusReq)
     else never
   return $ getLayoutResult @t b
@@ -353,10 +355,7 @@ col
   :: (MonadFix m, MonadHold t m, PostBuild t m, MonadNodeId m)
   => Layout t m a
   -> LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t (Maybe Int), Int, a)
-col child = do
-  let
-    navigateToEv = never -- TODO
-  runLayoutD (pure Orientation_Column) (Just 0) navigateToEv child
+col child = runLayoutD (pure Orientation_Column) (Just 0) child
 
 -- | A version of 'runLayout' that arranges tiles in a row and uses 'tabNavigation' to
 -- change tile focus.
@@ -364,14 +363,11 @@ row
   :: (MonadFix m, MonadHold t m, PostBuild t m, MonadNodeId m)
   => Layout t m a
   -> LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t (Maybe Int), Int, a)
-row child = do
-  let
-    navigateToEv = never -- TODO
-  runLayoutD (pure Orientation_Row) (Just 0) navigateToEv child
+row child = runLayoutD (pure Orientation_Row) (Just 0) child
 
--- | Use this if you need a placeholder
-dummy :: (Monad m) => LayoutVtyWidget t m (LayoutDebugTree t, Int, ())
-dummy = return (emptyLayoutDebugTree, 0, ())
+-- | Testing placeholder DELETE
+dummy :: (Reflex t, Monad m) => LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t (Maybe Int), Int, ())
+dummy = return (emptyLayoutDebugTree, constDyn Nothing, 0, ())
 
 -- | Produces an 'Event' that navigates forward one tile when the Tab key is pressed
 -- and backward one tile when Shift+Tab is pressed.
