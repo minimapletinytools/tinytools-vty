@@ -40,17 +40,17 @@ import Potato.Reflex.Vty.Widget.Layout2
 easyExample :: IO ()
 easyExample = mainWidget $ do
   beginLayoutD $ col $ do
-    (a1,b1,c1) <- fixed 3 $ row $ do
+    (a1,b1,c1) <- fixedD 3 $ row $ do
       a <- stretch $ textButtonStatic def "POTATO"
       b <- stretch $ textButtonStatic def "TOMATO"
       c <- stretch $ textButtonStatic def "EGGPLANT"
       return (a,b,c)
-    (a2,b2,c2) <- fixed 3 $ row $ do
+    (a2,b2,c2) <- fixedD 3 $ row $ do
       a <- stretch $ textButtonStatic def "CHEESE"
       b <- stretch $ textButtonStatic def "BEES"
       c <- stretch $ textButtonStatic def "ARROW IN MY KNEE"
       return (a,b,c)
-    (a3,b3,c3) <- fixed 3 $ row $ do
+    (a3,b3,c3) <- fixedD 3 $ row $ do
       a <- stretch $ textButtonStatic def "TIME"
       b <- stretch $ textButtonStatic def "RHYME"
       c <- stretch $ textButtonStatic def "A BIG CRIME"
