@@ -393,11 +393,9 @@ beginLayoutD ::
   => LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t (Maybe Int), Int, a)
   -> VtyWidget t m (LayoutDebugTree t, a)
 beginLayoutD child = mdo
-  focussed <- focus
   tabEv <- tabNavigation
-  indexDyn <- foldDyn (\shift cur -> (shift + cur) `mod` totalKiddos) 0 tabEv
-  let focusDyn = ffor2 focussed indexDyn $ \f index -> if f then Just index else Nothing
-  (ldt, _, totalKiddos, a) <- runIsLayoutVtyWidget child (updated focusDyn)
+  let focusChildEv = fmap (\(mcur, shift) -> maybe (Just 0) (\cur -> Just $ (shift + cur) `mod` totalKiddos) mcur) (attach (current indexDyn) tabEv)
+  (ldt, indexDyn, totalKiddos, a) <- runIsLayoutVtyWidget child focusChildEv
   return (ldt, a)
 
 -- |

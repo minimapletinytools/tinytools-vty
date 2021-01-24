@@ -43,11 +43,11 @@ easyExample = mainWidget $ do
     (a1,b1,c1) <- fixedD 3 $ row $ do
       a <- fixed 15 $ textButtonStatic def "POTATO"
       b <- fixed 15 $ textButtonStatic def "TOMATO"
-      c <- stretch $ textButtonStatic def "EGGPLANT"
-      {-c <- stretchD $ row $ do
+      --c <- stretch $ textButtonStatic def "EGGPLANT"
+      c <- stretchD $ row $ do
         stretch $ textButtonStatic def "A"
         stretch $ textButtonStatic def "B"
-        stretch $ textButtonStatic def "C"-}
+        stretch $ textButtonStatic def "C"
       return (a,b,c)
     (a2,b2,c2) <- fixedD 3 $ row $ do
       a <- stretch $ textButtonStatic def "CHEESE"
@@ -62,10 +62,10 @@ easyExample = mainWidget $ do
       b <- stretch $ textButtonStatic def "RHYME"
       c <- stretch $ textButtonStatic def "A BIG CRIME"
       return (a,b,c)
-    {-fixedD 3 $ dummy
     fixedD 3 $ dummy
     fixedD 3 $ dummy
-    fixedD 3 $ dummy-}
+    fixedD 3 $ dummy
+    fixedD 3 $ dummy
     return ()
   inp <- input
   return $ fforMaybe inp $ \case
