@@ -72,14 +72,9 @@ data LayoutSegment = LayoutSegment
 
 data LayoutCtx t = LayoutCtx
   { _layoutCtx_regions     :: Dynamic t (Map NodeId LayoutSegment)
-
-  -- TODO rename to focusSelfDemux
-  , _layoutCtx_focusDemux :: Demux t (Maybe NodeId)
-
+  , _layoutCtx_focusSelfDemux :: Demux t (Maybe NodeId)
   , _layoutCtx_orientation :: Dynamic t Orientation
-
-  -- TODO rename to focusChildSelector
-  , _layoutCtx_focusChildDemux  :: EventSelector t (Const2 NodeId (Maybe Int))
+  , _layoutCtx_focusChildSelector  :: EventSelector t (Const2 NodeId (Maybe Int))
   }
 
 
@@ -162,7 +157,7 @@ runLayoutD ddir mfocus0 (Layout child) = LayoutVtyWidget . ReaderT $ \focusReqIx
   let main = ffor3 ddir dw dh $ \d w h -> case d of
         Orientation_Column -> h
         Orientation_Row    -> w
-  ((a, focusReq), queriesEndo) <- runReaderT (runDynamicWriterT $ runEventWriterT child) $ LayoutCtx solutionMap focusDemux ddir focusChildDemux
+  ((a, focusReq), queriesEndo) <- runReaderT (runDynamicWriterT $ runEventWriterT child) $ LayoutCtx solutionMap focusDemux ddir focusChildSelector
   let queries = flip appEndo [] <$> queriesEndo
       solution = ffor2 main queries $ \sz qs -> Map.fromList
         . Map.elems
@@ -184,14 +179,12 @@ runLayoutD ddir mfocus0 (Layout child) = LayoutVtyWidget . ReaderT $ \focusReqIx
       focusable' = fmap (Bimap.fromList . snd . mapAccumL focusableMapAccumFn 0) $
         ffor queries $ \qs -> fforMaybe qs $ \n@(_, (f, _), _, nc) ->
           if f && nc > 0 then Just n else Nothing
-      --focusable = fmap (\fm -> R.traceShow (fmap (flip findNearestFloor (Bimap.toMap fm)) [0..15]) fm) focusable'
       focusable = focusable'
 
       -- ix is focus in self index space
       -- fst of return value is child node id to focus
       -- snd of return value is focus in child's index space
       findChildFocus :: Bimap Int NodeId -> Int -> Maybe (NodeId, Int)
-      --findChildFocus fm ix = R.trace "looking " $ R.traceShow ix $ R.traceShow fm $ R.traceShowId $ findNearestFloor ix (Bimap.toMap fm) >>= \(ixl, t) -> Just (t, ix-ixl)
       findChildFocus fm ix = findNearestFloor ix (Bimap.toMap fm) >>= \(ixl, t) -> Just (t, ix-ixl)
 
       adjustFocus
@@ -233,8 +226,7 @@ runLayoutD ddir mfocus0 (Layout child) = LayoutVtyWidget . ReaderT $ \focusReqIx
 
     focusReqWithNodeId :: Event t (Maybe (NodeId, Int))
     focusReqWithNodeId = attachWith (\fm mix -> mix >>= \ix -> findChildFocus fm ix) (current focusable) (focusReqIx)
-    -- TODO rename to focusChildEventSelector
-    focusChildDemux = fanFocusEv (current $ fmap (fmap snd) focussed) (focusReqWithNodeId)
+    focusChildSelector = fanFocusEv (current $ fmap (fmap snd) focussed) (focusReqWithNodeId)
 
   return (emptyLayoutDebugTree, (fmap (fmap fst)) focussed, totalKiddos, a)
 
@@ -284,9 +276,9 @@ tile (TileConfig con focusable) child = mdo
         }
   let nKiddos = getLayoutNumChildren @t @b @a b
 
-  focusChildSelector <- Layout $ asks _layoutCtx_focusChildDemux
+  focusChildSelector <- Layout $ asks _layoutCtx_focusChildSelector
   let focusChildEv = select focusChildSelector (Const2 nodeId)
-  focussed <- Layout $ asks _layoutCtx_focusDemux
+  focussed <- Layout $ asks _layoutCtx_focusSelfDemux
   (focusReq, b) <- Layout $ lift $ lift $ lift $
     pane reg (demuxed focussed $ Just nodeId) $ runIsLayoutVtyWidget child (focusChildEv)
   Layout $ tellEvent $ if nKiddos > 0
