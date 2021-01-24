@@ -31,34 +31,34 @@ module Potato.Reflex.Vty.Widget.Layout2
 
 import           Prelude
 
-import qualified Relude as R
+import qualified Relude                 as R
 
-import Control.Monad.Identity (Identity(..))
-import           Control.Monad.NodeId (MonadNodeId (..), NodeId(..))
+import           Control.Monad.Identity (Identity (..))
+import           Control.Monad.NodeId   (MonadNodeId (..), NodeId (..))
 import           Control.Monad.Reader
-import Data.Functor.Misc
-import           Data.Bimap           (Bimap)
-import qualified Data.Bimap           as Bimap
-import Data.Dependent.Map (DMap, DSum((:=>)))
-import qualified Data.Dependent.Map as DMap
-import           Data.Default         (Default (..))
-import      qualified     Data.Map.Internal as Map (Map(Bin, Tip))
-import           Data.Map             (Map)
-import qualified Data.Map as Map
-import           Data.Maybe           (fromMaybe, isJust)
-import           Data.Monoid          hiding (First (..))
-import           Data.Ratio           ((%))
-import Data.Traversable (mapAccumL)
-import           Data.Semigroup       (First (..))
-import Unsafe.Coerce
-import qualified Graphics.Vty         as V
-import Data.Tuple.Extra
+import           Data.Bimap             (Bimap)
+import qualified Data.Bimap             as Bimap
+import           Data.Default           (Default (..))
+import           Data.Dependent.Map     (DMap, DSum ((:=>)))
+import qualified Data.Dependent.Map     as DMap
+import           Data.Functor.Misc
+import           Data.Map               (Map)
+import qualified Data.Map               as Map
+import qualified Data.Map.Internal      as Map (Map (Bin, Tip))
+import           Data.Maybe             (fromMaybe, isJust)
+import           Data.Monoid            hiding (First (..))
+import           Data.Ratio             ((%))
+import           Data.Semigroup         (First (..))
+import           Data.Traversable       (mapAccumL)
+import           Data.Tuple.Extra
+import qualified Graphics.Vty           as V
+import           Unsafe.Coerce
 
 import           Reflex
-import           Reflex.Host.Class    (MonadReflexCreateTrigger)
+import           Reflex.Host.Class      (MonadReflexCreateTrigger)
 import           Reflex.Vty.Widget
 
-import Control.Exception (assert)
+import           Control.Exception      (assert)
 
 -- | The main-axis orientation of a 'Layout' widget
 data Orientation = Orientation_Column
@@ -71,10 +71,10 @@ data LayoutSegment = LayoutSegment
   }
 
 data LayoutCtx t = LayoutCtx
-  { _layoutCtx_regions     :: Dynamic t (Map NodeId LayoutSegment)
-  , _layoutCtx_focusSelfDemux :: Demux t (Maybe NodeId)
-  , _layoutCtx_orientation :: Dynamic t Orientation
-  , _layoutCtx_focusChildSelector  :: EventSelector t (Const2 NodeId (Maybe Int))
+  { _layoutCtx_regions            :: Dynamic t (Map NodeId LayoutSegment)
+  , _layoutCtx_focusSelfDemux     :: Demux t (Maybe NodeId)
+  , _layoutCtx_orientation        :: Dynamic t Orientation
+  , _layoutCtx_focusChildSelector :: EventSelector t (Const2 NodeId (Maybe Int))
   }
 
 
@@ -135,7 +135,7 @@ fanFocusEv :: (Reflex t) => Behavior t (Maybe (NodeId, Int)) -> Event t (Maybe (
 fanFocusEv focussed focusReqIx = fan $ attachWith attachfn focussed focusReqIx where
   attachfn mkv0 mkv1 = case mkv1 of
     Nothing -> case mkv0 of
-      Nothing -> DMap.empty
+      Nothing      -> DMap.empty
       Just (k0,v0) -> DMap.fromList [Const2 k0 :=> Identity Nothing]
     Just (k1,v1) -> case mkv0 of
       Nothing -> DMap.fromList [Const2 k1 :=> Identity (Just v1)]
