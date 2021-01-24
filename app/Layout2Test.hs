@@ -41,14 +41,21 @@ easyExample :: IO ()
 easyExample = mainWidget $ do
   beginLayoutD $ col $ do
     (a1,b1,c1) <- fixedD 3 $ row $ do
-      a <- stretch $ textButtonStatic def "POTATO"
-      b <- stretch $ textButtonStatic def "TOMATO"
-      c <- stretch $ textButtonStatic def "EGGPLANT"
+      a <- fixed 15 $ textButtonStatic def "POTATO"
+      b <- fixed 15 $ textButtonStatic def "TOMATO"
+      --c <- stretch $ textButtonStatic def "EGGPLANT"
+      c <- stretchD $ row $ do
+        stretch $ textButtonStatic def "A"
+        stretch $ textButtonStatic def "B"
+        stretch $ textButtonStatic def "C"
       return (a,b,c)
     (a2,b2,c2) <- fixedD 3 $ row $ do
       a <- stretch $ textButtonStatic def "CHEESE"
       b <- stretch $ textButtonStatic def "BEES"
       c <- stretch $ textButtonStatic def "ARROW IN MY KNEE"
+      stretch $ textButtonStatic def "boop"
+      stretch $ textButtonStatic def "doop"
+      stretch $ textButtonStatic def "goop"
       return (a,b,c)
     (a3,b3,c3) <- fixedD 3 $ row $ do
       a <- stretch $ textButtonStatic def "TIME"

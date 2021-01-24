@@ -87,7 +87,7 @@ data LayoutCtx t = LayoutCtx
 -- 'Constraint's of its child widgets, apportions vty real estate to each, and acts as a
 -- switchboard for focus requests. See 'tile' and 'runLayout'.
 newtype Layout t m a = Layout
-  { unLayout :: EventWriterT t (First (NodeId, Maybe Int))
+  { unLayout :: EventWriterT t (First (NodeId, Int))
       (DynamicWriterT t (Endo [(NodeId, (Bool, Constraint), LayoutDebugTree t, Int)])
         (ReaderT (LayoutCtx t)
           (VtyWidget t m))) a
@@ -182,8 +182,8 @@ runLayoutD ddir mfocus0 focusShift (Layout child) = LayoutVtyWidget . ReaderT $ 
         nextAcc = acc + nKiddos
         value = (acc, nodeId)
       focusable = fmap (Bimap.fromList . snd . mapAccumL focusableMapAccumFn 0) $
-        ffor queries $ \qs -> fforMaybe qs $ \n@(_, (f, _), _, _) ->
-          if f then Just n else Nothing
+        ffor queries $ \qs -> fforMaybe qs $ \n@(_, (f, _), _, nc) ->
+          if f && nc > 0 then Just n else Nothing
 
       -- ix is focus in self index space
       -- fst of return value is child node id to focus
@@ -204,7 +204,7 @@ runLayoutD ddir mfocus0 focusShift (Layout child) = LayoutVtyWidget . ReaderT $ 
 
       focusChange = attachWith adjustFocus (current focusable)
         -- TODO handle Nothing case in both places (so that event produces Nothing in this case)
-        $ leftmost [fmap Right . fmapMaybe (\(nid, mx) -> (mx >>= Just . (nid,))) . fmap getFirst $ focusReq, Left <$> (fmapMaybe id focusReqIx)]
+        $ leftmost [ fmap Right . fmap getFirst $ traceEvent "fcr" focusReq, traceEvent "fcl" $ Left <$> (fmapMaybe id focusReqIx)]
 
 
   fm0 <- sample . current $ focusable
@@ -218,14 +218,13 @@ runLayoutD ddir mfocus0 focusShift (Layout child) = LayoutVtyWidget . ReaderT $ 
   -- focusDemux is used to pass the 'pane's of immediate children
 
   -- fst is index we want to focus in self index space, snd is node id we want to focus
-  focussed :: Dynamic t (Maybe (Int, (NodeId, Int))) <- holdDyn initialFocus focusChange
+  focussed :: Dynamic t (Maybe (Int, (NodeId, Int))) <- holdDyn initialFocus (traceEvent "fc" focusChange)
   let
     initialFocus :: Maybe (Int, (NodeId, Int)) = do
       f0 <- mfocus0
       cf0 <- findChildFocus fm0 f0
       return (f0, cf0)
 
-    -- (-1) dummy value forces everything to unfocus
     focussedForDemux = fmap (fmap (fst . snd)) focussed
     focusDemux :: Demux t (Maybe NodeId) = demux focussedForDemux
 
@@ -234,9 +233,7 @@ runLayoutD ddir mfocus0 focusShift (Layout child) = LayoutVtyWidget . ReaderT $ 
     -- TODO rename to focusChildEventSelector
     focusChildDemux = fanFocusEv (current $ fmap (fmap snd) focussed) focusReqWithNodeId
 
-
-
-  R.traceShow totalKiddos $ return (emptyLayoutDebugTree, (fmap (fmap fst)) focussed, totalKiddos, a)
+  return (emptyLayoutDebugTree, (fmap (fmap fst)) focussed, totalKiddos, a)
 
 -- | Run a 'Layout' action
 runLayout
@@ -260,7 +257,7 @@ tile (TileConfig con focusable) child = mdo
   nodeId <- getNextNodeId
   -- by calling getLayoutTree/getLayoutNumChildren here, we store the children's layout info inside the DynamicWriter
   -- runLayoutD will extract this info later
-  Layout $ tellDyn $ ffor2 con focusable $ \c f -> Endo ((nodeId, (f, c), getLayoutTree @t @b @a b, getLayoutNumChildren @t @b @a b):)
+  Layout $ tellDyn $ ffor2 con focusable $ \c f -> Endo ((nodeId, (f, c), getLayoutTree @t @b @a b, nKiddos):)
   seg <- Layout $ asks $
     fmap (Map.findWithDefault (LayoutSegment 0 0) nodeId) . _layoutCtx_regions
   dw <- displayWidth
@@ -283,13 +280,16 @@ tile (TileConfig con focusable) child = mdo
             Orientation_Column -> _layoutSegment_size s
             Orientation_Row -> c
         }
+  let nKiddos = getLayoutNumChildren @t @b @a b
 
   focusChildSelector <- Layout $ asks _layoutCtx_focusChildDemux
   let focusChildEv = select focusChildSelector (Const2 nodeId)
   focussed <- Layout $ asks _layoutCtx_focusDemux
   (focusReq, b) <- Layout $ lift $ lift $ lift $
     pane reg (demuxed focussed $ Just nodeId) $ runIsLayoutVtyWidget child focusChildEv
-  Layout $ tellEvent $ fmap (First . swap) $ attachPromptlyDyn (getLayoutFocussedDyn @t @b @a b) (nodeId <$ focusReq)
+  Layout $ tellEvent $ traceEvent "meow" $ if nKiddos > 0
+    then fmap (First . swap) $ attachPromptlyDyn (fmap (fromMaybe 0) $ getLayoutFocussedDyn @t @b @a b) (nodeId <$ focusReq)
+    else never
   return $ getLayoutResult @t b
 
 
