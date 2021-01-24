@@ -42,9 +42,9 @@ import qualified Data.Bimap           as Bimap
 import Data.Dependent.Map (DMap, DSum((:=>)))
 import qualified Data.Dependent.Map as DMap
 import           Data.Default         (Default (..))
--- TODO you only need Bin/Tip from Internal
-import           Data.Map.Internal             (Map)
-import qualified Data.Map.Internal as Map
+import      qualified     Data.Map.Internal as Map (Map(Bin, Tip))
+import           Data.Map             (Map)
+import qualified Data.Map as Map
 import           Data.Maybe           (fromMaybe, isJust)
 import           Data.Monoid          hiding (First (..))
 import           Data.Ratio           ((%))
