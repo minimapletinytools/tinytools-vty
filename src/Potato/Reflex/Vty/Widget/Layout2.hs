@@ -449,11 +449,8 @@ emptyLayoutDebugTree = LayoutDebugTree_Leaf
 
 class IsLayoutReturn t b a where
   getLayoutResult :: b -> a
-
   getLayoutNumChildren :: b -> Int
-
   getLayoutFocussedDyn :: b -> Dynamic t (Maybe Int)
-
   getLayoutTree :: b -> LayoutDebugTree t
 
 
