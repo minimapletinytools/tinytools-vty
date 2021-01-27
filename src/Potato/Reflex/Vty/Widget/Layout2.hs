@@ -27,6 +27,9 @@ module Potato.Reflex.Vty.Widget.Layout2
   , beginLayoutD
   , tabNavigation
   , askOrientation
+  , LayoutVtyWidget(..)
+  , LayoutDebugTree(..)
+  , IsLayoutVtyWidget(..)
   ) where
 
 import           Prelude

@@ -21,14 +21,112 @@ import           Data.Dependent.Sum                (DSum ((:=>)))
 import qualified Data.IntMap                       as IM
 import qualified Data.Maybe
 import qualified Data.Text                         as T
-import qualified Potato.Data.Text.Zipper as TZ
+import qualified Data.Text.Zipper as TZ
 
 import qualified Graphics.Vty                      as V
 import           Reflex
 import           Reflex.Network
-import           Reflex.Vty
+import           Reflex.Vty hiding (row, col, fixed, stretch, tile, Orientation (..), Constraint (..))
+import Potato.Reflex.Vty.Widget.Layout2
 
 
+
+paramsNavigation :: (Reflex t, Monad m) => VtyWidget t m (Event t Int)
+paramsNavigation = do
+  tabEv <- key (V.KChar '\t')
+  returnEv <- key V.KEnter
+  let fwd  = fmap (const 1) $ leftmost [tabEv, returnEv]
+  back <- fmap (const (-1)) <$> key V.KBackTab
+  return $ leftmost [fwd, back]
+
+beginParamsLayout ::
+  forall m t a. (MonadHold t m, PostBuild t m, MonadFix m, MonadNodeId m)
+  => LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t (Maybe Int), Int, a)
+  -> VtyWidget t m (Dynamic t (Maybe Int), a)
+beginParamsLayout child = mdo
+  navEv <- paramsNavigation
+  let focusChildEv = fmap (\(mcur, shift) -> maybe (Just 0) (\cur -> Just $ (shift + cur) `mod` totalKiddos) mcur) (attach (current indexDyn) navEv)
+  (_, indexDyn, totalKiddos, a) <- runIsLayoutVtyWidget child focusChildEv
+  return (indexDyn, a)
+
+
+data SuperStyleCell = SSC_TL | SSC_TR | SSC_BL | SSC_BR | SSC_V | SSC_H | SSC_Fill
+
+updateFromSuperStyle :: SuperStyleCell -> (SuperStyle -> TZ.TextZipper)
+updateFromSuperStyle ssc = TZ.fromText . T.singleton . gettfn ssc where
+  gettfn SSC_TL = _superStyle_tl
+  gettfn SSC_TR = _superStyle_tr
+  gettfn SSC_BL = _superStyle_bl
+  gettfn SSC_BR = _superStyle_br
+  gettfn SSC_V = _superStyle_vertical
+  gettfn SSC_H = _superStyle_horizontal
+  gettfn SSC_Fill = (\case
+    FillStyle_Simple c -> c) . _superStyle_fill
+
+makeSuperStyleTextEntry :: (Reflex t, MonadHold t m, MonadFix m) => SuperStyleCell -> Dynamic t SuperStyle -> VtyWidget t m (Behavior t PChar)
+makeSuperStyleTextEntry ssc ssDyn = do
+  ss0 <- sample . current $ ssDyn
+  let config = def {
+      _textInputConfig_initialValue = updateFromSuperStyle ssc ss0
+      , _textInputConfig_modify = fmap (\ss -> const (updateFromSuperStyle ssc ss)) (updated ssDyn)
+    }
+  ti <- textInput config
+  return . current . fmap (\t -> maybe ' ' (\(c,_) -> c) (T.uncons t)) $ _textInput_value ti
+
+makeSuperStyleEvent :: (Reflex t)
+  => Behavior t PChar
+  -> Behavior t PChar
+  -> Behavior t PChar
+  -> Behavior t PChar
+  -> Behavior t PChar
+  -> Behavior t PChar
+  -> Behavior t PChar
+  -> Event t ()
+  -> Event t SuperStyle
+makeSuperStyleEvent tl v bl h f tr br trig = pushAlways pushfn trig where
+  pushfn _ = do
+    tl' <- sample tl
+    v' <- sample v
+    bl' <- sample bl
+    h' <- sample h
+    f' <- sample f
+    tr' <- sample tr
+    br' <- sample br
+    return $ def {
+        _superStyle_tl    = tl'
+        , _superStyle_tr     = tr'
+        , _superStyle_bl        = bl'
+        , _superStyle_br         = br'
+        , _superStyle_vertical   = v'
+        , _superStyle_horizontal = h'
+        --, _superStyle_point      :: PChar
+        , _superStyle_fill       = FillStyle_Simple f'
+      }
+
+holdSuperStyleWidget :: (Reflex t, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m) => Dynamic t SuperStyle -> VtyWidget t m (Event t SuperStyle)
+holdSuperStyleWidget ssDyn = mdo
+  (focusDyn,(tl,v,bl,h,f,tr,br)) <- beginParamsLayout $ col $ do
+    (tl'',v'',bl'') <- fixedD 2 $ row $ do
+      tl' <- fixed 1 $ makeSuperStyleTextEntry SSC_TL ssDyn
+      v' <- fixed 1 $ makeSuperStyleTextEntry SSC_V ssDyn
+      bl' <- fixed 1 $ makeSuperStyleTextEntry SSC_BL ssDyn
+      return (tl',v',bl')
+    (h'',f'') <- fixedD 2 $ row $ do
+      h' <- fixed 1 $ makeSuperStyleTextEntry SSC_H ssDyn
+      f' <- fixed 1 $ makeSuperStyleTextEntry SSC_Fill ssDyn
+      _ <- fixed 1 $ emptyWidget
+      return (h',f')
+    (tr'',br'') <- fixedD 2 $ row $ do
+      tr' <- fixed 1 $ makeSuperStyleTextEntry SSC_TR ssDyn
+      _ <- fixed 1 $ emptyWidget
+      br' <- fixed 1 $ makeSuperStyleTextEntry SSC_BR ssDyn
+      return (tr',br')
+    return (tl'',v'',bl'',h'',f'',tr'',br'')
+  return $ makeSuperStyleEvent tl v bl h f tr br (void $ updated focusDyn)
+
+
+emptyWidget :: (Monad m) => VtyWidget t m ()
+emptyWidget = return ()
 
 data SEltParams = SEltParams {
     --_sEltParams_sBox =
@@ -85,9 +183,9 @@ holdParamsWidget ParamsWidgetConfig {..} = do
   -- this is just a potato implementation to get us started
   setStyleEvEv <- networkView $ ffor typeChoiceDyn $ \case
     0 -> do
-      setStyleEv' <- col $ do
-        fixed 1 (return ())
-        presetClicks <- forM presetStyles $ \s -> fixed 1 $ row $ stretch $ do
+      setStyleEv' <- beginLayout $ col $ do
+        fixed 1 emptyWidget -- just to make a space
+        presetClicks <- forM presetStyles $ \s -> fixedD 1 $ row $ stretch $ do
           -- TODO highlight if style matches selection
           text (constant (T.pack s))
           fmap (fmap (\_ -> s)) (mouseDown V.BLeft)
