@@ -115,21 +115,23 @@ popupPane :: forall t m a. (MonadWidget t m)
 popupPane size widgetEv = mdo
   let
     emptyPopupWidget _ _ = return (never, never)
-    inputEv = leftmost [widgetEv, innerWidgetEv $> emptyPopupWidget, canceledEv $> emptyPopupWidget]
+    inputEv = leftmost [widgetEv, canceledEv $> emptyPopupWidget]
   innerDynEv :: Dynamic t (Event t a, Event t ())
     <- networkHold (return (never, never)) (fmap (popupPaneInternal size) inputEv)
   let
     innerWidgetEv = switchDyn (fmap fst innerDynEv)
     canceledEv = switchDyn (fmap snd innerDynEv)
-  outputStateDyn <- holdDyn False $ leftmostWarn "popupOverride" [widgetEv $> True, innerWidgetEv $> False, canceledEv $> False]
+  outputStateDyn <- holdDyn False $ leftmostWarn "popupOverride" [widgetEv $> True, canceledEv $> False]
   return (innerWidgetEv, outputStateDyn)
 
 
+-- | a simple popup pane
+-- the inner popup pane event closes the popup pane (e.g. notification dialog box with "ok" button)
 -- clicking outside or pressing escape closes the popup and emits no events
 popupPaneSimple :: forall t m a. (MonadWidget t m)
   => PopupPaneSize
   -> Event t (VtyWidget t m (Event t a)) -- ^ when inner event fires, popup is disabled
   -> VtyWidget t m (Event t a, Dynamic t Bool) -- ^ (inner widget event, popup state)
 popupPaneSimple size widgetEv = popupPane size fancyWidgetEv where
-  fmapfn w = \escEv clickOutsideEv -> fmap (\outputEv -> (leftmost [escEv, clickOutsideEv], outputEv)) w
+  fmapfn w = \escEv clickOutsideEv -> fmap (\outputEv -> (leftmost [escEv, clickOutsideEv, void outputEv], outputEv)) w
   fancyWidgetEv = fmap fmapfn widgetEv
