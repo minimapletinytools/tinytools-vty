@@ -32,6 +32,6 @@ mainWithDebug = do
   fd <- openFile "stderr.txt" WriteMode
   hDuplicateTo fd stderr  -- redirect stdout to file
   hPutStrLn stderr "STDERR" -- will print to stderr
-  --flowMain
-  easyExample
+  flowMain
+  --easyExample
   hClose fd
