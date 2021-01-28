@@ -110,7 +110,7 @@ welcomeWidget = do
   welcomeMessageDyn <- holdDyn "loading..." welcomeMessageEv
   boxTitle (constant def) "😱😱😱" $ do
     col $ do
-      fixed 10 $ text (current welcomeMessageDyn)
+      stretch $ text (current welcomeMessageDyn)
       fixed 3 $ textButton def (constant "bye")
 
 
