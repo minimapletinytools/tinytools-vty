@@ -22,6 +22,8 @@ import qualified Data.IntMap                       as IM
 import qualified Data.Maybe
 import qualified Data.Text                         as T
 import qualified Data.Text.Zipper as TZ
+import qualified Data.List.Extra as L
+import Data.Tuple.Extra
 
 import qualified Graphics.Vty                      as V
 import           Reflex
@@ -134,6 +136,49 @@ holdSuperStyleWidget ssDyn = mdo
   return $ makeSuperStyleEvent tl v bl h f tr br (void $ updated focusDyn)
 
 
+type ParamsSelector a = (Eq a) => SuperSEltLabel -> Maybe a
+
+selectParamsFromSelection :: (Eq a) => Selection -> ParamsSelector a -> Maybe a
+selectParamsFromSelection selection ps = r where
+  params = catMaybes . toList . fmap (\ssl@(rid,_,_) -> ps ssl >>= \a -> Just (rid, a)) $ selection
+  values = fmap snd params
+  r = case values of
+    [] -> Nothing
+    x:xs -> if L.allSame values
+      then Just x
+      else Nothing
+
+
+holdTextAlignmentWidget :: forall t m. (MonadWidget t m) => Dynamic t (Selection, Maybe TextAlign) -> VtyWidget t m (Event t ControllersWithId)
+holdTextAlignmentWidget taDyn = (switchHold never =<<) . networkView . ffor taDyn $ \(selection, mta) -> do
+  let
+    startAlign = case mta of
+      Nothing -> []
+      Just TextAlign_Left -> [0]
+      Just TextAlign_Center -> [1]
+      Just TextAlign_Right -> [2]
+
+  setAlignmentEv' <- radioList (constDyn ["left","center","right"]) (constDyn startAlign)
+  let
+    setAlignmentEv = fmap (\case
+        0 -> TextAlign_Left
+        1 -> TextAlign_Center
+        2 -> TextAlign_Right
+      ) $ setAlignmentEv'
+    pushAlignmentFn :: TextAlign -> PushM t (Maybe ControllersWithId)
+    pushAlignmentFn ta = do
+      let
+        fmapfn (rid,_,seltl) = case getSEltLabelBoxTextStyle seltl of
+          Nothing -> Nothing
+          Just oldts -> if oldts == TextStyle ta
+            then Nothing
+            else Just (rid, CTagBoxTextStyle :=> Identity (CTextStyle (DeltaTextStyle (oldts, TextStyle ta))))
+      return $ case Data.Maybe.mapMaybe fmapfn . toList $ selection of
+        [] -> Nothing
+        x  -> Just $ IM.fromList x
+    alignmentParamsEv = push pushAlignmentFn setAlignmentEv
+  return (alignmentParamsEv)
+
 emptyWidget :: (Monad m) => VtyWidget t m ()
 emptyWidget = return ()
 
@@ -166,6 +211,8 @@ holdParamsWidget ParamsWidgetConfig {..} = do
 
   -- TODO read canvasSelection and figure out what the preset is
 
+
+{-
   let
     textAlignmentWidget = do
 
@@ -191,6 +238,13 @@ holdParamsWidget ParamsWidgetConfig {..} = do
             x  -> Just $ IM.fromList x
         alignmentParamsEv = push pushAlignmentFn setAlignmentEv
       return (1, alignmentParamsEv)
+-}
+
+  let
+    selectionDyn = _goatWidget_selection (_pFWidgetCtx_goatWidget _paramsWidgetConfig_pfctx)
+    textAlignSelector = (fmap (\(TextStyle ta) -> ta)) . getSEltLabelBoxTextStyle . thd3
+    textAlignInputDyn = fmap (\selection -> (selection, selectParamsFromSelection selection textAlignSelector)) selectionDyn
+    textAlignmentWidget :: VtyWidget t m (Dynamic t Int, Event t ControllersWithId) = fmap (1,) $ holdTextAlignmentWidget textAlignInputDyn
 
 
   let

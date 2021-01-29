@@ -9,8 +9,8 @@ import           Relude
 
 import           Example
 import           Flow
-import           Potato
 import           Layout2Test
+import           Potato
 
 import           GHC.IO.Handle
 import           GHC.IO.Handle.FD
@@ -35,3 +35,4 @@ mainWithDebug = do
   flowMain
   --easyExample
   hClose fd
+
