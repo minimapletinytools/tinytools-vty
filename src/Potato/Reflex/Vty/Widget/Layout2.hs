@@ -1,4 +1,4 @@
-{-# LANGUAGE AllowAmbiguousTypes        #-}
+{-# LANGUAGE AllowAmbiguousTypes           #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -7,6 +7,9 @@
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE RecursiveDo                #-}
 {-# LANGUAGE UndecidableInstances       #-}
+
+{-# language DataKinds, TypeFamilies, TypeOperators, UndecidableInstances #-}
+
 
 
 module Potato.Reflex.Vty.Widget.Layout2
@@ -55,7 +58,10 @@ import           Data.Semigroup         (First (..))
 import           Data.Traversable       (mapAccumL)
 import           Data.Tuple.Extra
 import qualified Graphics.Vty           as V
-import           Unsafe.Coerce
+--import Data.Type.Equality
+import qualified Data.Kind (Constraint)
+import GHC.TypeLits (TypeError, ErrorMessage(..))
+
 
 import           Reflex
 import           Reflex.Host.Class      (MonadReflexCreateTrigger)
@@ -153,7 +159,7 @@ runLayoutD
   => Dynamic t Orientation -- ^ The main-axis 'Orientation' of this 'Layout'
   -> Maybe Int -- ^ The positional index of the initially focused tile
   -> Layout t m a -- ^ The 'Layout' widget
-  -> LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t (Maybe Int), Int, a)
+  -> LayoutVtyWidget t m (LayoutReturnData t a)
 runLayoutD ddir mfocus0 (Layout child) = LayoutVtyWidget . ReaderT $ \focusReqIx -> mdo
   dw <- displayWidth
   dh <- displayHeight
@@ -303,53 +309,56 @@ instance Reflex t => Default (TileConfig t) where
   def = TileConfig (pure $ Constraint_Min 0) (pure True)
 
 -- | A 'tile' of a fixed size that is focusable and gains focus on click
-fixed'
+fixed
   :: (Reflex t, IsLayoutReturn t b a, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
   => Dynamic t Int
   -> widget t m b
   -> Layout t m a
-fixed' sz = tile (def { _tileConfig_constraint =  Constraint_Fixed <$> sz }) . clickable
+fixed sz = tile (def { _tileConfig_constraint =  Constraint_Fixed <$> sz }) . clickable
 
 fixedD
   :: (Reflex t, Monad m, MonadFix m, MonadNodeId m)
   => Dynamic t Int
-  -> LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t (Maybe Int), Int, a)
+  -> LayoutVtyWidget t m (LayoutReturnData t a)
   -> Layout t m a
-fixedD = fixed'
+fixedD = fixed
 
-fixed
-  :: (Reflex t, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
-  => Dynamic t Int
-  -> widget t m a
-  -> Layout t m a
-fixed = fixed'
 
 -- | A 'tile' that can stretch (i.e., has no fixed size) and has a minimum size of 0.
 -- This tile is focusable and gains focus on click.
-stretch'
+stretch
   :: (Reflex t, IsLayoutReturn t b a, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
   => widget t m b
   -> Layout t m a
-stretch' = tile def . clickable
+stretch = tile def . clickable
 
 stretchD
   :: (Reflex t, Monad m, MonadFix m, MonadNodeId m)
-  => LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t (Maybe Int), Int, a)
+  => LayoutVtyWidget t m (LayoutReturnData t a)
   -> Layout t m a
-stretchD = stretch'
+stretchD = stretch
 
+{-
 stretch
-  :: (Reflex t, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
+  :: (Reflex t, NotLayoutReturnData a, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
   => widget t m a
   -> Layout t m a
 stretch = stretch'
+
+
+fixed
+  :: (Reflex t, NotLayoutReturnData a, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
+  => Dynamic t Int
+  -> widget t m a
+  -> Layout t m a
+fixed = fixed' -}
 
 -- | A version of 'runLayout' that arranges tiles in a column and uses 'tabNavigation' to
 -- change tile focus.
 col
   :: (MonadFix m, MonadHold t m, PostBuild t m, MonadNodeId m)
   => Layout t m a
-  -> LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t (Maybe Int), Int, a)
+  -> LayoutVtyWidget t m (LayoutReturnData t a)
 col child = runLayoutD (pure Orientation_Column) (Just 0) child
 
 -- | A version of 'runLayout' that arranges tiles in a row and uses 'tabNavigation' to
@@ -357,7 +366,7 @@ col child = runLayoutD (pure Orientation_Column) (Just 0) child
 row
   :: (MonadFix m, MonadHold t m, PostBuild t m, MonadNodeId m)
   => Layout t m a
-  -> LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t (Maybe Int), Int, a)
+  -> LayoutVtyWidget t m (LayoutReturnData t a)
 row child = runLayoutD (pure Orientation_Row) (Just 0) child
 
 -- | Testing placeholder DELETE
@@ -385,7 +394,7 @@ clickable child = LayoutVtyWidget . ReaderT $ \focusEv -> do
 
 beginLayoutD ::
   forall m t a. (MonadHold t m, PostBuild t m, MonadFix m, MonadNodeId m)
-  => LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t (Maybe Int), Int, a)
+  => LayoutVtyWidget t m (LayoutReturnData t a)
   -> VtyWidget t m (LayoutDebugTree t, a)
 beginLayoutD child = mdo
   -- TODO consider unfocusing if this loses focus
@@ -398,7 +407,7 @@ beginLayoutD child = mdo
 -- |
 beginLayout ::
   forall m t b a. (MonadHold t m, PostBuild t m, MonadFix m, MonadNodeId m)
-  => LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t (Maybe Int), Int, a)
+  => LayoutVtyWidget t m (LayoutReturnData t a)
   -> VtyWidget t m a
 beginLayout = fmap snd . beginLayoutD
 
@@ -450,6 +459,18 @@ data LayoutDebugTree t = LayoutDebugTree_Branch [LayoutDebugTree t] | LayoutDebu
 emptyLayoutDebugTree :: LayoutDebugTree t
 emptyLayoutDebugTree = LayoutDebugTree_Leaf
 
+-- TODO change to ADT
+type LayoutReturnData t a = (LayoutDebugTree t, Dynamic t (Maybe Int), Int, a)
+
+
+type family NotLayoutReturnData a :: Data.Kind.Constraint where
+  NotLayoutReturnData (LayoutReturnData t a) = TypeError
+    ( 'Text "Expected a type that wasn't "
+    ':<>: 'ShowType (LayoutReturnData t a)
+    ':<>: 'Text "!"
+    )
+  NotLayoutReturnData _ = ()
+
 class IsLayoutReturn t b a where
   getLayoutResult :: b -> a
   getLayoutNumChildren :: b -> Int
@@ -457,13 +478,20 @@ class IsLayoutReturn t b a where
   getLayoutTree :: b -> LayoutDebugTree t
 
 
-instance IsLayoutReturn t (LayoutDebugTree t, Dynamic t (Maybe Int), Int, a) a where
+instance IsLayoutReturn t (LayoutReturnData t a) a where
   getLayoutResult (_,_,_,a) = a
   getLayoutNumChildren (_,_,d,_) = d
   getLayoutFocussedDyn (_,d,_,_) = d
   getLayoutTree (tree,_,_,_) = tree
 
-instance Reflex t => IsLayoutReturn t a a where
+--instance (Reflex t, (LayoutReturnData t a' == a) ~ 'False) => IsLayoutReturn t a a where
+instance (Reflex t, NotLayoutReturnData a) => IsLayoutReturn t a a where
+  getLayoutResult = id
+  getLayoutNumChildren _ = 1
+  getLayoutFocussedDyn _ = constDyn Nothing
+  getLayoutTree _ = emptyLayoutDebugTree
+
+instance (Reflex t) => IsLayoutReturn t () () where
   getLayoutResult = id
   getLayoutNumChildren _ = 1
   getLayoutFocussedDyn _ = constDyn Nothing
