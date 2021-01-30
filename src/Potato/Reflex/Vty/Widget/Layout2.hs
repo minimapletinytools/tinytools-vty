@@ -235,7 +235,7 @@ runLayoutD ddir mfocus0 (Layout child) = LayoutVtyWidget . ReaderT $ \focusReqIx
 
 -- | Run a 'Layout' action
 runLayout
-  :: (MonadFix m, MonadHold t m, PostBuild t m, Monad m, MonadNodeId m)
+  :: (Reflex t, MonadFix m, MonadHold t m, Monad m, MonadNodeId m)
   => Dynamic t Orientation -- ^ The main-axis 'Orientation' of this 'Layout'
   -> Maybe Int -- ^ The positional index of the initially focused tile
   -> Layout t m a -- ^ The 'Layout' widget
@@ -347,7 +347,7 @@ stretch = stretch'
 -- | A version of 'runLayout' that arranges tiles in a column and uses 'tabNavigation' to
 -- change tile focus.
 col
-  :: (MonadFix m, MonadHold t m, PostBuild t m, MonadNodeId m)
+  :: (Reflex t, MonadFix m, MonadHold t m, MonadNodeId m)
   => Layout t m a
   -> LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t (Maybe Int), Int, a)
 col child = runLayoutD (pure Orientation_Column) (Just 0) child
@@ -355,7 +355,7 @@ col child = runLayoutD (pure Orientation_Column) (Just 0) child
 -- | A version of 'runLayout' that arranges tiles in a row and uses 'tabNavigation' to
 -- change tile focus.
 row
-  :: (MonadFix m, MonadHold t m, PostBuild t m, MonadNodeId m)
+  :: (Reflex t, MonadFix m, MonadHold t m, MonadNodeId m)
   => Layout t m a
   -> LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t (Maybe Int), Int, a)
 row child = runLayoutD (pure Orientation_Row) (Just 0) child
@@ -384,7 +384,7 @@ clickable child = LayoutVtyWidget . ReaderT $ \focusEv -> do
   return (() <$ click, a)
 
 beginLayoutD ::
-  forall m t a. (MonadHold t m, PostBuild t m, MonadFix m, MonadNodeId m)
+  forall m t a. (Reflex t, MonadHold t m, MonadFix m, MonadNodeId m)
   => LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t (Maybe Int), Int, a)
   -> VtyWidget t m (LayoutDebugTree t, a)
 beginLayoutD child = mdo
@@ -397,7 +397,7 @@ beginLayoutD child = mdo
 
 -- |
 beginLayout ::
-  forall m t b a. (MonadHold t m, PostBuild t m, MonadFix m, MonadNodeId m)
+  forall m t b a. (Reflex t, MonadHold t m, MonadFix m, MonadNodeId m)
   => LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t (Maybe Int), Int, a)
   -> VtyWidget t m a
 beginLayout = fmap snd . beginLayoutD
