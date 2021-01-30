@@ -81,7 +81,7 @@ layoutTestMain :: IO ()
 layoutTestMain = mainWidget $ do
   inp <- input
   let buttons = beginLayout $ col $ do
-        fixed 4 $ col $ do
+        fixedD 4 $ col $ do
           fixed 1 $ text "Select an example."
           fixed 1 $ text "Esc will bring you back here."
           fixed 1 $ text "Ctrl+c to quit."

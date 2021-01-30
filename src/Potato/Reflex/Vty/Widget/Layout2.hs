@@ -318,9 +318,9 @@ fixedD
 fixedD = fixed'
 
 fixed
-  :: (Reflex t, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
+  :: (Reflex t, Monad m, MonadFix m, MonadNodeId m)
   => Dynamic t Int
-  -> widget t m a
+  -> VtyWidget t m a
   -> Layout t m a
 fixed = fixed'
 
@@ -339,8 +339,8 @@ stretchD
 stretchD = stretch'
 
 stretch
-  :: (Reflex t, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
-  => widget t m a
+  :: (Reflex t, Monad m, MonadFix m, MonadNodeId m)
+  => VtyWidget t m a
   -> Layout t m a
 stretch = stretch'
 
