@@ -30,6 +30,7 @@ module Potato.Reflex.Vty.Widget.Layout2
   , LayoutVtyWidget(..)
   , LayoutDebugTree(..)
   , IsLayoutVtyWidget(..)
+  , LayoutReturnData
   ) where
 
 import           Prelude
@@ -153,7 +154,7 @@ runLayoutD
   => Dynamic t Orientation -- ^ The main-axis 'Orientation' of this 'Layout'
   -> Maybe Int -- ^ The positional index of the initially focused tile
   -> Layout t m a -- ^ The 'Layout' widget
-  -> LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t (Maybe Int), Int, a)
+  -> LayoutVtyWidget t m (LayoutReturnData t a)
 runLayoutD ddir mfocus0 (Layout child) = LayoutVtyWidget . ReaderT $ \focusReqIx -> mdo
   dw <- displayWidth
   dh <- displayHeight
@@ -313,7 +314,7 @@ fixed' sz = tile (def { _tileConfig_constraint =  Constraint_Fixed <$> sz }) . c
 fixedD
   :: (Reflex t, Monad m, MonadFix m, MonadNodeId m)
   => Dynamic t Int
-  -> LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t (Maybe Int), Int, a)
+  -> LayoutVtyWidget t m (LayoutReturnData t a)
   -> Layout t m a
 fixedD = fixed'
 
@@ -334,7 +335,7 @@ stretch' = tile def . clickable
 
 stretchD
   :: (Reflex t, Monad m, MonadFix m, MonadNodeId m)
-  => LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t (Maybe Int), Int, a)
+  => LayoutVtyWidget t m (LayoutReturnData t a)
   -> Layout t m a
 stretchD = stretch'
 
@@ -349,7 +350,7 @@ stretch = stretch'
 col
   :: (Reflex t, MonadFix m, MonadHold t m, MonadNodeId m)
   => Layout t m a
-  -> LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t (Maybe Int), Int, a)
+  -> LayoutVtyWidget t m (LayoutReturnData t a)
 col child = runLayoutD (pure Orientation_Column) (Just 0) child
 
 -- | A version of 'runLayout' that arranges tiles in a row and uses 'tabNavigation' to
@@ -357,7 +358,7 @@ col child = runLayoutD (pure Orientation_Column) (Just 0) child
 row
   :: (Reflex t, MonadFix m, MonadHold t m, MonadNodeId m)
   => Layout t m a
-  -> LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t (Maybe Int), Int, a)
+  -> LayoutVtyWidget t m (LayoutReturnData t a)
 row child = runLayoutD (pure Orientation_Row) (Just 0) child
 
 -- | Testing placeholder DELETE
@@ -385,7 +386,7 @@ clickable child = LayoutVtyWidget . ReaderT $ \focusEv -> do
 
 beginLayoutD ::
   forall m t a. (Reflex t, MonadHold t m, MonadFix m, MonadNodeId m)
-  => LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t (Maybe Int), Int, a)
+  => LayoutVtyWidget t m (LayoutReturnData t a)
   -> VtyWidget t m (LayoutDebugTree t, a)
 beginLayoutD child = mdo
   -- TODO consider unfocusing if this loses focus
@@ -398,7 +399,7 @@ beginLayoutD child = mdo
 -- |
 beginLayout ::
   forall m t b a. (Reflex t, MonadHold t m, MonadFix m, MonadNodeId m)
-  => LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t (Maybe Int), Int, a)
+  => LayoutVtyWidget t m (LayoutReturnData t a)
   -> VtyWidget t m a
 beginLayout = fmap snd . beginLayoutD
 
@@ -456,8 +457,9 @@ class IsLayoutReturn t b a where
   getLayoutFocussedDyn :: b -> Dynamic t (Maybe Int)
   getLayoutTree :: b -> LayoutDebugTree t
 
+type LayoutReturnData t a = (LayoutDebugTree t, Dynamic t (Maybe Int), Int, a)
 
-instance IsLayoutReturn t (LayoutDebugTree t, Dynamic t (Maybe Int), Int, a) a where
+instance IsLayoutReturn t (LayoutReturnData t a) a where
   getLayoutResult (_,_,_,a) = a
   getLayoutNumChildren (_,_,d,_) = d
   getLayoutFocussedDyn (_,d,_,_) = d
