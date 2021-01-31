@@ -7,6 +7,9 @@
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE RecursiveDo                #-}
 {-# LANGUAGE UndecidableInstances       #-}
+{-# LANGUAGE TypeApplications       #-}
+{-# LANGUAGE RankNTypes       #-}
+{-# LANGUAGE ScopedTypeVariables       #-}
 
 
 module Potato.Reflex.Vty.Widget.Layout2
@@ -42,8 +45,8 @@ import           Control.Monad.Reader
 import           Data.Bimap             (Bimap)
 import qualified Data.Bimap             as Bimap
 import           Data.Default           (Default (..))
-import           Data.Dependent.Map     (DSum ((:=>)))
 import qualified Data.Dependent.Map     as DMap
+import Data.Dependent.Sum (DSum((:=>)))
 import           Data.Functor.Misc
 import           Data.Map               (Map)
 import qualified Data.Map               as Map
@@ -53,7 +56,6 @@ import           Data.Monoid            hiding (First (..))
 import           Data.Ratio             ((%))
 import           Data.Semigroup         (First (..))
 import           Data.Traversable       (mapAccumL)
-import           Data.Tuple.Extra
 import qualified Graphics.Vty           as V
 
 import           Reflex
@@ -234,15 +236,18 @@ runLayoutL ddir mfocus0 (Layout child) = LayoutVtyWidget . ReaderT $ \focusReqIx
 
 -- | Run a 'Layout' action
 runLayout
-  :: (Reflex t, MonadFix m, MonadHold t m, Monad m, MonadNodeId m)
+  :: forall t m a. (Reflex t, MonadFix m, MonadHold t m, Monad m, MonadNodeId m)
   => Dynamic t Orientation -- ^ The main-axis 'Orientation' of this 'Layout'
   -> Maybe Int -- ^ The positional index of the initially focused tile_
   -> Layout t m a -- ^ The 'Layout' widget
   -> LayoutVtyWidget t m a
 runLayout ddir mfocus0 layout = fmap _layoutReturnData_value $ runLayoutL ddir mfocus0 layout
 
+swap :: (a,b) -> (b,a)
+swap (a,b) = (b,a)
+
 tile_
-  :: forall t b widget x m a. (Reflex t, IsLayoutReturn t b a, IsLayoutVtyWidget widget t m, MonadFix m, MonadNodeId m)
+  :: forall t b widget m a x. (Reflex t, IsLayoutReturn t b a, IsLayoutVtyWidget widget t m, MonadFix m, MonadNodeId m)
   => TileConfig t -- ^ The tile_'s configuration
   -> widget t m (Event t x, b) -- ^ A child widget. The 'Event' that it returns is used to request that it be focused.
   -> Layout t m a
@@ -289,7 +294,7 @@ tile_ (TileConfig con focusable) child = mdo
 -- on its size and ability to grow and on whether it can be focused. It also allows its child
 -- widget to request focus.
 tile
-  :: forall t widget x m a. (Reflex t, IsLayoutVtyWidget widget t m, MonadFix m, MonadNodeId m)
+  :: (Reflex t, IsLayoutVtyWidget widget t m, MonadFix m, MonadNodeId m)
   => TileConfig t -- ^ The tile's configuration
   -> widget t m (Event t x, a) -- ^ A child widget. The 'Event' that it returns is used to request that it be focused.
   -> Layout t m a
@@ -396,8 +401,8 @@ clickable child = LayoutVtyWidget . ReaderT $ \focusEv -> do
 
 -- TODO look into making a variant of this function that takes a navigation event
 -- | Use this variant to begin a layout if you need its "LayoutReturnData"
-beginLayoutL ::
-  forall m t a. (Reflex t, MonadHold t m, MonadFix m)
+beginLayoutL
+  :: (Reflex t, MonadHold t m, MonadFix m)
   => LayoutVtyWidget t m (LayoutReturnData t a)
   -> VtyWidget t m (LayoutReturnData t a)
 beginLayoutL child = mdo
@@ -409,8 +414,8 @@ beginLayoutL child = mdo
   return lrd
 
 -- | Begin a layout using tab and shift-tab to navigate
-beginLayout ::
-  forall m t a. (Reflex t, MonadHold t m, MonadFix m, MonadNodeId m)
+beginLayout
+  :: (Reflex t, MonadHold t m, MonadFix m, MonadNodeId m)
   => LayoutVtyWidget t m (LayoutReturnData t a)
   -> VtyWidget t m a
 beginLayout = fmap _layoutReturnData_value . beginLayoutL
