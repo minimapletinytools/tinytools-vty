@@ -13,6 +13,7 @@ module Potato.Reflex.Vty.Widget.Layout2
   ( Orientation(..)
   , Constraint(..)
   , Layout
+  , runLayoutL
   , runLayout
   , TileConfig(..)
   , tile
@@ -297,7 +298,7 @@ tile = tile_
 
 -- | Configuration options for and constraints on 'tile_'
 data TileConfig t = TileConfig
-  { _tile_Config_constraint :: Dynamic t Constraint
+  { _tileConfig_constraint :: Dynamic t Constraint
     -- ^ 'Constraint' on the tile_'s size
   , _tile_Config_focusable  :: Dynamic t Bool
     -- ^ Whether the tile_ is focusable
@@ -312,7 +313,7 @@ fixed_
   => Dynamic t Int
   -> widget t m b
   -> Layout t m a
-fixed_ sz = tile_ (def { _tile_Config_constraint =  Constraint_Fixed <$> sz }) . clickable
+fixed_ sz = tile_ (def { _tileConfig_constraint =  Constraint_Fixed <$> sz }) . clickable
 
 -- | Use this variant to start a sub layout.
 fixedL
