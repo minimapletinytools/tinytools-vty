@@ -17,14 +17,14 @@ module Potato.Reflex.Vty.Widget.Layout2
   , TileConfig(..)
   , tile
   , fixed
-  , fixedD
+  , fixedL
   , stretch
-  , stretchD
+  , stretchL
   , col
   , row
   , dummyCell
   , beginLayout
-  , beginLayoutD
+  , beginLayoutL
   , tabNavigation
   , askOrientation
   , LayoutVtyWidget(..)
@@ -311,46 +311,46 @@ instance Reflex t => Default (TileConfig t) where
   def = TileConfig (pure $ Constraint_Min 0) (pure True)
 
 -- | A 'tile' of a fixed size that is focusable and gains focus on click
-fixed'
+fixed_
   :: (Reflex t, IsLayoutReturn t b a, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
   => Dynamic t Int
   -> widget t m b
   -> Layout t m a
-fixed' sz = tile (def { _tileConfig_constraint =  Constraint_Fixed <$> sz }) . clickable
+fixed_ sz = tile (def { _tileConfig_constraint =  Constraint_Fixed <$> sz }) . clickable
 
-fixedD
+fixedL
   :: (Reflex t, Monad m, MonadFix m, MonadNodeId m)
   => Dynamic t Int
   -> LayoutVtyWidget t m (LayoutReturnData t a)
   -> Layout t m a
-fixedD = fixed'
+fixedL = fixed_
 
 fixed
   :: (Reflex t, Monad m, MonadFix m, MonadNodeId m)
   => Dynamic t Int
   -> VtyWidget t m a
   -> Layout t m a
-fixed = fixed'
+fixed = fixed_
 
 -- | A 'tile' that can stretch (i.e., has no fixed size) and has a minimum size of 0.
 -- This tile is focusable and gains focus on click.
-stretch'
+stretch_
   :: (Reflex t, IsLayoutReturn t b a, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
   => widget t m b
   -> Layout t m a
-stretch' = tile def . clickable
+stretch_ = tile def . clickable
 
-stretchD
+stretchL
   :: (Reflex t, Monad m, MonadFix m, MonadNodeId m)
   => LayoutVtyWidget t m (LayoutReturnData t a)
   -> Layout t m a
-stretchD = stretch'
+stretchL = stretch_
 
 stretch
   :: (Reflex t, Monad m, MonadFix m, MonadNodeId m)
   => VtyWidget t m a
   -> Layout t m a
-stretch = stretch'
+stretch = stretch_
 
 -- | A version of 'runLayout' that arranges tiles in a column and uses 'tabNavigation' to
 -- change tile focus.
@@ -396,11 +396,11 @@ clickable child = LayoutVtyWidget . ReaderT $ \focusEv -> do
   a <- runIsLayoutVtyWidget child focusEv
   return (() <$ click, a)
 
-beginLayoutD ::
+beginLayoutL ::
   forall m t a. (Reflex t, MonadHold t m, MonadFix m, MonadNodeId m)
   => LayoutVtyWidget t m (LayoutReturnData t a)
   -> VtyWidget t m (LayoutReturnData t a)
-beginLayoutD child = mdo
+beginLayoutL child = mdo
   -- TODO consider unfocusing if this loses focus
   --focussed <- focus
   tabEv <- tabNavigation
@@ -413,7 +413,7 @@ beginLayout ::
   forall m t b a. (Reflex t, MonadHold t m, MonadFix m, MonadNodeId m)
   => LayoutVtyWidget t m (LayoutReturnData t a)
   -> VtyWidget t m a
-beginLayout = fmap _layoutReturnData_value . beginLayoutD
+beginLayout = fmap _layoutReturnData_value . beginLayoutL
 
 -- | Retrieve the current orientation of a 'Layout'
 askOrientation :: Monad m => Layout t m (Dynamic t Orientation)

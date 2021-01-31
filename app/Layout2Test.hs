@@ -39,17 +39,17 @@ import Potato.Reflex.Vty.Widget.Layout2
 
 easyExample :: IO ()
 easyExample = mainWidget $ do
-  beginLayoutD $ col $ do
-    (a1,b1,c1) <- fixedD 3 $ row $ do
+  beginLayoutL $ col $ do
+    (a1,b1,c1) <- fixedL 3 $ row $ do
       a <- fixed 15 $ textButtonStatic def "POTATO"
       b <- fixed 15 $ textButtonStatic def "TOMATO"
       --c <- stretch $ textButtonStatic def "EGGPLANT"
-      c <- stretchD $ row $ do
+      c <- stretchL $ row $ do
         stretch $ textButtonStatic def "A"
         stretch $ textButtonStatic def "B"
         stretch $ textButtonStatic def "C"
       return (a,b,c)
-    (a2,b2,c2) <- fixedD 3 $ row $ do
+    (a2,b2,c2) <- fixedL 3 $ row $ do
       a <- stretch $ textButtonStatic def "CHEESE"
       b <- stretch $ textButtonStatic def "BEES"
       c <- stretch $ textButtonStatic def "ARROW IN MY KNEE"
@@ -57,15 +57,15 @@ easyExample = mainWidget $ do
       stretch $ textButtonStatic def "doop"
       stretch $ textButtonStatic def "goop"
       return (a,b,c)
-    (a3,b3,c3) <- fixedD 3 $ row $ do
+    (a3,b3,c3) <- fixedL 3 $ row $ do
       a <- stretch $ textButtonStatic def "TIME"
       b <- stretch $ textButtonStatic def "RHYME"
       c <- stretch $ textButtonStatic def "A BIG CRIME"
       return (a,b,c)
-    fixedD 3 $ dummyCell
-    fixedD 3 $ dummyCell
-    fixedD 3 $ dummyCell
-    fixedD 3 $ dummyCell
+    fixedL 3 $ dummyCell
+    fixedL 3 $ dummyCell
+    fixedL 3 $ dummyCell
+    fixedL 3 $ dummyCell
     return ()
   inp <- input
   return $ fforMaybe inp $ \case
@@ -81,7 +81,7 @@ layoutTestMain :: IO ()
 layoutTestMain = mainWidget $ do
   inp <- input
   let buttons = beginLayout $ col $ do
-        fixedD 4 $ col $ do
+        fixedL 4 $ col $ do
           fixed 1 $ text "Select an example."
           fixed 1 $ text "Esc will bring you back here."
           fixed 1 $ text "Ctrl+c to quit."

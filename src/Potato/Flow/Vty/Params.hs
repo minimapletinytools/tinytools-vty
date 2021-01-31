@@ -172,17 +172,17 @@ holdSuperStyleWidget inputDyn = constDyn . Just $ mdo
     mssDyn = fmap snd inputDyn
     selectionDyn = fmap fst inputDyn
   (focusDyn,(tl,v,bl,h,f,tr,br)) <- beginParamsLayout $ row $ do
-    (tl'',v'',bl'') <- fixedD 1 $ col $ do
+    (tl'',v'',bl'') <- fixedL 1 $ col $ do
       tl' <- fixed 1 $ makeSuperStyleTextEntry SSC_TL mssDyn
       v' <- fixed 1 $ makeSuperStyleTextEntry SSC_V mssDyn
       bl' <- fixed 1 $ makeSuperStyleTextEntry SSC_BL mssDyn
       return (tl',v',bl')
-    (h'',f'') <- fixedD 1 $ col $ do
+    (h'',f'') <- fixedL 1 $ col $ do
       h' <- fixed 1 $ makeSuperStyleTextEntry SSC_H mssDyn
       f' <- fixed 1 $ makeSuperStyleTextEntry SSC_Fill mssDyn
       _ <- fixed 1 $ emptyWidget
       return (h',f')
-    (tr'',br'') <- fixedD 1 $ col $ do
+    (tr'',br'') <- fixedL 1 $ col $ do
       tr' <- fixed 1 $ makeSuperStyleTextEntry SSC_TR mssDyn
       _ <- fixed 1 $ emptyWidget
       br' <- fixed 1 $ makeSuperStyleTextEntry SSC_BR mssDyn
@@ -275,7 +275,7 @@ holdParamsWidget ParamsWidgetConfig {..} = do
         0 -> do
           setStyleEv' <- beginLayout $ col $ do
             fixed 1 emptyWidget -- just to make a space
-            presetClicks <- forM presetStyles $ \s -> fixedD 1 $ row $ stretch $ do
+            presetClicks <- forM presetStyles $ \s -> fixedL 1 $ row $ stretch $ do
               -- TODO highlight if style matches selection
               text (constant (T.pack s))
               fmap (fmap (\_ -> s)) (mouseDown V.BLeft)
