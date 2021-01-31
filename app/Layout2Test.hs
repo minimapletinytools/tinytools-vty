@@ -39,34 +39,27 @@ import Potato.Reflex.Vty.Widget.Layout2
 
 easyExample :: IO ()
 easyExample = mainWidget $ do
-  beginLayoutL $ col $ do
+  beginLayout $ row $ fixedL 39 $ col $ do
     (a1,b1,c1) <- fixedL 3 $ row $ do
-      a <- fixed 15 $ textButtonStatic def "POTATO"
-      b <- fixed 15 $ textButtonStatic def "TOMATO"
-      --c <- stretch $ textButtonStatic def "EGGPLANT"
-      c <- stretchL $ row $ do
-        stretch $ textButtonStatic def "A"
-        stretch $ textButtonStatic def "B"
-        stretch $ textButtonStatic def "C"
+      a <- stretch $ textButtonStatic def "POTATO"
+      b <- stretch $ textButtonStatic def "TOMATO"
+      c <- stretch $ textButtonStatic def "EGGPLANT"
       return (a,b,c)
     (a2,b2,c2) <- fixedL 3 $ row $ do
       a <- stretch $ textButtonStatic def "CHEESE"
       b <- stretch $ textButtonStatic def "BEES"
-      c <- stretch $ textButtonStatic def "ARROW IN MY KNEE"
-      stretch $ textButtonStatic def "boop"
-      stretch $ textButtonStatic def "doop"
-      stretch $ textButtonStatic def "goop"
+      c <- stretch $ textButtonStatic def "MY KNEES"
       return (a,b,c)
     (a3,b3,c3) <- fixedL 3 $ row $ do
       a <- stretch $ textButtonStatic def "TIME"
       b <- stretch $ textButtonStatic def "RHYME"
       c <- stretch $ textButtonStatic def "A BIG CRIME"
       return (a,b,c)
-    fixedL 3 $ dummyCell
-    fixedL 3 $ dummyCell
-    fixedL 3 $ dummyCell
-    fixedL 3 $ dummyCell
-    return ()
+    -- NOTE the box will most likely not render correctly once you put emoji's
+    -- you need to initialize vty with an updated char width map to fix this
+    fixed 5 $ boxTitle (constant def) "CLICK BUTTONS TO DRAW" $ do
+      outputDyn <- foldDyn (<>) "" $ mergeWith (<>) [a1 $> "🥔", b1 $> "🍅", c1 $> "🍆", a2 $> "🧀", b2 $> "🐝🐝", c2 $> "💘", a3 $> "⏰", b3 $> "📜", c3 $> "💰🔪🔒"]
+      text (current outputDyn)
   inp <- input
   return $ fforMaybe inp $ \case
     V.EvKey (V.KChar 'c') [V.MCtrl] -> Just ()
