@@ -67,7 +67,7 @@ beginNoNavLayout child = mdo
 -- | method type for picking out params from SuperSEltLabel
 type ParamsSelector a = (Eq a) => SuperSEltLabel -> Maybe a
 
--- |
+-- | method to extract common parameters from a selection
 -- returns Nothing if nothing in the selection has the selected param
 -- returns Just (selection, Nothing) if selection that has the selected param do not share the same value
 selectParamsFromSelection :: (Eq a) => Selection -> ParamsSelector a -> Maybe (Selection, Maybe a)
@@ -85,8 +85,10 @@ selectParamsFromSelection selection ps = r where
 type MaybeParamsWidgetOutputDyn t m = Dynamic t (Maybe (VtyWidget t m (Dynamic t Int, Event t ControllersWithId)))
 type MaybeParamsWidgetFn t m a = Dynamic t (Selection, Maybe a) -> MaybeParamsWidgetOutputDyn t m
 
+-- |
+-- returned Dynamic contains Nothing if selection was Nothing, otherwise contains Just the widget to modify parameters
 holdMaybeParamsWidget :: forall t m a. (MonadWidget t m)
-  => Dynamic t (Maybe (Selection, Maybe a))
+  => Dynamic t (Maybe (Selection, Maybe a)) -- ^ selection/params input
   -> MaybeParamsWidgetFn t m a -- ^ function creating widget, note that it should always return non-nothing but using Maybe type makes life easier
   -> MaybeParamsWidgetOutputDyn t m
 holdMaybeParamsWidget mInputDyn widgetFn = join . ffor mInputDyn $ \case
@@ -231,48 +233,11 @@ holdParamsWidget :: forall t m. (MonadWidget t m)
   -> VtyWidget t m (ParamsWidget t)
 holdParamsWidget ParamsWidgetConfig {..} = do
 
-  -- TODO read canvasSelection and figure out what the preset is
-
-
-{-
-  let
-    textAlignmentWidget = do
-
-      -- tepm alignment stuff
-      setAlignmentDyn <- radioListSimple 0 ["left","center","right"]
-      let
-        setAlignmentEv = fmap (\case
-            0 -> TextAlign_Left
-            1 -> TextAlign_Center
-            2 -> TextAlign_Right
-          ) $ updated setAlignmentDyn
-        pushAlignmentFn :: TextAlign -> PushM t (Maybe ControllersWithId)
-        pushAlignmentFn ta = do
-          selection <- sample . current $ _goatWidget_selection (_pFWidgetCtx_goatWidget _paramsWidgetConfig_pfctx)
-          let
-            fmapfn (rid,_,seltl) = case getSEltLabelBoxTextStyle seltl of
-              Nothing -> Nothing
-              Just oldts -> if oldts == TextStyle ta
-                then Nothing
-                else Just (rid, CTagBoxTextStyle :=> Identity (CTextStyle (DeltaTextStyle (oldts, TextStyle ta))))
-          return $ case Data.Maybe.mapMaybe fmapfn . toList $ selection of
-            [] -> Nothing
-            x  -> Just $ IM.fromList x
-        alignmentParamsEv = push pushAlignmentFn setAlignmentEv
-      return (1, alignmentParamsEv)
--}
-
   let
     selectionDyn = _goatWidget_selection (_pFWidgetCtx_goatWidget _paramsWidgetConfig_pfctx)
     textAlignSelector = (fmap (\(TextStyle ta) -> ta)) . getSEltLabelBoxTextStyle . thd3
     mTextAlignInputDyn = fmap (\selection -> selectParamsFromSelection selection textAlignSelector) selectionDyn
     textAlignmentWidget = holdMaybeParamsWidget mTextAlignInputDyn holdTextAlignmentWidget
-
-
-
-
-
-
 
   let
     superStyleWidget = do
@@ -309,6 +274,7 @@ holdParamsWidget ParamsWidgetConfig {..} = do
         ssparamsEv = push pushSuperStyleFn setStyleEv
       return (4, ssparamsEv)
 
+  -- do some magic to collapse MaybeParamsWidgetOutputDyn and render it with paramsLayout
   outputEv <- paramsLayout . fmap catMaybes . mconcat . (fmap (fmap (:[]))) $ [textAlignmentWidget, constDyn $ Just superStyleWidget]
 
   return ParamsWidget {
