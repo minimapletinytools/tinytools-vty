@@ -203,7 +203,7 @@ mainPFWidget = mdo
       _ <- fixed 5 $ holdInfoWidget $ InfoWidgetConfig {
           _infoWidgetConfig_selection = _goatWidget_selection everythingW
         }
-      params' <- fixed 5 $ holdParamsWidget $ ParamsWidgetConfig {
+      params' <- fixed 10 $ holdParamsWidget $ ParamsWidgetConfig {
           _paramsWidgetConfig_pfctx = pfctx
         }
       return (layers', tools', params')

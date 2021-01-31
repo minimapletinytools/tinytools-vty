@@ -70,8 +70,8 @@ type ParamsSelector a = (Eq a) => SuperSEltLabel -> Maybe a
 -- | method to extract common parameters from a selection
 -- returns Nothing if nothing in the selection has the selected param
 -- returns Just (selection, Nothing) if selection that has the selected param do not share the same value
-selectParamsFromSelection :: (Eq a) => Selection -> ParamsSelector a -> Maybe (Selection, Maybe a)
-selectParamsFromSelection selection ps = r where
+selectParamsFromSelection :: (Eq a) => ParamsSelector a -> Selection -> Maybe (Selection, Maybe a)
+selectParamsFromSelection ps selection = r where
   -- TODO don't do list conversion in between whataver ugh
   params = catMaybes . toList . fmap (\ssl@(rid,_,_) -> ps ssl >>= \a -> Just (ssl, a)) $ selection
   values = fmap snd params
@@ -121,13 +121,17 @@ updateFromSuperStyle ssc = TZ.fromText . T.singleton . gettfn ssc where
   gettfn SSC_Fill = (\case
     FillStyle_Simple c -> c) . _superStyle_fill
 
-makeSuperStyleTextEntry :: (Reflex t, MonadHold t m, MonadFix m) => SuperStyleCell -> Dynamic t SuperStyle -> VtyWidget t m (Behavior t PChar)
-makeSuperStyleTextEntry ssc ssDyn = do
-  ss0 <- sample . current $ ssDyn
-  let config = def {
-      _textInputConfig_initialValue = updateFromSuperStyle ssc ss0
-      , _textInputConfig_modify = fmap (\ss -> const (updateFromSuperStyle ssc ss)) (updated ssDyn)
-    }
+makeSuperStyleTextEntry :: (Reflex t, MonadHold t m, MonadFix m) => SuperStyleCell -> Dynamic t (Maybe SuperStyle) -> VtyWidget t m (Behavior t PChar)
+makeSuperStyleTextEntry ssc mssDyn = do
+  mss0 <- sample . current $ mssDyn
+  let
+    -- TODO reset TZ to BOL each time character is input and/or limit text entry to 1 char
+    config = def {
+        _textInputConfig_initialValue = case mss0 of
+          Nothing -> ""
+          Just ss0 -> updateFromSuperStyle ssc ss0
+        , _textInputConfig_modify = fmap (maybe id (\ss -> const (updateFromSuperStyle ssc ss))) (updated mssDyn)
+      }
   ti <- textInput config
   return . current . fmap (\t -> maybe ' ' (\(c,_) -> c) (T.uncons t)) $ _textInput_value ti
 
@@ -161,26 +165,44 @@ makeSuperStyleEvent tl v bl h f tr br trig = pushAlways pushfn trig where
         , _superStyle_fill       = FillStyle_Simple f'
       }
 
-holdSuperStyleWidget :: (Reflex t, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m) => Dynamic t SuperStyle -> VtyWidget t m (Event t SuperStyle)
-holdSuperStyleWidget ssDyn = mdo
-  (focusDyn,(tl,v,bl,h,f,tr,br)) <- beginParamsLayout $ col $ do
-    (tl'',v'',bl'') <- fixedD 2 $ row $ do
-      tl' <- fixed 1 $ makeSuperStyleTextEntry SSC_TL ssDyn
-      v' <- fixed 1 $ makeSuperStyleTextEntry SSC_V ssDyn
-      bl' <- fixed 1 $ makeSuperStyleTextEntry SSC_BL ssDyn
+holdSuperStyleWidget :: (Reflex t, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m) => MaybeParamsWidgetFn t m SuperStyle
+holdSuperStyleWidget inputDyn = constDyn . Just $ mdo
+  -- TODO need to ignore tab events or something
+  let
+    mssDyn = fmap snd inputDyn
+    selectionDyn = fmap fst inputDyn
+  (focusDyn,(tl,v,bl,h,f,tr,br)) <- beginParamsLayout $ row $ do
+    (tl'',v'',bl'') <- fixedD 1 $ col $ do
+      tl' <- fixed 1 $ makeSuperStyleTextEntry SSC_TL mssDyn
+      v' <- fixed 1 $ makeSuperStyleTextEntry SSC_V mssDyn
+      bl' <- fixed 1 $ makeSuperStyleTextEntry SSC_BL mssDyn
       return (tl',v',bl')
-    (h'',f'') <- fixedD 2 $ row $ do
-      h' <- fixed 1 $ makeSuperStyleTextEntry SSC_H ssDyn
-      f' <- fixed 1 $ makeSuperStyleTextEntry SSC_Fill ssDyn
+    (h'',f'') <- fixedD 1 $ col $ do
+      h' <- fixed 1 $ makeSuperStyleTextEntry SSC_H mssDyn
+      f' <- fixed 1 $ makeSuperStyleTextEntry SSC_Fill mssDyn
       _ <- fixed 1 $ emptyWidget
       return (h',f')
-    (tr'',br'') <- fixedD 2 $ row $ do
-      tr' <- fixed 1 $ makeSuperStyleTextEntry SSC_TR ssDyn
+    (tr'',br'') <- fixedD 1 $ col $ do
+      tr' <- fixed 1 $ makeSuperStyleTextEntry SSC_TR mssDyn
       _ <- fixed 1 $ emptyWidget
-      br' <- fixed 1 $ makeSuperStyleTextEntry SSC_BR ssDyn
+      br' <- fixed 1 $ makeSuperStyleTextEntry SSC_BR mssDyn
       return (tr',br')
     return (tl'',v'',bl'',h'',f'',tr'',br'')
-  return $ makeSuperStyleEvent tl v bl h f tr br (void $ updated focusDyn)
+  let
+    fmapfn ss (rid,_,seltl) = case getSEltLabelSuperStyle seltl of
+      Nothing -> Nothing
+      Just oldss -> if oldss == ss
+        then Nothing
+        else Just (rid, CTagSuperStyle :=> Identity (CSuperStyle (DeltaSuperStyle (oldss, ss))))
+    fforfn (selection, ss) = case Data.Maybe.mapMaybe (fmapfn ss) . toList $ selection of
+      [] -> Nothing
+      x  -> Just $ IM.fromList x
+    outputEv = fforMaybe (attach (current selectionDyn) $ makeSuperStyleEvent tl v bl h f tr br (void $ updated focusDyn)) fforfn
+  return (4, outputEv)
+
+
+
+
 
 -- Text Alignment stuff
 holdTextAlignmentWidget :: forall t m. (MonadWidget t m) => MaybeParamsWidgetFn t m TextAlign
@@ -236,8 +258,13 @@ holdParamsWidget ParamsWidgetConfig {..} = do
   let
     selectionDyn = _goatWidget_selection (_pFWidgetCtx_goatWidget _paramsWidgetConfig_pfctx)
     textAlignSelector = (fmap (\(TextStyle ta) -> ta)) . getSEltLabelBoxTextStyle . thd3
-    mTextAlignInputDyn = fmap (\selection -> selectParamsFromSelection selection textAlignSelector) selectionDyn
+    mTextAlignInputDyn = fmap ( selectParamsFromSelection textAlignSelector) selectionDyn
     textAlignmentWidget = holdMaybeParamsWidget mTextAlignInputDyn holdTextAlignmentWidget
+
+    mSuperStyleInputDyn = fmap (selectParamsFromSelection (getSEltLabelSuperStyle . thd3)) selectionDyn
+    superStyleWidget2 = holdMaybeParamsWidget mSuperStyleInputDyn holdSuperStyleWidget
+
+
 
   let
     superStyleWidget = do
@@ -275,7 +302,7 @@ holdParamsWidget ParamsWidgetConfig {..} = do
       return (4, ssparamsEv)
 
   -- do some magic to collapse MaybeParamsWidgetOutputDyn and render it with paramsLayout
-  outputEv <- paramsLayout . fmap catMaybes . mconcat . (fmap (fmap (:[]))) $ [textAlignmentWidget, constDyn $ Just superStyleWidget]
+  outputEv <- paramsLayout . fmap catMaybes . mconcat . (fmap (fmap (:[]))) $ [textAlignmentWidget, superStyleWidget2, constDyn $ Just superStyleWidget]
 
   return ParamsWidget {
     _paramsWidget_paramsEvent = outputEv
