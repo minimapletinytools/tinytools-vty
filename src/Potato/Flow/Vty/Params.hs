@@ -23,6 +23,7 @@ import qualified Data.Maybe
 import qualified Data.Text                         as T
 import qualified Data.Text.Zipper as TZ
 import qualified Data.List.Extra as L
+import qualified Data.Sequence as Seq
 import Data.Tuple.Extra
 
 import qualified Graphics.Vty                      as V
@@ -61,6 +62,50 @@ beginNoNavLayout child = mdo
   return (indexDyn, a)
 
 
+-- Maybe Params stuff
+
+-- | method type for picking out params from SuperSEltLabel
+type ParamsSelector a = (Eq a) => SuperSEltLabel -> Maybe a
+
+-- |
+-- returns Nothing if nothing in the selection has the selected param
+-- returns Just (selection, Nothing) if selection that has the selected param do not share the same value
+selectParamsFromSelection :: (Eq a) => Selection -> ParamsSelector a -> Maybe (Selection, Maybe a)
+selectParamsFromSelection selection ps = r where
+  -- TODO don't do list conversion in between whataver ugh
+  params = catMaybes . toList . fmap (\ssl@(rid,_,_) -> ps ssl >>= \a -> Just (ssl, a)) $ selection
+  values = fmap snd params
+  subSelection = Seq.fromList $ fmap fst params
+  r = case values of
+    [] -> Nothing
+    x:xs -> if L.allSame values
+      then Just (subSelection, Just x)
+      else Just (subSelection, Nothing)
+
+type MaybeParamsWidgetOutputDyn t m = Dynamic t (Maybe (VtyWidget t m (Dynamic t Int, Event t ControllersWithId)))
+type MaybeParamsWidgetFn t m a = Dynamic t (Selection, Maybe a) -> MaybeParamsWidgetOutputDyn t m
+
+holdMaybeParamsWidget :: forall t m a. (MonadWidget t m)
+  => Dynamic t (Maybe (Selection, Maybe a))
+  -> MaybeParamsWidgetFn t m a -- ^ function creating widget, note that it should always return non-nothing but using Maybe type makes life easier
+  -> MaybeParamsWidgetOutputDyn t m
+holdMaybeParamsWidget mInputDyn widgetFn = join . ffor mInputDyn $ \case
+  Nothing -> constDyn Nothing
+  -- eh this is weird, maybe using fromJust is ok due to laziness but I don't care to find out
+  Just _ -> widgetFn (fmap (fromMaybe (Seq.empty, Nothing)) mInputDyn)
+
+emptyWidget :: (Monad m) => VtyWidget t m ()
+emptyWidget = return ()
+
+paramsLayout :: (MonadWidget t m) => Dynamic t [VtyWidget t m (Dynamic t Int, Event t ControllersWithId)] -> VtyWidget t m (Event t ControllersWithId)
+paramsLayout widgets' = (switchHold never =<<) . networkView . ffor widgets' $ \widgets -> fmap snd $ beginNoNavLayout $ col $ do
+  outputs <- forM widgets $ \w -> mdo
+    (sz, ev) <- fixed sz w
+    return ev
+  return $ leftmostWarn "paramsLayout" outputs
+
+
+-- SuperStyle stuff
 data SuperStyleCell = SSC_TL | SSC_TR | SSC_BL | SSC_BR | SSC_V | SSC_H | SSC_Fill
 
 updateFromSuperStyle :: SuperStyleCell -> (SuperStyle -> TZ.TextZipper)
@@ -135,22 +180,9 @@ holdSuperStyleWidget ssDyn = mdo
     return (tl'',v'',bl'',h'',f'',tr'',br'')
   return $ makeSuperStyleEvent tl v bl h f tr br (void $ updated focusDyn)
 
-
-type ParamsSelector a = (Eq a) => SuperSEltLabel -> Maybe a
-
-selectParamsFromSelection :: (Eq a) => Selection -> ParamsSelector a -> Maybe a
-selectParamsFromSelection selection ps = r where
-  params = catMaybes . toList . fmap (\ssl@(rid,_,_) -> ps ssl >>= \a -> Just (rid, a)) $ selection
-  values = fmap snd params
-  r = case values of
-    [] -> Nothing
-    x:xs -> if L.allSame values
-      then Just x
-      else Nothing
-
-
-holdTextAlignmentWidget :: forall t m. (MonadWidget t m) => Dynamic t (Selection, Maybe TextAlign) -> VtyWidget t m (Event t ControllersWithId)
-holdTextAlignmentWidget taDyn = (switchHold never =<<) . networkView . ffor taDyn $ \(selection, mta) -> do
+-- Text Alignment stuff
+holdTextAlignmentWidget :: forall t m. (MonadWidget t m) => MaybeParamsWidgetFn t m TextAlign
+holdTextAlignmentWidget taDyn = ffor taDyn $ \(selection, mta) -> Just $ do
   let
     startAlign = case mta of
       Nothing -> []
@@ -177,17 +209,7 @@ holdTextAlignmentWidget taDyn = (switchHold never =<<) . networkView . ffor taDy
         [] -> Nothing
         x  -> Just $ IM.fromList x
     alignmentParamsEv = push pushAlignmentFn setAlignmentEv
-  return (alignmentParamsEv)
-
-emptyWidget :: (Monad m) => VtyWidget t m ()
-emptyWidget = return ()
-
-paramsLayout :: (MonadWidget t m) => [VtyWidget t m (Dynamic t Int, Event t ControllersWithId)] -> VtyWidget t m (Event t ControllersWithId)
-paramsLayout widgets = fmap snd $ beginNoNavLayout $ col $ do
-  outputs <- forM widgets $ \w -> mdo
-    (sz, ev) <- fixed sz w
-    return ev
-  return $ leftmostWarn "paramsLayout" outputs
+  return (1, alignmentParamsEv)
 
 data SEltParams = SEltParams {
     --_sEltParams_sBox =
@@ -243,8 +265,13 @@ holdParamsWidget ParamsWidgetConfig {..} = do
   let
     selectionDyn = _goatWidget_selection (_pFWidgetCtx_goatWidget _paramsWidgetConfig_pfctx)
     textAlignSelector = (fmap (\(TextStyle ta) -> ta)) . getSEltLabelBoxTextStyle . thd3
-    textAlignInputDyn = fmap (\selection -> (selection, selectParamsFromSelection selection textAlignSelector)) selectionDyn
-    textAlignmentWidget :: VtyWidget t m (Dynamic t Int, Event t ControllersWithId) = fmap (1,) $ holdTextAlignmentWidget textAlignInputDyn
+    mTextAlignInputDyn = fmap (\selection -> selectParamsFromSelection selection textAlignSelector) selectionDyn
+    textAlignmentWidget = holdMaybeParamsWidget mTextAlignInputDyn holdTextAlignmentWidget
+
+
+
+
+
 
 
   let
@@ -282,7 +309,7 @@ holdParamsWidget ParamsWidgetConfig {..} = do
         ssparamsEv = push pushSuperStyleFn setStyleEv
       return (4, ssparamsEv)
 
-  outputEv <- paramsLayout [textAlignmentWidget, superStyleWidget]
+  outputEv <- paramsLayout . fmap catMaybes . mconcat . (fmap (fmap (:[]))) $ [textAlignmentWidget, constDyn $ Just superStyleWidget]
 
   return ParamsWidget {
     _paramsWidget_paramsEvent = outputEv
