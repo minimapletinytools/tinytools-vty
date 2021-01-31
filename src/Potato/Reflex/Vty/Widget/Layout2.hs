@@ -22,7 +22,7 @@ module Potato.Reflex.Vty.Widget.Layout2
   , stretchD
   , col
   , row
-  , dummy
+  , dummyCell
   , beginLayout
   , beginLayoutD
   , tabNavigation
@@ -30,7 +30,7 @@ module Potato.Reflex.Vty.Widget.Layout2
   , LayoutVtyWidget(..)
   , LayoutDebugTree(..)
   , IsLayoutVtyWidget(..)
-  , LayoutReturnData
+  , LayoutReturnData(..)
   ) where
 
 import           Prelude
@@ -232,7 +232,14 @@ runLayoutD ddir mfocus0 (Layout child) = LayoutVtyWidget . ReaderT $ \focusReqIx
     focusReqWithNodeId = attachWith (\fm mix -> mix >>= \ix -> findChildFocus fm ix) (current focusable) (focusReqIx)
     focusChildSelector = fanFocusEv (current $ fmap (fmap snd) focussed) (focusReqWithNodeId)
 
-  return (emptyLayoutDebugTree, (fmap (fmap fst)) focussed, totalKiddos, a)
+  return LayoutReturnData {
+      _layoutReturnData_tree = emptyLayoutDebugTree
+      , _layoutReturnData_focus = (fmap (fmap fst)) focussed
+      , _layoutReturnData_children = totalKiddos
+      , _layoutReturnData_value = a
+    }
+
+
 
 -- | Run a 'Layout' action
 runLayout
@@ -241,7 +248,7 @@ runLayout
   -> Maybe Int -- ^ The positional index of the initially focused tile
   -> Layout t m a -- ^ The 'Layout' widget
   -> LayoutVtyWidget t m a
-runLayout ddir mfocus0 layout = fmap (\(_,_,_,a)->a) $ runLayoutD ddir mfocus0 layout
+runLayout ddir mfocus0 layout = fmap _layoutReturnData_value $ runLayoutD ddir mfocus0 layout
 
 -- | Tiles are the basic building blocks of 'Layout' widgets. Each tile has a constraint
 -- on its size and ability to grow and on whether it can be focused. It also allows its child
@@ -362,8 +369,13 @@ row
 row child = runLayoutD (pure Orientation_Row) (Just 0) child
 
 -- | Testing placeholder DELETE
-dummy :: (Reflex t, Monad m) => LayoutVtyWidget t m (LayoutDebugTree t, Dynamic t (Maybe Int), Int, ())
-dummy = return (emptyLayoutDebugTree, constDyn Nothing, 0, ())
+dummyCell :: (Reflex t, Monad m) => LayoutVtyWidget t m (LayoutReturnData t ())
+dummyCell = return LayoutReturnData {
+    _layoutReturnData_tree = emptyLayoutDebugTree
+    , _layoutReturnData_focus = constDyn Nothing
+    , _layoutReturnData_children = 0
+    , _layoutReturnData_value = ()
+  }
 
 -- | Produces an 'Event' that navigates forward one tile when the Tab key is pressed
 -- and backward one tile when Shift+Tab is pressed.
@@ -387,21 +399,21 @@ clickable child = LayoutVtyWidget . ReaderT $ \focusEv -> do
 beginLayoutD ::
   forall m t a. (Reflex t, MonadHold t m, MonadFix m, MonadNodeId m)
   => LayoutVtyWidget t m (LayoutReturnData t a)
-  -> VtyWidget t m (LayoutDebugTree t, a)
+  -> VtyWidget t m (LayoutReturnData t a)
 beginLayoutD child = mdo
   -- TODO consider unfocusing if this loses focus
   --focussed <- focus
   tabEv <- tabNavigation
-  let focusChildEv = fmap (\(mcur, shift) -> maybe (Just 0) (\cur -> Just $ (shift + cur) `mod` totalKiddos) mcur) (attach (current indexDyn) tabEv)
-  (ldt, indexDyn, totalKiddos, a) <- runIsLayoutVtyWidget child focusChildEv
-  return (ldt, a)
+  let focusChildEv = fmap (\(mcur, shift) -> maybe (Just 0) (\cur -> Just $ (shift + cur) `mod` _layoutReturnData_children) mcur) (attach (current _layoutReturnData_focus) tabEv)
+  lrd@LayoutReturnData{..} <- runIsLayoutVtyWidget child focusChildEv
+  return lrd
 
 -- |
 beginLayout ::
   forall m t b a. (Reflex t, MonadHold t m, MonadFix m, MonadNodeId m)
   => LayoutVtyWidget t m (LayoutReturnData t a)
   -> VtyWidget t m a
-beginLayout = fmap snd . beginLayoutD
+beginLayout = fmap _layoutReturnData_value . beginLayoutD
 
 -- | Retrieve the current orientation of a 'Layout'
 askOrientation :: Monad m => Layout t m (Dynamic t Orientation)
@@ -457,13 +469,18 @@ class IsLayoutReturn t b a where
   getLayoutFocussedDyn :: b -> Dynamic t (Maybe Int)
   getLayoutTree :: b -> LayoutDebugTree t
 
-type LayoutReturnData t a = (LayoutDebugTree t, Dynamic t (Maybe Int), Int, a)
+data LayoutReturnData t a = LayoutReturnData {
+    _layoutReturnData_tree :: LayoutDebugTree t
+    , _layoutReturnData_focus :: Dynamic t (Maybe Int)
+    , _layoutReturnData_children :: Int
+    , _layoutReturnData_value :: a
+  }
 
 instance IsLayoutReturn t (LayoutReturnData t a) a where
-  getLayoutResult (_,_,_,a) = a
-  getLayoutNumChildren (_,_,d,_) = d
-  getLayoutFocussedDyn (_,d,_,_) = d
-  getLayoutTree (tree,_,_,_) = tree
+  getLayoutResult lrd = _layoutReturnData_value lrd
+  getLayoutNumChildren lrd = _layoutReturnData_children lrd
+  getLayoutFocussedDyn lrd = _layoutReturnData_focus lrd
+  getLayoutTree lrd = _layoutReturnData_tree lrd
 
 instance Reflex t => IsLayoutReturn t a a where
   getLayoutResult = id

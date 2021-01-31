@@ -62,10 +62,10 @@ easyExample = mainWidget $ do
       b <- stretch $ textButtonStatic def "RHYME"
       c <- stretch $ textButtonStatic def "A BIG CRIME"
       return (a,b,c)
-    fixedD 3 $ dummy
-    fixedD 3 $ dummy
-    fixedD 3 $ dummy
-    fixedD 3 $ dummy
+    fixedD 3 $ dummyCell
+    fixedD 3 $ dummyCell
+    fixedD 3 $ dummyCell
+    fixedD 3 $ dummyCell
     return ()
   inp <- input
   return $ fforMaybe inp $ \case
