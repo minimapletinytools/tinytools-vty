@@ -35,34 +35,29 @@ module Potato.Reflex.Vty.Widget.Layout2
 
 import           Prelude
 
-import qualified Relude                 as R
-
 import           Control.Monad.Identity (Identity (..))
-import           Control.Monad.NodeId   (MonadNodeId (..), NodeId (..))
+import           Control.Monad.NodeId   (MonadNodeId (..), NodeId)
 import           Control.Monad.Reader
 import           Data.Bimap             (Bimap)
 import qualified Data.Bimap             as Bimap
 import           Data.Default           (Default (..))
-import           Data.Dependent.Map     (DMap, DSum ((:=>)))
+import           Data.Dependent.Map     (DSum ((:=>)))
 import qualified Data.Dependent.Map     as DMap
 import           Data.Functor.Misc
 import           Data.Map               (Map)
 import qualified Data.Map               as Map
 import qualified Data.Map.Internal      as Map (Map (Bin, Tip))
-import           Data.Maybe             (fromMaybe, isJust)
+import           Data.Maybe             (fromMaybe)
 import           Data.Monoid            hiding (First (..))
 import           Data.Ratio             ((%))
 import           Data.Semigroup         (First (..))
 import           Data.Traversable       (mapAccumL)
 import           Data.Tuple.Extra
 import qualified Graphics.Vty           as V
-import           Unsafe.Coerce
 
 import           Reflex
 import           Reflex.Host.Class      (MonadReflexCreateTrigger)
 import           Reflex.Vty.Widget
-
-import           Control.Exception      (assert)
 
 -- | The main-axis orientation of a 'Layout' widget
 data Orientation = Orientation_Column
@@ -116,15 +111,15 @@ instance (Adjustable t m, MonadFix m, MonadHold t m) => Adjustable t (Layout t m
   traverseDMapWithKeyWithAdjustWithMove f m e = Layout $ traverseDMapWithKeyWithAdjustWithMove (\k v -> unLayout $ f k v) m e
 
 findNearestFloor_ :: (Ord k) => k -> (k, a) -> (k, a) -> Map k a -> Maybe (k, a)
-findNearestFloor_ target leftmost parent Map.Tip = if target < fst leftmost
+findNearestFloor_ target leftValue parent Map.Tip = if target < fst leftValue
   then Nothing -- error $ "Map.findNearestFloorSure: map has no element <= " <> show target
   else if target < fst parent
-    then Just leftmost
+    then Just leftValue
     else Just parent
-findNearestFloor_ target leftmost _ (Map.Bin _ k a l r) = if target == k
+findNearestFloor_ target leftValue _ (Map.Bin _ k a l r) = if target == k
   then Just (k, a)
   else if target < k
-    then findNearestFloor_ target leftmost (k, a) l
+    then findNearestFloor_ target leftValue (k, a) l
     else findNearestFloor_ target (k, a) (k, a) r
 
 findNearestFloor :: (Ord k) => k -> Map k a -> Maybe (k,a)
@@ -137,17 +132,17 @@ fanFocusEv focussed focusReqIx = fan $ attachWith attachfn focussed focusReqIx w
   attachfn mkv0 mkv1 = case mkv1 of
     Nothing -> case mkv0 of
       Nothing      -> DMap.empty
-      Just (k0,v0) -> DMap.fromList [Const2 k0 :=> Identity Nothing]
+      Just (k0,_) -> DMap.fromList [Const2 k0 :=> Identity Nothing]
     Just (k1,v1) -> case mkv0 of
       Nothing -> DMap.fromList [Const2 k1 :=> Identity (Just v1)]
       Just (k0,v0) | k0 == k1 && v0 == v1 -> DMap.empty
-      Just (k0,v0) | k0 == k1 -> DMap.fromList [Const2 k1 :=> Identity (Just v1)]
-      Just (k0,v0) -> DMap.fromList [Const2 k0 :=> Identity Nothing,
+      Just (k0,_) | k0 == k1 -> DMap.fromList [Const2 k1 :=> Identity (Just v1)]
+      Just (k0,_) -> DMap.fromList [Const2 k0 :=> Identity Nothing,
                           Const2 k1 :=> Identity (Just v1)]
 
 -- | Run a 'Layout' action
 runLayoutL
-  :: forall t m a. (Reflex t, MonadFix m, MonadHold t m, Monad m, MonadNodeId m)
+  :: forall t m a. (Reflex t, MonadFix m, MonadHold t m)
   => Dynamic t Orientation -- ^ The main-axis 'Orientation' of this 'Layout'
   -> Maybe Int -- ^ The positional index of the initially focused tile_
   -> Layout t m a -- ^ The 'Layout' widget
@@ -246,7 +241,7 @@ runLayout
 runLayout ddir mfocus0 layout = fmap _layoutReturnData_value $ runLayoutL ddir mfocus0 layout
 
 tile_
-  :: forall t b widget x m a. (Reflex t, IsLayoutReturn t b a, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
+  :: forall t b widget x m a. (Reflex t, IsLayoutReturn t b a, IsLayoutVtyWidget widget t m, MonadFix m, MonadNodeId m)
   => TileConfig t -- ^ The tile_'s configuration
   -> widget t m (Event t x, b) -- ^ A child widget. The 'Event' that it returns is used to request that it be focused.
   -> Layout t m a
@@ -293,7 +288,7 @@ tile_ (TileConfig con focusable) child = mdo
 -- on its size and ability to grow and on whether it can be focused. It also allows its child
 -- widget to request focus.
 tile
-  :: forall t b widget x m a. (Reflex t, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
+  :: forall t widget x m a. (Reflex t, IsLayoutVtyWidget widget t m, MonadFix m, MonadNodeId m)
   => TileConfig t -- ^ The tile's configuration
   -> widget t m (Event t x, a) -- ^ A child widget. The 'Event' that it returns is used to request that it be focused.
   -> Layout t m a
@@ -313,7 +308,7 @@ instance Reflex t => Default (TileConfig t) where
 
 
 fixed_
-  :: (Reflex t, IsLayoutReturn t b a, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
+  :: (Reflex t, IsLayoutReturn t b a, IsLayoutVtyWidget widget t m, MonadFix m, MonadNodeId m)
   => Dynamic t Int
   -> widget t m b
   -> Layout t m a
@@ -321,7 +316,7 @@ fixed_ sz = tile_ (def { _tile_Config_constraint =  Constraint_Fixed <$> sz }) .
 
 -- | Use this variant to start a sub layout.
 fixedL
-  :: (Reflex t, Monad m, MonadFix m, MonadNodeId m)
+  :: (Reflex t, MonadFix m, MonadNodeId m)
   => Dynamic t Int
   -> LayoutVtyWidget t m (LayoutReturnData t a)
   -> Layout t m a
@@ -329,21 +324,21 @@ fixedL = fixed_
 
 -- | A 'tile' of a fixed size that is focusable and gains focus on click
 fixed
-  :: (Reflex t, Monad m, MonadFix m, MonadNodeId m)
+  :: (Reflex t, MonadFix m, MonadNodeId m)
   => Dynamic t Int
   -> VtyWidget t m a
   -> Layout t m a
 fixed = fixed_
 
 stretch_
-  :: (Reflex t, IsLayoutReturn t b a, IsLayoutVtyWidget widget t m, Monad m, MonadFix m, MonadNodeId m)
+  :: (Reflex t, IsLayoutReturn t b a, IsLayoutVtyWidget widget t m, MonadFix m, MonadNodeId m)
   => widget t m b
   -> Layout t m a
 stretch_ = tile_ def . clickable
 
 -- | Use this variant to start a sub layout.
 stretchL
-  :: (Reflex t, Monad m, MonadFix m, MonadNodeId m)
+  :: (Reflex t, MonadFix m, MonadNodeId m)
   => LayoutVtyWidget t m (LayoutReturnData t a)
   -> Layout t m a
 stretchL = stretch_
@@ -351,7 +346,7 @@ stretchL = stretch_
 -- | A 'tile' that can stretch (i.e., has no fixed size) and has a minimum size of 0.
 -- This tile is focusable and gains focus on click.
 stretch
-  :: (Reflex t, Monad m, MonadFix m, MonadNodeId m)
+  :: (Reflex t, MonadFix m, MonadNodeId m)
   => VtyWidget t m a
   -> Layout t m a
 stretch = stretch_
@@ -401,7 +396,7 @@ clickable child = LayoutVtyWidget . ReaderT $ \focusEv -> do
 -- TODO look into making a variant of this function that takes a navigation event
 -- | Use this variant to begin a layout if you need its "LayoutReturnData"
 beginLayoutL ::
-  forall m t a. (Reflex t, MonadHold t m, MonadFix m, MonadNodeId m)
+  forall m t a. (Reflex t, MonadHold t m, MonadFix m)
   => LayoutVtyWidget t m (LayoutReturnData t a)
   -> VtyWidget t m (LayoutReturnData t a)
 beginLayoutL child = mdo
@@ -414,7 +409,7 @@ beginLayoutL child = mdo
 
 -- | Begin a layout using tab and shift-tab to navigate
 beginLayout ::
-  forall m t b a. (Reflex t, MonadHold t m, MonadFix m, MonadNodeId m)
+  forall m t a. (Reflex t, MonadHold t m, MonadFix m, MonadNodeId m)
   => LayoutVtyWidget t m (LayoutReturnData t a)
   -> VtyWidget t m a
 beginLayout = fmap _layoutReturnData_value . beginLayoutL
@@ -430,8 +425,7 @@ data Constraint = Constraint_Fixed Int
 
 -- | Compute the size of each widget "@k@" based on the total set of 'Constraint's
 computeSizes
-  :: Ord k
-  => Int
+  :: Int
   -> Map k (a, Constraint)
   -> Map k (a, Int)
 computeSizes available constraints =
@@ -486,7 +480,7 @@ instance Reflex t => IsLayoutReturn t a a where
   getLayoutFocussedDyn _ = constDyn Nothing
   getLayoutTree _ = emptyLayoutDebugTree
 
-class IsLayoutVtyWidget l t (m :: * -> *) where
+class IsLayoutVtyWidget l t m where
   runIsLayoutVtyWidget :: l t m a -> Event t (Maybe Int) -> VtyWidget t m a
 
 newtype LayoutVtyWidget t m a = LayoutVtyWidget {
