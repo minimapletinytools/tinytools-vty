@@ -20,7 +20,7 @@ import           Potato.Flow.Vty.Tools
 import           Potato.Reflex.Vty.Helpers
 import           Potato.Reflex.Vty.Popup
 import           Potato.Reflex.Vty.Widget
-
+import qualified Potato.Reflex.Vty.Host
 
 import           Control.Concurrent
 import           Control.Monad.Fix
@@ -44,6 +44,34 @@ import           Reflex.Potato.Helpers
 import           Reflex.Vty
 
 
+-- TODO move all this into Potato.Reflex.Vty.Host or something whatever
+-- | Sets up the top-level context for a 'VtyWidget' and runs it with that context
+potatoMainWidgetWithHandle
+  :: V.Vty
+  -> (forall t m. (MonadVtyApp t m, MonadNodeId m) => VtyWidget t m (Event t ()))
+  -> IO ()
+potatoMainWidgetWithHandle vty child =
+  Potato.Reflex.Vty.Host.runVtyAppWithHandle vty $ \dr0 inp -> do
+    size <- holdDyn dr0 $ fforMaybe inp $ \case
+      V.EvResize w h -> Just (w, h)
+      _ -> Nothing
+    let inp' = fforMaybe inp $ \case
+          V.EvResize {} -> Nothing
+          x -> Just x
+    let ctx = VtyWidgetCtx
+          { _vtyWidgetCtx_width = fmap fst size
+          , _vtyWidgetCtx_height = fmap snd size
+          , _vtyWidgetCtx_input = inp'
+          , _vtyWidgetCtx_focus = constDyn True
+          }
+    (shutdown, images) <- runNodeIdT $ runVtyWidget ctx $ do
+      tellImages . ffor (current size) $ \(w, h) -> [V.charFill V.defAttr ' ' w h]
+      child
+    return $ Potato.Reflex.Vty.Host.VtyResult
+      { _vtyResult_picture = fmap (V.picForLayers . reverse) images
+      , _vtyResult_shutdown = shutdown
+      }
+
 -- | run a VtyWidget using term width map written to disk with write-term-width for the current terminal
 -- uses default if the file does not exist
 potatoMainWidget
@@ -64,7 +92,13 @@ potatoMainWidget child = do
           , V.termWidthMaps = [(fromJust mTermName, widthMapFile)]
         }
   vty <- V.mkVty cfg
-  mainWidgetWithHandle vty child
+  potatoMainWidgetWithHandle vty child
+
+
+
+
+
+
 
 flowMain :: IO ()
 flowMain = do
