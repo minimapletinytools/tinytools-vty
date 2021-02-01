@@ -34,6 +34,19 @@ import Potato.Reflex.Vty.Widget.Layout2
 import           Reflex.Potato.Helpers
 
 
+-- | Default vty event handler for text inputs
+updateTextZipperForSingleCharacter
+  :: V.Event -- ^ The vty event to handle
+  -> TZ.TextZipper -- ^ The zipper to modify
+  -> TZ.TextZipper
+updateTextZipperForSingleCharacter ev = case ev of
+  V.EvKey (V.KChar '\t') [] -> id
+  V.EvKey (V.KChar k) [] -> const $ TZ.insertChar k TZ.empty
+  V.EvKey V.KBS [] -> const TZ.empty
+  V.EvKey V.KDel [] -> const TZ.empty
+  V.EvKey (V.KChar 'u') [V.MCtrl] -> const TZ.empty
+  _ -> id
+
 
 paramsNavigation :: (Reflex t, Monad m) => VtyWidget t m (Event t Int)
 paramsNavigation = do
@@ -82,7 +95,13 @@ selectParamsFromSelection ps selection = r where
       then Just (subSelection, Just x)
       else Just (subSelection, Nothing)
 
+
 type MaybeParamsWidgetOutputDyn t m = Dynamic t (Maybe (VtyWidget t m (Dynamic t Int, Event t ControllersWithId)))
+
+-- I think the Dynamic is not necessary because the widget gets remade by "paramsLayout`"" each time the dynamic changes anyways
+-- you could be smarter about this and only call "holdMaybeParamsWidget" when the widget appears/dissapears
+-- but I'm not going to bother remimplementing this...
+-- TODO actually you need to do this because tabbing informaiton gets lost each time the widget is recerated...
 type MaybeParamsWidgetFn t m a = Dynamic t (Selection, Maybe a) -> MaybeParamsWidgetOutputDyn t m
 
 -- |
@@ -121,19 +140,51 @@ updateFromSuperStyle ssc = TZ.fromText . T.singleton . gettfn ssc where
   gettfn SSC_Fill = (\case
     FillStyle_Simple c -> c) . _superStyle_fill
 
+-- copy pasta from Reflex.Vty.Widget.Input.textInput a lot of stuff in here is not necessary
+-- TODO DELETE simplify.. you don't need TextZipper
+cellInput
+  :: (Reflex t, MonadHold t m, MonadFix m)
+  => Event t (TZ.TextZipper -> TZ.TextZipper)
+  -> TZ.TextZipper
+  -> VtyWidget t m (Dynamic t Text)
+cellInput modifyEv c0 = mdo
+  i <- input
+  f <- focus
+  dh <- displayHeight
+  dw <- displayWidth
+  rec v <- foldDyn ($) c0 $ mergeWith (.)
+        [ fmap updateTextZipperForSingleCharacter i
+        , modifyEv
+        , let displayInfo = (,) <$> current rows <*> scrollTop
+          in ffor (attach displayInfo click) $ \((dl, st), MouseDown _ (mx, my) _) ->
+            TZ.goToDisplayLinePosition mx (st + my) dl
+        ]
+      click <- mouseDown V.BLeft
+      let cursorAttrs = ffor f $ \x -> if x then cursorAttributes else V.defAttr
+      let rows = (\w s c -> TZ.displayLines w V.defAttr c s)
+            <$> dw
+            <*> (TZ.mapZipper <$> (constDyn id) <*> v)
+            <*> cursorAttrs
+          img = images . TZ._displayLines_spans <$> rows
+      y <- holdUniqDyn $ TZ._displayLines_cursorY <$> rows
+      let newScrollTop :: Int -> (Int, Int) -> Int
+          newScrollTop st (h, cursorY)
+            | cursorY < st = cursorY
+            | cursorY >= st + h = cursorY - h + 1
+            | otherwise = st
+      let hy = attachWith newScrollTop scrollTop $ updated $ zipDyn dh y
+      scrollTop <- hold 0 hy
+      tellImages $ (\imgs st -> (:[]) . V.vertCat $ drop st imgs) <$> current img <*> scrollTop
+  return $ TZ.value <$> v
+
 makeSuperStyleTextEntry :: (Reflex t, MonadHold t m, MonadFix m) => SuperStyleCell -> Dynamic t (Maybe SuperStyle) -> VtyWidget t m (Behavior t PChar)
 makeSuperStyleTextEntry ssc mssDyn = do
   mss0 <- sample . current $ mssDyn
-  let
-    -- TODO reset TZ to BOL each time character is input and/or limit text entry to 1 char
-    config = def {
-        _textInputConfig_initialValue = case mss0 of
-          Nothing -> ""
-          Just ss0 -> updateFromSuperStyle ssc ss0
-        , _textInputConfig_modify = fmap (maybe id (\ss -> const (updateFromSuperStyle ssc ss))) (updated mssDyn)
-      }
-  ti <- textInput config
-  return . current . fmap (\t -> maybe ' ' (\(c,_) -> c) (T.uncons t)) $ _textInput_value ti
+  let modifyEv = (fmap (maybe id (\ss -> const (updateFromSuperStyle ssc ss))) (updated mssDyn))
+  ti <- cellInput modifyEv $ case mss0 of
+    Nothing -> ""
+    Just ss0 -> updateFromSuperStyle ssc ss0
+  return . current . fmap (\t -> maybe ' ' (\(c,_) -> c) (T.uncons t)) $ ti
 
 makeSuperStyleEvent :: (Reflex t)
   => Behavior t PChar
@@ -197,6 +248,7 @@ holdSuperStyleWidget inputDyn = constDyn . Just $ mdo
     fforfn (selection, ss) = case Data.Maybe.mapMaybe (fmapfn ss) . toList $ selection of
       [] -> Nothing
       x  -> Just $ IM.fromList x
+    -- TODO maybe just do it when any of the cell dynamics are updated rather than when focus changes...
     outputEv = fforMaybe (attach (current selectionDyn) $ makeSuperStyleEvent tl v bl h f tr br (void $ updated focusDyn)) fforfn
   return (4, outputEv)
 
@@ -305,5 +357,5 @@ holdParamsWidget ParamsWidgetConfig {..} = do
   outputEv <- paramsLayout . fmap catMaybes . mconcat . (fmap (fmap (:[]))) $ [textAlignmentWidget, superStyleWidget2, constDyn $ Just superStyleWidget]
 
   return ParamsWidget {
-    _paramsWidget_paramsEvent = outputEv
+    _paramsWidget_paramsEvent = traceEvent "wtf" $ outputEv
   }
