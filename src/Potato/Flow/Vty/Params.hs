@@ -41,7 +41,7 @@ updateTextZipperForSingleCharacter
   -> TZ.TextZipper
 updateTextZipperForSingleCharacter ev = case ev of
   V.EvKey (V.KChar '\t') [] -> id
-  V.EvKey (V.KChar k) [] -> const $ TZ.insertChar k TZ.empty
+  V.EvKey (V.KChar k) [] -> const $ TZ.top $ TZ.insertChar k TZ.empty
   V.EvKey V.KBS [] -> const TZ.empty
   V.EvKey V.KDel [] -> const TZ.empty
   V.EvKey (V.KChar 'u') [V.MCtrl] -> const TZ.empty
