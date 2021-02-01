@@ -2,7 +2,7 @@
 {-# LANGUAGE RecordWildCards      #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module Potato.Reflex.Vty.PopupSpec
+module Potato.Reflex.Vty.Widget.PopupSpec
   ( spec
   )
 where
@@ -13,7 +13,7 @@ import           Test.Hspec
 import           Test.Hspec.Contrib.HUnit   (fromHUnitTest)
 import           Test.HUnit
 
-import           Potato.Reflex.Vty.Popup
+import           Potato.Reflex.Vty.Widget.Popup
 
 import           Control.Monad.IO.Class     (liftIO)
 import           Control.Monad.Ref

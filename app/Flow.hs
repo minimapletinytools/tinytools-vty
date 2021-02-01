@@ -18,7 +18,7 @@ import           Potato.Flow.Vty.Params
 import           Potato.Flow.Vty.PFWidgetCtx
 import           Potato.Flow.Vty.Tools
 import           Potato.Reflex.Vty.Helpers
-import           Potato.Reflex.Vty.Popup
+import           Potato.Reflex.Vty.Widget.Popup
 import           Potato.Reflex.Vty.Widget
 import qualified Potato.Reflex.Vty.Host
 

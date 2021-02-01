@@ -1,7 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE RecursiveDo     #-}
 
-module Potato.Reflex.Vty.Popup (
+module Potato.Reflex.Vty.Widget.Popup (
   popupPaneSimple
 ) where
 
