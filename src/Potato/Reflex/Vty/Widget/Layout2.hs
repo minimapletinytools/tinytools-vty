@@ -4,12 +4,12 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE RankNTypes                 #-}
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE RecursiveDo                #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE UndecidableInstances       #-}
-{-# LANGUAGE TypeApplications       #-}
-{-# LANGUAGE RankNTypes       #-}
-{-# LANGUAGE ScopedTypeVariables       #-}
 
 
 module Potato.Reflex.Vty.Widget.Layout2
@@ -32,7 +32,7 @@ module Potato.Reflex.Vty.Widget.Layout2
   , tabNavigation
   , askOrientation
   , LayoutVtyWidget(..)
-  , LayoutDebugTree(..)
+  , LayoutTree(..)
   , IsLayoutVtyWidget(..)
   , LayoutReturnData(..)
   ) where
@@ -46,7 +46,7 @@ import           Data.Bimap             (Bimap)
 import qualified Data.Bimap             as Bimap
 import           Data.Default           (Default (..))
 import qualified Data.Dependent.Map     as DMap
-import Data.Dependent.Sum (DSum((:=>)))
+import           Data.Dependent.Sum     (DSum ((:=>)))
 import           Data.Functor.Misc
 import           Data.Map               (Map)
 import qualified Data.Map               as Map
@@ -56,6 +56,7 @@ import           Data.Monoid            hiding (First (..))
 import           Data.Ratio             ((%))
 import           Data.Semigroup         (First (..))
 import           Data.Traversable       (mapAccumL)
+import qualified Data.Tree              as Tree
 import qualified Graphics.Vty           as V
 
 import           Reflex
@@ -85,7 +86,7 @@ data LayoutCtx t = LayoutCtx
 -- switchboard for focus requests. See 'tile_' and 'runLayout'.
 newtype Layout t m a = Layout
   { unLayout :: EventWriterT t (First (NodeId, Int))
-      (DynamicWriterT t (Endo [(NodeId, (Bool, Constraint), LayoutDebugTree t, Int)])
+      (DynamicWriterT t (Endo [(NodeId, (Bool, Constraint), LayoutTree t, Int)])
         (ReaderT (LayoutCtx t)
           (VtyWidget t m))) a
   } deriving
@@ -134,7 +135,7 @@ fanFocusEv :: (Reflex t) => Behavior t (Maybe (NodeId, Int)) -> Event t (Maybe (
 fanFocusEv focussed focusReqIx = fan $ attachWith attachfn focussed focusReqIx where
   attachfn mkv0 mkv1 = case mkv1 of
     Nothing -> case mkv0 of
-      Nothing      -> DMap.empty
+      Nothing     -> DMap.empty
       Just (k0,_) -> DMap.fromList [Const2 k0 :=> Identity Nothing]
     Just (k1,v1) -> case mkv0 of
       Nothing -> DMap.fromList [Const2 k1 :=> Identity (Just v1)]
@@ -166,7 +167,7 @@ runLayoutL ddir mfocus0 (Layout child) = LayoutVtyWidget . ReaderT $ \focusReqIx
         . Map.fromList
         . zip [0::Integer ..]
         $ qs
-      solutionMap = ffor solution $ \ss -> ffor ss $ \(offset, sz) -> LayoutSegment
+      solutionMap :: _ = ffor solution $ \ss -> ffor ss $ \(offset, sz) -> LayoutSegment
         { _layoutSegment_offset = offset
         , _layoutSegment_size = sz
         }
@@ -201,6 +202,13 @@ runLayoutL ddir mfocus0 (Layout child) = LayoutVtyWidget . ReaderT $ \focusReqIx
         -- TODO handle Nothing case in both places (so that event produces Nothing in this case)
         $ leftmost [ fmap Right . fmap getFirst $ focusReq, Left <$> (fmapMaybe id focusReqIx)]
 
+  --let
+    --selfRegion :: DynRegion t = DynRegion 0 0 dw dh
+    --forest' :: Dynamic t [LayoutTree] = fmap (fmap (Tree.Node selfRegion) . fmap (\(_,_,t,_)->t)) queries
+    -- TODO zip with solutionMap
+    -- TODO if tree is emptyLayoutTree (has no children) than use solutionMap to generate layout
+    -- otherwise, offset layout by x y and assert than sz are equal
+
 
   fm0 <- sample . current $ focusable
   totalKiddos <- sample . current $ fmap (sum . fmap (\(_,_,_,k) -> k)) queries
@@ -228,7 +236,7 @@ runLayoutL ddir mfocus0 (Layout child) = LayoutVtyWidget . ReaderT $ \focusReqIx
     focusChildSelector = fanFocusEv (current $ fmap (fmap snd) focussed) (focusReqWithNodeId)
 
   return LayoutReturnData {
-      _layoutReturnData_tree = emptyLayoutDebugTree
+      _layoutReturnData_tree = emptyLayoutTree
       , _layoutReturnData_focus = (fmap (fmap fst)) focussed
       , _layoutReturnData_children = totalKiddos
       , _layoutReturnData_value = a
@@ -305,7 +313,7 @@ tile = tile_
 data TileConfig t = TileConfig
   { _tileConfig_constraint :: Dynamic t Constraint
     -- ^ 'Constraint' on the tile_'s size
-  , _tile_Config_focusable  :: Dynamic t Bool
+  , _tile_Config_focusable :: Dynamic t Bool
     -- ^ Whether the tile_ is focusable
   }
 
@@ -374,7 +382,7 @@ row child = runLayoutL (pure Orientation_Row) (Just 0) child
 -- | Use to make placeholder empty cells in sub layouts.
 dummyCell :: (Reflex t, Monad m) => LayoutVtyWidget t m (LayoutReturnData t ())
 dummyCell = return LayoutReturnData {
-    _layoutReturnData_tree = emptyLayoutDebugTree
+    _layoutReturnData_tree = emptyLayoutTree
     , _layoutReturnData_focus = constDyn Nothing
     , _layoutReturnData_children = 0
     , _layoutReturnData_value = ()
@@ -453,25 +461,23 @@ computeEdges :: (Ord k) => Map k (a, Int) -> Map k (a, (Int, Int))
 computeEdges = fst . Map.foldlWithKey' (\(m, offset) k (a, sz) ->
   (Map.insert k (a, (offset, sz)) m, sz + offset)) (Map.empty, 0)
 
--- TODO FINISH
--- but it's weird cuz a leaf node won't know it's PosDim until combined with a Region...
 -- | Dynamic sizing information on a layout hierarchy (intended for testing)
-data LayoutDebugTree t = LayoutDebugTree_Branch [LayoutDebugTree t] | LayoutDebugTree_Leaf
+type LayoutTree t = Tree.Tree (DynRegion t)
 
-emptyLayoutDebugTree :: LayoutDebugTree t
-emptyLayoutDebugTree = LayoutDebugTree_Leaf
+emptyLayoutTree :: (Reflex t) => LayoutTree t
+emptyLayoutTree = Tree.Node (DynRegion 0 0 0 0) []
 
 class IsLayoutReturn t b a where
   getLayoutResult :: b -> a
   getLayoutNumChildren :: b -> Int
   getLayoutFocussedDyn :: b -> Dynamic t (Maybe Int)
-  getLayoutTree :: b -> LayoutDebugTree t
+  getLayoutTree :: b -> LayoutTree t
 
 data LayoutReturnData t a = LayoutReturnData {
-    _layoutReturnData_tree :: LayoutDebugTree t
-    , _layoutReturnData_focus :: Dynamic t (Maybe Int)
+    _layoutReturnData_tree       :: LayoutTree t
+    , _layoutReturnData_focus    :: Dynamic t (Maybe Int)
     , _layoutReturnData_children :: Int
-    , _layoutReturnData_value :: a
+    , _layoutReturnData_value    :: a
   }
 
 instance IsLayoutReturn t (LayoutReturnData t a) a where
@@ -484,7 +490,7 @@ instance Reflex t => IsLayoutReturn t a a where
   getLayoutResult = id
   getLayoutNumChildren _ = 1
   getLayoutFocussedDyn _ = constDyn Nothing
-  getLayoutTree _ = emptyLayoutDebugTree
+  getLayoutTree _ = emptyLayoutTree
 
 class IsLayoutVtyWidget l t m where
   runIsLayoutVtyWidget :: l t m a -> Event t (Maybe Int) -> VtyWidget t m a

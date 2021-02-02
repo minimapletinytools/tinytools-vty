@@ -19,19 +19,21 @@ import           Control.Monad.Fix
 import           Control.Monad.NodeId
 import           Data.Dependent.Sum                (DSum ((:=>)))
 import qualified Data.IntMap                       as IM
+import qualified Data.List.Extra                   as L
 import qualified Data.Maybe
+import qualified Data.Sequence                     as Seq
 import qualified Data.Text                         as T
-import qualified Data.Text.Zipper as TZ
-import qualified Data.List.Extra as L
-import qualified Data.Sequence as Seq
-import Data.Tuple.Extra
+import qualified Data.Text.Zipper                  as TZ
+import           Data.Tuple.Extra
 
 import qualified Graphics.Vty                      as V
+import           Potato.Reflex.Vty.Widget.Layout2
 import           Reflex
 import           Reflex.Network
-import           Reflex.Vty hiding (row, col, fixed, stretch, tile, Orientation (..), Constraint (..))
-import Potato.Reflex.Vty.Widget.Layout2
 import           Reflex.Potato.Helpers
+import           Reflex.Vty                        hiding (Constraint (..),
+                                                    Orientation (..), col,
+                                                    fixed, row, stretch, tile)
 
 
 -- | Default vty event handler for text inputs
@@ -182,7 +184,7 @@ makeSuperStyleTextEntry ssc mssDyn = do
   mss0 <- sample . current $ mssDyn
   let modifyEv = (fmap (maybe id (\ss -> const (updateFromSuperStyle ssc ss))) (updated mssDyn))
   ti <- cellInput modifyEv $ case mss0 of
-    Nothing -> ""
+    Nothing  -> ""
     Just ss0 -> updateFromSuperStyle ssc ss0
   return . current . fmap (\t -> maybe ' ' (\(c,_) -> c) (T.uncons t)) $ ti
 
@@ -261,10 +263,10 @@ holdTextAlignmentWidget :: forall t m. (MonadWidget t m) => MaybeParamsWidgetFn 
 holdTextAlignmentWidget taDyn = ffor taDyn $ \(selection, mta) -> Just $ do
   let
     startAlign = case mta of
-      Nothing -> []
-      Just TextAlign_Left -> [0]
+      Nothing               -> []
+      Just TextAlign_Left   -> [0]
       Just TextAlign_Center -> [1]
-      Just TextAlign_Right -> [2]
+      Just TextAlign_Right  -> [2]
 
   setAlignmentEv' <- radioList (constDyn ["left","center","right"]) (constDyn startAlign)
   let

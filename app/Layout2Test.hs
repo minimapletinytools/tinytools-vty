@@ -5,9 +5,9 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE RankNTypes            #-}
+{-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE RecursiveDo           #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
-{-# LANGUAGE RecordWildCards   #-}
 {-# OPTIONS_GHC -threaded #-}
 
 module Layout2Test (
@@ -23,18 +23,22 @@ import           Control.Monad
 import           Control.Monad.Fix
 import           Control.Monad.NodeId
 import           Data.Functor.Misc
-import           Data.Map                (Map)
-import qualified Data.Map                as Map
+import           Data.Map                         (Map)
+import qualified Data.Map                         as Map
 import           Data.Maybe
-import           Data.Text               (Text)
-import qualified Data.Text               as T
-import qualified Data.Text.Zipper        as TZ
-import qualified Graphics.Vty            as V
+import           Data.Text                        (Text)
+import qualified Data.Text                        as T
+import qualified Data.Text.Zipper                 as TZ
+import qualified Graphics.Vty                     as V
+import           Potato.Reflex.Vty.Widget.Layout2
 import           Reflex
 import           Reflex.Class.Switchable
 import           Reflex.Network
-import           Reflex.Vty hiding (row, col, fixed, stretch, tile, TileConfig(..), tabNavigation, runLayout, Orientation (..), Constraint (..))
-import Potato.Reflex.Vty.Widget.Layout2
+import           Reflex.Vty                       hiding (Constraint (..),
+                                                   Orientation (..),
+                                                   TileConfig (..), col, fixed,
+                                                   row, runLayout, stretch,
+                                                   tabNavigation, tile)
 
 
 easyExample :: IO ()

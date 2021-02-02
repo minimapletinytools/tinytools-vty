@@ -226,6 +226,9 @@ runReflexVtyTestApp r0 rtm = do
   inp <- makeInputs
   runReflexVtyTestT r0 inp getApp rtm
 
+-- TODO TemplateHaskell nonsense to generate ReflexVtyTestApp??
+-- or maybe you want to add this in the base library
+
 
 -- | creates a 'DynRegion' in absolute coordinates from a child DynRegion in the parent DynRegion coordinates
 -- this method is intended for tracking the 'DynRegion' of 'VtyWidget's created through the 'pane' method
