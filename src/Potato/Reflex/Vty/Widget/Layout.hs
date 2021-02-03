@@ -387,14 +387,14 @@ col
   :: (Reflex t, MonadFix m, MonadHold t m, MonadNodeId m)
   => Layout t m a
   -> LayoutVtyWidget t m (LayoutReturnData t a)
-col child = runLayoutL (pure Orientation_Column) (Just 0) child
+col child = runLayoutL (pure Orientation_Column) (Nothing) child
 
 -- | A version of 'runLayout' that arranges tiles in a row
 row
   :: (Reflex t, MonadFix m, MonadHold t m, MonadNodeId m)
   => Layout t m a
   -> LayoutVtyWidget t m (LayoutReturnData t a)
-row child = runLayoutL (pure Orientation_Row) (Just 0) child
+row child = runLayoutL (pure Orientation_Row) (Nothing) child
 
 -- | Use to make placeholder empty cells in sub layouts.
 dummyCell :: (Reflex t, Monad m) => LayoutVtyWidget t m (LayoutReturnData t ())

@@ -27,7 +27,7 @@ import qualified Data.Text.Zipper                  as TZ
 import           Data.Tuple.Extra
 
 import qualified Graphics.Vty                      as V
-import           Potato.Reflex.Vty.Widget.Layout2
+import           Potato.Reflex.Vty.Widget.Layout
 import           Reflex
 import           Reflex.Network
 import           Reflex.Potato.Helpers
