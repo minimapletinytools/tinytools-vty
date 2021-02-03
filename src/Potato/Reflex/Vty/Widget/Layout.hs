@@ -86,7 +86,7 @@ data LayoutCtx t = LayoutCtx
 -- switchboard for focus requests. See 'tile_' and 'runLayout'.
 newtype Layout t m a = Layout
   { unLayout :: EventWriterT t (First (NodeId, Int))
-      (DynamicWriterT t (Endo [(NodeId, (Bool, Constraint), LayoutTree t, Int)])
+      (DynamicWriterT t (Endo [(NodeId, (Bool, Constraint), Dynamic t LayoutTree, Int)])
         (ReaderT (LayoutCtx t)
           (VtyWidget t m))) a
   } deriving
@@ -145,17 +145,13 @@ fanFocusEv focussed focusReqIx = fan $ attachWith attachfn focussed focusReqIx w
                           Const2 k1 :=> Identity (Just v1)]
 
 
-translateLayoutTree :: (Reflex t) => Dynamic t (Map NodeId LayoutSegment) -> Orientation -> NodeId -> LayoutTree t -> LayoutTree t
-translateLayoutTree solutionMap orient nid lt = r where
-  lsdyn = fmap (\m -> fromMaybe (error "expected result") (Map.lookup nid m)) solutionMap
-  r = ffor lt $ \dr -> dr {
-    _dynRegion_left = if orient == Orientation_Row
-      then ffor2 lsdyn (_dynRegion_left dr) $ \ls l -> _layoutSegment_offset ls + l
-      else _dynRegion_left dr
-    , _dynRegion_top = if orient == Orientation_Column
-      then ffor2 lsdyn (_dynRegion_top dr) $ \ls l -> _layoutSegment_offset ls + l
-      else _dynRegion_top dr
-  }
+translateLayoutTree :: (Reflex t) => Orientation -> NodeId -> Dynamic t (Map NodeId LayoutSegment) -> Dynamic t LayoutTree -> Dynamic t LayoutTree
+translateLayoutTree orient nid solutionMap dlt = ffor2 solutionMap dlt fn where
+  fn sm lt = result where
+    ls = fromMaybe (error "expected result") (Map.lookup nid sm)
+    result = ffor lt $ \reg -> if orient == Orientation_Row
+      then offsetRegion (_layoutSegment_offset ls, 0) reg
+      else offsetRegion (0, _layoutSegment_offset ls) reg
 
 -- | Run a 'Layout' action
 runLayoutL
@@ -215,17 +211,9 @@ runLayoutL ddir mfocus0 (Layout child) = LayoutVtyWidget . ReaderT $ \focusReqIx
         -- TODO handle Nothing case in both places (so that event produces Nothing in this case)
         $ leftmost [ fmap Right . fmap getFirst $ focusReq, Left <$> (fmapMaybe id focusReqIx)]
 
-
-  -- these do not change throughout the lifetime of this VtyWidget so it's ok just to sample
-  qs0 <- sample . current $ queries
-  dir0 <- sample . current $ ddir
   let
-    selfRegion :: DynRegion t = DynRegion 0 0 dw dh
-    forest :: [LayoutTree t] = ffor qs0 $ \(nid,_,t,_) -> translateLayoutTree solutionMapDyn dir0 nid t
-    layoutTree = Tree.Node selfRegion forest
-    --forestDyn :: Dynamic t [LayoutTree t] = ffor2 queries ddir $ \qs dir -> ffor qs $ \(nid,_,t,_) -> translateLayoutTree solutionMapDyn dir nid t
-    -- no good way to flatten this :(
-    --layoutTreeDyn :: Dynamic t (LayoutTree t) = fmap (Tree.Node selfRegion) forestDyn
+    forestDyn :: Dynamic t [LayoutTree] = join . fmap distributeListOverDyn $ ffor2 queries ddir $ \qs dir -> ffor qs $ \(nid,_,dlt,_) -> translateLayoutTree dir nid solutionMapDyn dlt
+    layoutTreeDyn :: Dynamic t LayoutTree = ffor3 forestDyn dw dh $ \f w h -> Tree.Node (Region 0 0 w h) f
 
   fm0 <- sample . current $ focusable
   totalKiddos <- sample . current $ fmap (sum . fmap (\(_,_,_,k) -> k)) queries
@@ -253,7 +241,7 @@ runLayoutL ddir mfocus0 (Layout child) = LayoutVtyWidget . ReaderT $ \focusReqIx
     focusChildSelector = fanFocusEv (current $ fmap (fmap snd) focussed) (focusReqWithNodeId)
 
   return LayoutReturnData {
-      _layoutReturnData_tree = layoutTree
+      _layoutReturnData_tree = layoutTreeDyn
       , _layoutReturnData_focus = (fmap (fmap fst)) focussed
       , _layoutReturnData_children = totalKiddos
       , _layoutReturnData_value = a
@@ -397,9 +385,9 @@ row
 row child = runLayoutL (pure Orientation_Row) (Nothing) child
 
 -- | Use to make placeholder empty cells in sub layouts.
-dummyCell :: (Reflex t, Monad m) => LayoutVtyWidget t m (LayoutReturnData t ())
+dummyCell :: (Reflex t, Monad m) => (Reflex t) => LayoutVtyWidget t m (LayoutReturnData t ())
 dummyCell = return LayoutReturnData {
-    _layoutReturnData_tree = emptyLayoutTree
+    _layoutReturnData_tree = constDyn emptyLayoutTree
     , _layoutReturnData_focus = constDyn Nothing
     , _layoutReturnData_children = 0
     , _layoutReturnData_value = ()
@@ -478,20 +466,30 @@ computeEdges :: (Ord k) => Map k (a, Int) -> Map k (a, (Int, Int))
 computeEdges = fst . Map.foldlWithKey' (\(m, offset) k (a, sz) ->
   (Map.insert k (a, (offset, sz)) m, sz + offset)) (Map.empty, 0)
 
--- | Dynamic sizing information on a layout hierarchy (intended for testing)
-type LayoutTree t = Tree.Tree (DynRegion t)
 
-emptyLayoutTree :: (Reflex t) => LayoutTree t
-emptyLayoutTree = Tree.Node (DynRegion 0 0 0 0) []
+
+offsetRegion :: (Int, Int) -> Region -> Region
+offsetRegion (x,y) reg = reg {
+    _region_left = x+x'
+    , _region_top = y+y'
+  } where
+    x' = _region_left reg
+    y' = _region_top reg
+
+-- | Dynamic sizing information on a layout hierarchy (intended for testing)
+type LayoutTree = Tree.Tree Region
+
+emptyLayoutTree :: LayoutTree
+emptyLayoutTree = Tree.Node (Region 0 0 0 0) []
 
 class IsLayoutReturn t b a where
   getLayoutResult :: b -> a
   getLayoutNumChildren :: b -> Int
   getLayoutFocussedDyn :: b -> Dynamic t (Maybe Int)
-  getLayoutTree :: b -> LayoutTree t
+  getLayoutTree :: b -> Dynamic t LayoutTree
 
 data LayoutReturnData t a = LayoutReturnData {
-    _layoutReturnData_tree       :: LayoutTree t
+    _layoutReturnData_tree       :: Dynamic t LayoutTree
     , _layoutReturnData_focus    :: Dynamic t (Maybe Int)
     , _layoutReturnData_children :: Int
     , _layoutReturnData_value    :: a
@@ -507,7 +505,7 @@ instance Reflex t => IsLayoutReturn t a a where
   getLayoutResult = id
   getLayoutNumChildren _ = 1
   getLayoutFocussedDyn _ = constDyn Nothing
-  getLayoutTree _ = emptyLayoutTree
+  getLayoutTree _ = constDyn emptyLayoutTree
 
 class IsLayoutVtyWidget l t m where
   runIsLayoutVtyWidget :: l t m a -> Event t (Maybe Int) -> VtyWidget t m a
