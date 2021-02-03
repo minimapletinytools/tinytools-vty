@@ -30,7 +30,7 @@ import           Data.Text                        (Text)
 import qualified Data.Text                        as T
 import qualified Data.Text.Zipper                 as TZ
 import qualified Graphics.Vty                     as V
-import           Potato.Reflex.Vty.Widget.Layout2
+import           Potato.Reflex.Vty.Widget.Layout
 import           Reflex
 import           Reflex.Class.Switchable
 import           Reflex.Network

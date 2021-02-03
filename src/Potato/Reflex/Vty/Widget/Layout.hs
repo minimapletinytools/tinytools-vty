@@ -12,7 +12,7 @@
 {-# LANGUAGE UndecidableInstances       #-}
 
 
-module Potato.Reflex.Vty.Widget.Layout2
+module Potato.Reflex.Vty.Widget.Layout
   ( Orientation(..)
   , Constraint(..)
   , Layout
