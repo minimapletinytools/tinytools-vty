@@ -144,6 +144,19 @@ fanFocusEv focussed focusReqIx = fan $ attachWith attachfn focussed focusReqIx w
       Just (k0,_) -> DMap.fromList [Const2 k0 :=> Identity Nothing,
                           Const2 k1 :=> Identity (Just v1)]
 
+
+translateLayoutTree :: (Reflex t) => Dynamic t (Map NodeId LayoutSegment) -> Orientation -> NodeId -> LayoutTree t -> LayoutTree t
+translateLayoutTree solutionMap orient nid lt = r where
+  lsdyn = fmap (\m -> fromMaybe (error "expected result") (Map.lookup nid m)) solutionMap
+  r = ffor lt $ \dr -> dr {
+    _dynRegion_left = if orient == Orientation_Row
+      then ffor2 lsdyn (_dynRegion_left dr) $ \ls l -> _layoutSegment_offset ls + l
+      else _dynRegion_left dr
+    , _dynRegion_top = if orient == Orientation_Column
+      then ffor2 lsdyn (_dynRegion_top dr) $ \ls l -> _layoutSegment_offset ls + l
+      else _dynRegion_top dr
+  }
+
 -- | Run a 'Layout' action
 runLayoutL
   :: forall t m a. (Reflex t, MonadFix m, MonadHold t m)
@@ -157,7 +170,7 @@ runLayoutL ddir mfocus0 (Layout child) = LayoutVtyWidget . ReaderT $ \focusReqIx
   let main = ffor3 ddir dw dh $ \d w h -> case d of
         Orientation_Column -> h
         Orientation_Row    -> w
-  ((a, focusReq), queriesEndo) <- runReaderT (runDynamicWriterT $ runEventWriterT child) $ LayoutCtx solutionMap focusDemux ddir focusChildSelector
+  ((a, focusReq), queriesEndo) <- runReaderT (runDynamicWriterT $ runEventWriterT child) $ LayoutCtx solutionMapDyn focusDemux ddir focusChildSelector
   let queries = flip appEndo [] <$> queriesEndo
       solution = ffor2 main queries $ \sz qs -> Map.fromList
         . Map.elems
@@ -167,7 +180,7 @@ runLayoutL ddir mfocus0 (Layout child) = LayoutVtyWidget . ReaderT $ \focusReqIx
         . Map.fromList
         . zip [0::Integer ..]
         $ qs
-      solutionMap :: _ = ffor solution $ \ss -> ffor ss $ \(offset, sz) -> LayoutSegment
+      solutionMapDyn = ffor solution $ \ss -> ffor ss $ \(offset, sz) -> LayoutSegment
         { _layoutSegment_offset = offset
         , _layoutSegment_size = sz
         }
@@ -202,13 +215,17 @@ runLayoutL ddir mfocus0 (Layout child) = LayoutVtyWidget . ReaderT $ \focusReqIx
         -- TODO handle Nothing case in both places (so that event produces Nothing in this case)
         $ leftmost [ fmap Right . fmap getFirst $ focusReq, Left <$> (fmapMaybe id focusReqIx)]
 
-  --let
-    --selfRegion :: DynRegion t = DynRegion 0 0 dw dh
-    --forest' :: Dynamic t [LayoutTree] = fmap (fmap (Tree.Node selfRegion) . fmap (\(_,_,t,_)->t)) queries
-    -- TODO zip with solutionMap
-    -- TODO if tree is emptyLayoutTree (has no children) than use solutionMap to generate layout
-    -- otherwise, offset layout by x y and assert than sz are equal
 
+  -- these do not change throughout the lifetime of this VtyWidget so it's ok just to sample
+  qs0 <- sample . current $ queries
+  dir0 <- sample . current $ ddir
+  let
+    selfRegion :: DynRegion t = DynRegion 0 0 dw dh
+    forest :: [LayoutTree t] = ffor qs0 $ \(nid,_,t,_) -> translateLayoutTree solutionMapDyn dir0 nid t
+    layoutTree = Tree.Node selfRegion forest
+    --forestDyn :: Dynamic t [LayoutTree t] = ffor2 queries ddir $ \qs dir -> ffor qs $ \(nid,_,t,_) -> translateLayoutTree solutionMapDyn dir nid t
+    -- no good way to flatten this :(
+    --layoutTreeDyn :: Dynamic t (LayoutTree t) = fmap (Tree.Node selfRegion) forestDyn
 
   fm0 <- sample . current $ focusable
   totalKiddos <- sample . current $ fmap (sum . fmap (\(_,_,_,k) -> k)) queries
@@ -236,7 +253,7 @@ runLayoutL ddir mfocus0 (Layout child) = LayoutVtyWidget . ReaderT $ \focusReqIx
     focusChildSelector = fanFocusEv (current $ fmap (fmap snd) focussed) (focusReqWithNodeId)
 
   return LayoutReturnData {
-      _layoutReturnData_tree = emptyLayoutTree
+      _layoutReturnData_tree = layoutTree
       , _layoutReturnData_focus = (fmap (fmap fst)) focussed
       , _layoutReturnData_children = totalKiddos
       , _layoutReturnData_value = a
