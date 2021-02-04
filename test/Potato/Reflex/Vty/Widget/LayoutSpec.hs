@@ -41,6 +41,7 @@ instance (MonadVtyApp t (TestGuestT t m), TestGuestConstraints t m) => ReflexVty
   data VtyAppOutput (BasicNetworkTest1 t m) =
     BasicNetworkTest1_Output {
         _basicNetworkTest1_Output_focusDyn :: Dynamic t (Maybe Int)
+        , _basicNetworkTest1_Output_layoutTreeDyn :: Dynamic t LayoutTree
       }
   getApp _ = do
     LayoutReturnData {..} <- beginLayoutL $ row $ fixedL 39 $ col $ do
@@ -66,6 +67,7 @@ instance (MonadVtyApp t (TestGuestT t m), TestGuestConstraints t m) => ReflexVty
         text (current outputDyn)
     return BasicNetworkTest1_Output {
         _basicNetworkTest1_Output_focusDyn = _layoutReturnData_focus
+        , _basicNetworkTest1_Output_layoutTreeDyn = _layoutReturnData_tree
       }
 
   makeInputs =
@@ -78,13 +80,15 @@ test_basic :: Test
 test_basic = TestLabel "basic" $ TestCase $ runSpiderHost $
   runReflexVtyTestApp @ (BasicNetworkTest1 (SpiderTimeline Global) (SpiderHost Global)) (100,100) $ do
     return ()
-{-
     -- get our app's output events and subscribe to them
     BasicNetworkTest1_Output {..} <- userOutputs
-    focusDynH <- subscribeDynamic _basicNetworkTest1_Output_focusDyn
+    --focusDynH <- subscribeDynamic _basicNetworkTest1_Output_focusDyn
 
     let
-      readFocusDyn = readDynamic focusDynH
+      --readFocusDyn = readDynamic focusDynH
+
+      tempReadLayoutTree = sample . current $ _basicNetworkTest1_Output_layoutTreeDyn
+{-
 
     -- fire an empty event and ensure there is no popup
     fireQueuedEventsAndRead readFocusDyn >>= \a -> liftIO (checkSingle a Nothing)
@@ -93,6 +97,12 @@ test_basic = TestLabel "basic" $ TestCase $ runSpiderHost $
     queueVtyEvent $ V.EvKey (V.KChar '\t') []
     fireQueuedEventsAndRead readFocusDyn >>= \a -> liftIO (checkSingle a (Just 0))
 -}
+
+    --resize the window
+    queueVtyEvent $ V.EvResize 50 50
+
+    fireQueuedEventsAndRead tempReadLayoutTree >>= \a -> liftIO (print a)
+    fireQueuedEventsAndRead tempReadLayoutTree >>= \a -> liftIO (print a)
 
 spec :: Spec
 spec = do
