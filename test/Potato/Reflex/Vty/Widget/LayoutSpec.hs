@@ -8,6 +8,7 @@ module Potato.Reflex.Vty.Widget.LayoutSpec
 where
 
 import           Relude
+import qualified Relude.Unsafe as Unsafe
 
 import           Test.Hspec
 import           Test.Hspec.Contrib.HUnit   (fromHUnitTest)
@@ -22,6 +23,8 @@ import           Control.Monad.Ref
 import           Data.Default
 import           Data.Kind
 import qualified Data.List                  as L
+import qualified Data.Tree as Tree
+import Data.Maybe (fromJust)
 
 import qualified Graphics.Vty               as V
 import           Reflex
@@ -94,37 +97,55 @@ test_basic = TestLabel "basic" $ TestCase $ runSpiderHost $
     -- get our app's output events and subscribe to them
     BasicNetworkTest1_Output {..} <- userOutputs
     focusDynH <- subscribeDynamic _basicNetworkTest1_Output_focusDyn
+    layoutTreeDynH <- subscribeDynamic _basicNetworkTest1_Output_layoutTreeDyn
 
     let
       readFocusDyn = readDynamic focusDynH
-
-      --tempReadLayoutTree = sample . current $ _basicNetworkTest1_Output_layoutTreeDyn
+      readLayoutTreeDyn = readDynamic layoutTreeDynH
 
     -- fire an empty event and ensure that there is no focus
     fireQueuedEventsAndRead readFocusDyn >>= \a -> liftIO (checkSingle a Nothing)
 
-    -- tab to the last cell
-    forM [0..8] $ \n -> do
+    let nCells = 9 :: Int
+
+    -- tab a bunch of times
+    forM [0..99] $ \n -> do
       queueVtyEvent $ V.EvKey (V.KChar '\t') []
-      fireQueuedEventsAndRead readFocusDyn >>= \a -> liftIO (checkSingle a (Just n))
+      fireQueuedEventsAndRead readFocusDyn >>= \a -> liftIO (checkSingle a (Just (n `mod` nCells)))
 
-    -- tab cycle back to beginning
-    queueVtyEvent $ V.EvKey (V.KChar '\t') []
-    fireQueuedEventsAndRead readFocusDyn >>= \a -> liftIO (checkSingle a (Just 0))
+    -- shift tab a bunch of times
+    forM [1..99] $ \n -> do
+      queueVtyEvent $ V.EvKey V.KBackTab []
+      fireQueuedEventsAndRead readFocusDyn >>= \a -> liftIO (checkSingle a (Just ((99-n) `mod` nCells)))
 
-    -- TODO clear focus
+    -- TODO clear focus (you need to put the whole thing inside a pane to control focus)
 
-    -- TODO repeat
-      -- TODO click on a cell
-      -- TODO tab a few times more to ensure we continue from the cell
+    lt <- fireQueuedEventsAndRead readLayoutTreeDyn >>= return . Unsafe.head
+    --liftIO . putStrLn . Tree.drawTree . ffor lt $ \(Region x y _ _) -> show x <> " " <> show y
+
+    let
+      testClickCell = forM [0..8] $ \n -> do
+        let
+          cell = [0, n `div` 3, n `mod` 3]
+          (x,y) = fromJust $ layoutTreeCellToPosition cell lt
+        -- click on a cell
+        queueVtyEvent $ V.EvMouseDown x y V.BLeft []
+        fireQueuedEventsAndRead readFocusDyn >>= \a -> liftIO (checkSingle a (Just (n `mod` nCells)))
+        -- tab forward
+        queueVtyEvent $ V.EvKey (V.KChar '\t') []
+        fireQueuedEventsAndRead readFocusDyn >>= \a -> liftIO (checkSingle a (Just ((n+1) `mod` nCells)))
+
+    -- click on cells
+    testClickCell
 
     -- resize the window
     queueVtyEvent $ V.EvResize 50 50
 
-    -- TODO verify size is correct
+    -- click on cells again
+    testClickCell
 
-    --fireQueuedEventsAndRead tempReadLayoutTree >>= \a -> liftIO (print a)
-    --fireQueuedEventsAndRead tempReadLayoutTree >>= \a -> liftIO (print a)
+    return ()
+
 
 spec :: Spec
 spec = do
