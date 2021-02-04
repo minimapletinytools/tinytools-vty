@@ -33,8 +33,21 @@ import           Reflex.Network
 import           Reflex.Potato.Helpers
 import           Reflex.Vty                        hiding (Constraint (..),
                                                     Orientation (..), col,
-                                                    fixed, row, stretch, tile)
+                                                    fixed, row, stretch, tile, TileConfig(..), Layout(..))
 
+
+
+
+fixedNoFocus
+  :: (Reflex t, MonadFix m, MonadNodeId m)
+  => Dynamic t Int
+  -> VtyWidget t m a
+  -> Layout t m a
+fixedNoFocus sz = tile_ cfg . clickable where
+  cfg = TileConfig {
+      _tileConfig_constraint =  Constraint_Fixed <$> sz
+      , _tile_Config_focusable = constDyn False
+    }
 
 -- | Default vty event handler for text inputs
 updateTextZipperForSingleCharacter
@@ -100,10 +113,6 @@ selectParamsFromSelection ps selection = r where
 
 type MaybeParamsWidgetOutputDyn t m = Dynamic t (Maybe (VtyWidget t m (Dynamic t Int, Event t ControllersWithId)))
 
--- I think the Dynamic is not necessary because the widget gets remade by "paramsLayout`"" each time the dynamic changes anyways
--- you could be smarter about this and only call "holdMaybeParamsWidget" when the widget appears/dissapears
--- but I'm not going to bother remimplementing this...
--- TODO actually you need to do this because tabbing informaiton gets lost each time the widget is recerated...
 type MaybeParamsWidgetFn t m a = Dynamic t (Selection, Maybe a) -> MaybeParamsWidgetOutputDyn t m
 
 -- |
@@ -111,11 +120,13 @@ type MaybeParamsWidgetFn t m a = Dynamic t (Selection, Maybe a) -> MaybeParamsWi
 holdMaybeParamsWidget :: forall t m a. (MonadWidget t m)
   => Dynamic t (Maybe (Selection, Maybe a)) -- ^ selection/params input
   -> MaybeParamsWidgetFn t m a -- ^ function creating widget, note that it should always return non-nothing but using Maybe type makes life easier
-  -> MaybeParamsWidgetOutputDyn t m
-holdMaybeParamsWidget mInputDyn widgetFn = join . ffor mInputDyn $ \case
-  Nothing -> constDyn Nothing
-  -- eh this is weird, maybe using fromJust is ok due to laziness but I don't care to find out
-  Just _ -> widgetFn (fmap (fromMaybe (Seq.empty, Nothing)) mInputDyn)
+  -> VtyWidget t m (MaybeParamsWidgetOutputDyn t m)
+holdMaybeParamsWidget mInputDyn widgetFn = do
+  uniqDyn <- holdUniqDynBy (\a b -> isJust a == isJust b) mInputDyn
+  return . join . ffor uniqDyn $ \case
+    Nothing -> constDyn Nothing
+    -- eh this is weird, maybe using fromJust is ok due to laziness but I don't care to find out
+    Just _ -> widgetFn (fmap (fromMaybe (Seq.empty, Nothing)) mInputDyn)
 
 emptyWidget :: (Monad m) => VtyWidget t m ()
 emptyWidget = return ()
@@ -224,6 +235,7 @@ holdSuperStyleWidget inputDyn = constDyn . Just $ mdo
   let
     mssDyn = fmap snd inputDyn
     selectionDyn = fmap fst inputDyn
+  -- TODO change this so it's left to right
   (focusDyn,(tl,v,bl,h,f,tr,br)) <- beginParamsLayout $ row $ do
     (tl'',v'',bl'') <- fixedL 1 $ col $ do
       tl' <- fixed 1 $ makeSuperStyleTextEntry SSC_TL mssDyn
@@ -233,11 +245,11 @@ holdSuperStyleWidget inputDyn = constDyn . Just $ mdo
     (h'',f'') <- fixedL 1 $ col $ do
       h' <- fixed 1 $ makeSuperStyleTextEntry SSC_H mssDyn
       f' <- fixed 1 $ makeSuperStyleTextEntry SSC_Fill mssDyn
-      _ <- fixed 1 $ emptyWidget
+      _ <- fixedNoFocus 1 $ emptyWidget
       return (h',f')
     (tr'',br'') <- fixedL 1 $ col $ do
       tr' <- fixed 1 $ makeSuperStyleTextEntry SSC_TR mssDyn
-      _ <- fixed 1 $ emptyWidget
+      _ <- fixedNoFocus 1 $ emptyWidget
       br' <- fixed 1 $ makeSuperStyleTextEntry SSC_BR mssDyn
       return (tr',br')
     return (tl'',v'',bl'',h'',f'',tr'',br'')
@@ -311,12 +323,14 @@ holdParamsWidget ParamsWidgetConfig {..} = do
 
   let
     selectionDyn = _goatWidget_selection (_pFWidgetCtx_goatWidget _paramsWidgetConfig_pfctx)
+
     textAlignSelector = (fmap (\(TextStyle ta) -> ta)) . getSEltLabelBoxTextStyle . thd3
     mTextAlignInputDyn = fmap ( selectParamsFromSelection textAlignSelector) selectionDyn
-    textAlignmentWidget = holdMaybeParamsWidget mTextAlignInputDyn holdTextAlignmentWidget
 
     mSuperStyleInputDyn = fmap (selectParamsFromSelection (getSEltLabelSuperStyle . thd3)) selectionDyn
-    superStyleWidget2 = holdMaybeParamsWidget mSuperStyleInputDyn holdSuperStyleWidget
+
+  textAlignmentWidget <- holdMaybeParamsWidget mTextAlignInputDyn holdTextAlignmentWidget
+  superStyleWidget2 <- holdMaybeParamsWidget mSuperStyleInputDyn holdSuperStyleWidget
 
 
 

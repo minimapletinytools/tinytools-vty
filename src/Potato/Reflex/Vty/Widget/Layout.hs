@@ -19,6 +19,8 @@ module Potato.Reflex.Vty.Widget.Layout
   , runLayoutL
   , runLayout
   , TileConfig(..)
+  , clickable
+  , tile_
   , tile
   , fixed
   , fixedL
