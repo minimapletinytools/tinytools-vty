@@ -77,8 +77,8 @@ beginParamsLayout ::
   -> VtyWidget t m (Dynamic t (Maybe Int), a)
 beginParamsLayout child = mdo
   navEv <- paramsNavigation
-  let focusChildEv = fmap (\(mcur, shift) -> maybe (Just 0) (\cur -> Just $ (shift + cur) `mod` _layoutReturnData_children) mcur) (attach (current _layoutReturnData_focus) navEv)
-  LayoutReturnData {..} <- runIsLayoutVtyWidget child focusChildEv
+  let focusChildEv = layoutFocusEvFromNavigation navEv lrd
+  lrd@LayoutReturnData {..} <- runIsLayoutVtyWidget child focusChildEv
   return (_layoutReturnData_focus, _layoutReturnData_value)
 
 beginNoNavLayout ::

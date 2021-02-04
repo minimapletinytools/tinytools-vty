@@ -31,6 +31,7 @@ module Potato.Reflex.Vty.Widget.Layout
   , dummyCell
   , beginLayout
   , beginLayoutL
+  , layoutFocusEvFromNavigation
   , tabNavigation
   , askOrientation
   , LayoutVtyWidget(..)
@@ -219,7 +220,7 @@ runLayoutL ddir mfocus0 (Layout child) = LayoutVtyWidget . ReaderT $ \focusReqIx
   fm0 <- sample . current $ focusable
   -- TODO this is dependent on focusable-ness of children so _layoutReturnData_children should be changed to dynamic...
   -- TODO consider removing dynamic from focus/constraint instead
-  totalKiddos <- sample . current $ fmap (sum . fmap (\(_,(f, _),_,k) -> if f then k else 0)) queries
+  let totalKiddos = fmap (sum . fmap (\(_,(f, _),_,k) -> if f then k else 0)) queries
 
   -- brief explanation of overly complicated focus tracking
   -- focus is propogated in 2 ways
@@ -271,7 +272,7 @@ tile_ (TileConfig con focusable) child = mdo
   nodeId <- getNextNodeId
   -- by calling getLayoutTree/getLayoutNumChildren here, we store the children's layout info inside the DynamicWriter
   -- runLayoutL will extract this info later
-  Layout $ tellDyn $ ffor2 con focusable $ \c f -> Endo ((nodeId, (f, c), getLayoutTree @t @b @a b, nKiddos):)
+  Layout $ tellDyn $ ffor3 con focusable nKiddosDyn $ \c f n -> Endo ((nodeId, (f, c), getLayoutTree @t @b @a b, n):)
   seg <- Layout $ asks $
     fmap (Map.findWithDefault (LayoutSegment 0 0) nodeId) . _layoutCtx_regions
   dw <- displayWidth
@@ -294,16 +295,17 @@ tile_ (TileConfig con focusable) child = mdo
             Orientation_Column -> _layoutSegment_size s
             Orientation_Row -> c
         }
-  let nKiddos = getLayoutNumChildren @t @b @a b
+  let nKiddosDyn = getLayoutNumChildren @t @b @a b
 
   focusChildSelector <- Layout $ asks _layoutCtx_focusChildSelector
   let focusChildEv = select focusChildSelector (Const2 nodeId)
   focussed <- Layout $ asks _layoutCtx_focusSelfDemux
   (focusReq, b) <- Layout $ lift $ lift $ lift $
     pane reg (demuxed focussed $ Just nodeId) $ runIsLayoutVtyWidget child (focusChildEv)
-  Layout $ tellEvent $ if nKiddos > 0
-    then fmap (First . swap) $ attachPromptlyDyn (fmap (fromMaybe 0) $ getLayoutFocussedDyn @t @b @a b) (nodeId <$ focusReq)
-    else never
+  Layout $ tellEvent $
+    gate (fmap  (>0) (current nKiddosDyn))
+    . fmap (First . swap)
+    $ attachPromptlyDyn (fmap (fromMaybe 0) $ getLayoutFocussedDyn @t @b @a b) (nodeId <$ focusReq)
   return $ getLayoutResult @t b
 
 -- | Tiles are the basic building blocks of 'Layout' widgets. Each tile has a constraint
@@ -415,6 +417,17 @@ clickable child = LayoutVtyWidget . ReaderT $ \focusEv -> do
   a <- runIsLayoutVtyWidget child focusEv
   return (() <$ click, a)
 
+
+layoutFocusEvFromNavigation
+  :: (Reflex t)
+  => Event t Int
+  -> LayoutReturnData t a
+  -> Event t (Maybe Int)
+layoutFocusEvFromNavigation navEv LayoutReturnData {..} = r where
+  fmapfn (nKiddos, (mcur, shift)) = maybe (Just 0) (\cur -> Just $ (shift + cur) `mod` nKiddos) mcur
+  navEv' = attach (current _layoutReturnData_children) $ attach (current _layoutReturnData_focus) navEv
+  r = fmap fmapfn navEv'
+
 -- TODO look into making a variant of this function that takes a navigation event
 -- | Use this variant to begin a layout if you need its "LayoutReturnData"
 beginLayoutL
@@ -425,8 +438,9 @@ beginLayoutL child = mdo
   -- TODO consider unfocusing if this loses focus
   --focussed <- focus
   tabEv <- tabNavigation
-  let focusChildEv = fmap (\(mcur, shift) -> maybe (Just 0) (\cur -> Just $ (shift + cur) `mod` _layoutReturnData_children) mcur) (attach (current _layoutReturnData_focus) tabEv)
-  lrd@LayoutReturnData{..} <- runIsLayoutVtyWidget child focusChildEv
+  let
+    focusChildEv = layoutFocusEvFromNavigation tabEv lrd
+  lrd <- runIsLayoutVtyWidget child focusChildEv
   return lrd
 
 -- | Begin a layout using tab and shift-tab to navigate
@@ -487,14 +501,14 @@ emptyLayoutTree = Tree.Node (Region 0 0 0 0) []
 
 class IsLayoutReturn t b a where
   getLayoutResult :: b -> a
-  getLayoutNumChildren :: b -> Int
+  getLayoutNumChildren :: b -> Dynamic t Int
   getLayoutFocussedDyn :: b -> Dynamic t (Maybe Int)
   getLayoutTree :: b -> Dynamic t LayoutTree
 
 data LayoutReturnData t a = LayoutReturnData {
     _layoutReturnData_tree       :: Dynamic t LayoutTree
     , _layoutReturnData_focus    :: Dynamic t (Maybe Int)
-    , _layoutReturnData_children :: Int
+    , _layoutReturnData_children :: Dynamic t Int
     , _layoutReturnData_value    :: a
   }
 
