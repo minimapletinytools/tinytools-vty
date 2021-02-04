@@ -184,13 +184,12 @@ runLayoutL ddir mfocus0 (Layout child) = LayoutVtyWidget . ReaderT $ \focusReqIx
         }
 
 
-      focusableMapAccumFn acc (nodeId, (_, _), _, nKiddos) = (nextAcc, value) where
-        nextAcc = acc + nKiddos
-        value = (acc, nodeId)
-      focusable' = fmap (Bimap.fromList . snd . mapAccumL focusableMapAccumFn 0) $
+      focusableMapAccumFn acc (nid, (_, _), _, nc) = (nextAcc, value) where
+        nextAcc = acc + nc
+        value = (acc, nid)
+      focusable = fmap (Bimap.fromList . snd . mapAccumL focusableMapAccumFn 0) $
         ffor queries $ \qs -> fforMaybe qs $ \n@(_, (f, _), _, nc) ->
           if f && nc > 0 then Just n else Nothing
-      focusable = focusable'
 
       -- ix is focus in self index space
       -- fst of return value is child node id to focus
@@ -218,7 +217,9 @@ runLayoutL ddir mfocus0 (Layout child) = LayoutVtyWidget . ReaderT $ \focusReqIx
     layoutTreeDyn :: Dynamic t LayoutTree = ffor3 forestDyn dw dh $ \f w h -> Tree.Node (Region 0 0 w h) f
 
   fm0 <- sample . current $ focusable
-  totalKiddos <- sample . current $ fmap (sum . fmap (\(_,_,_,k) -> k)) queries
+  -- TODO this is dependent on focusable-ness of children so _layoutReturnData_children should be changed to dynamic...
+  -- TODO consider removing dynamic from focus/constraint instead
+  totalKiddos <- sample . current $ fmap (sum . fmap (\(_,(f, _),_,k) -> if f then k else 0)) queries
 
   -- brief explanation of overly complicated focus tracking
   -- focus is propogated in 2 ways
