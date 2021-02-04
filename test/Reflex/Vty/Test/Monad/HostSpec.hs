@@ -30,7 +30,7 @@ instance (MonadVtyApp t (TestGuestT t m), TestGuestConstraints t m) => ReflexVty
   data VtyAppInputEvents (BasicNetworkTest1 t m) = BasicNetworkTest1_InputEvents
   data VtyAppOutput (BasicNetworkTest1 t m) =
     BasicNetworkTest1_Output {
-        _basicNetworkTest1_Output_vtyEv :: Event t VtyEvent 
+        _basicNetworkTest1_Output_vtyEv :: Event t VtyEvent
         , _basicNetworkTest1_Output_displayWidth :: Dynamic t Int
         , _basicNetworkTest1_Output_displayHeight :: Dynamic t Int
       }

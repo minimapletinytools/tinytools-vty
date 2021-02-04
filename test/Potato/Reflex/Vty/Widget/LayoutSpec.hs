@@ -16,6 +16,7 @@ import           Test.HUnit
 import           Potato.Reflex.Vty.Widget.Layout
 
 
+import Control.Monad.Fix
 import           Control.Monad.IO.Class     (liftIO)
 import           Control.Monad.Ref
 import           Data.Default
@@ -25,15 +26,25 @@ import qualified Data.List                  as L
 import qualified Graphics.Vty               as V
 import           Reflex
 import           Reflex.Host.Class
-import           Reflex.Vty                       hiding (Constraint (..),
-                                                   Orientation (..),
-                                                   TileConfig (..), col, fixed,
-                                                   row, runLayout, stretch,
-                                                   tabNavigation, tile)
+import           Reflex.Vty                        hiding (Constraint (..),
+                                                    Orientation (..), col,
+                                                    fixed, row, stretch, tile, TileConfig(..), Layout(..))
 import           Reflex.Vty.Test.Monad.Host
 import Reflex.Vty.Test.Common
 
 data BasicNetworkTest1 t (m :: Type -> Type)
+
+
+fixedNoFocus
+  :: (Reflex t, MonadFix m, MonadNodeId m)
+  => Dynamic t Int
+  -> VtyWidget t m a
+  -> Layout t m a
+fixedNoFocus sz = tile_ cfg . clickable where
+  cfg = TileConfig {
+      _tileConfig_constraint =  Constraint_Fixed <$> sz
+      , _tile_Config_focusable = constDyn False
+    }
 
 instance (MonadVtyApp t (TestGuestT t m), TestGuestConstraints t m) => ReflexVtyTestApp (BasicNetworkTest1 t m) t m where
   data VtyAppInputTriggerRefs (BasicNetworkTest1 t m) = BasicNetworkTest1_InputTriggerRefs
@@ -62,7 +73,7 @@ instance (MonadVtyApp t (TestGuestT t m), TestGuestConstraints t m) => ReflexVty
         return (a,b,c)
       -- NOTE the box will most likely not render correctly once you put emoji's
       -- you need to initialize vty with an updated char width map to fix this
-      fixed 7 $ boxTitle (constant def) "CLICK BUTTONS TO DRAW" $ do
+      fixedNoFocus 7 $ boxTitle (constant def) "CLICK BUTTONS TO DRAW" $ do
         outputDyn <- foldDyn (<>) "" $ mergeWith (<>) [a1 $> "🥔", b1 $> "🍅", c1 $> "🍆", a2 $> "🧀", b2 $> "🐝🐝", c2 $> "💘", a3 $> "⏰", b3 $> "📜", c3 $> "💰🔪🔒"]
         text (current outputDyn)
     return BasicNetworkTest1_Output {
@@ -82,27 +93,38 @@ test_basic = TestLabel "basic" $ TestCase $ runSpiderHost $
     return ()
     -- get our app's output events and subscribe to them
     BasicNetworkTest1_Output {..} <- userOutputs
-    --focusDynH <- subscribeDynamic _basicNetworkTest1_Output_focusDyn
+    focusDynH <- subscribeDynamic _basicNetworkTest1_Output_focusDyn
 
     let
-      --readFocusDyn = readDynamic focusDynH
+      readFocusDyn = readDynamic focusDynH
 
-      tempReadLayoutTree = sample . current $ _basicNetworkTest1_Output_layoutTreeDyn
-{-
+      --tempReadLayoutTree = sample . current $ _basicNetworkTest1_Output_layoutTreeDyn
 
-    -- fire an empty event and ensure there is no popup
+    -- fire an empty event and ensure that there is no focus
     fireQueuedEventsAndRead readFocusDyn >>= \a -> liftIO (checkSingle a Nothing)
 
-    -- tab a few times
+    -- tab to the last cell
+    forM [0..8] $ \n -> do
+      queueVtyEvent $ V.EvKey (V.KChar '\t') []
+      fireQueuedEventsAndRead readFocusDyn >>= \a -> liftIO (checkSingle a (Just n))
+
+    -- tab cycle back to beginning
     queueVtyEvent $ V.EvKey (V.KChar '\t') []
     fireQueuedEventsAndRead readFocusDyn >>= \a -> liftIO (checkSingle a (Just 0))
--}
 
-    --resize the window
+    -- TODO clear focus
+
+    -- TODO repeat
+      -- TODO click on a cell
+      -- TODO tab a few times more to ensure we continue from the cell
+
+    -- resize the window
     queueVtyEvent $ V.EvResize 50 50
 
-    fireQueuedEventsAndRead tempReadLayoutTree >>= \a -> liftIO (print a)
-    fireQueuedEventsAndRead tempReadLayoutTree >>= \a -> liftIO (print a)
+    -- TODO verify size is correct
+
+    --fireQueuedEventsAndRead tempReadLayoutTree >>= \a -> liftIO (print a)
+    --fireQueuedEventsAndRead tempReadLayoutTree >>= \a -> liftIO (print a)
 
 spec :: Spec
 spec = do

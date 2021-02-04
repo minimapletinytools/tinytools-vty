@@ -23,22 +23,18 @@ import           Reflex.Vty
 import           Reflex.Vty.Test.Monad.Host
 
 
-{-
-subscribeDynamic :: (TestGuestConstraints t m) => Dynamic t a -> m (EventHandle t a, Behavior t a)
+subscribeDynamic :: (MonadSubscribeEvent t m) => Dynamic t a -> m (EventHandle t a, Behavior t a)
 subscribeDynamic d = do
   eh <- subscribeEvent $ updated d
   return (eh, current d)
 
-readDynamic :: (TestGuestConstraints t m) => (EventHandle t a, Behavior t a) -> ReadPhase m a
+readDynamic :: forall t m a. (MonadReadEvent t m, MonadSample t m) => (EventHandle t a, Behavior t a) -> m a
 readDynamic (evh, b) = do
-  v <- sequence =<< readEvent evh
+  v <- readEvent evh
   case v of
     Nothing -> sample b
-    Just x -> return x
--}
+    Just x -> x
 
-subscribeDynamic = undefined
-readDynamic = undefined
 
 
 checkSingle :: (HasCallStack, Eq a, Show a) => [a] -> a -> Assertion
