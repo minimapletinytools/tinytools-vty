@@ -36,6 +36,8 @@ module Potato.Reflex.Vty.Widget.Layout
   , askOrientation
   , LayoutVtyWidget(..)
   , LayoutTree(..)
+  , dynLayoutTreeInDynRegion
+  , layoutTreeCellToPosition
   , IsLayoutVtyWidget(..)
   , LayoutReturnData(..)
   ) where
@@ -417,7 +419,7 @@ clickable child = LayoutVtyWidget . ReaderT $ \focusEv -> do
   a <- runIsLayoutVtyWidget child focusEv
   return (() <$ click, a)
 
-
+-- | create a focus event (to be used with runIsLayoutVtyWidget) from a navigation event
 layoutFocusEvFromNavigation
   :: (Reflex t)
   => Event t Int
@@ -445,7 +447,7 @@ beginLayoutL child = mdo
 
 -- | Begin a layout using tab and shift-tab to navigate
 beginLayout
-  :: (Reflex t, MonadHold t m, MonadFix m, MonadNodeId m)
+  :: (Reflex t, MonadHold t m, MonadFix m)
   => LayoutVtyWidget t m (LayoutReturnData t a)
   -> VtyWidget t m a
 beginLayout = fmap _layoutReturnData_value . beginLayoutL
@@ -498,6 +500,26 @@ type LayoutTree = Tree.Tree Region
 
 emptyLayoutTree :: LayoutTree
 emptyLayoutTree = Tree.Node (Region 0 0 0 0) []
+
+dynLayoutTreeInDynRegion :: (Reflex t) => DynRegion t -> Dynamic t LayoutTree ->  Dynamic t LayoutTree
+dynLayoutTreeInDynRegion DynRegion {..} dlt = ffor3 _dynRegion_left _dynRegion_top dlt $ \x y lt -> fmap (offsetRegion (x,y)) lt
+
+infix 9 !!?
+(!!?) :: [a] -> Int -> Maybe a
+(!!?) xs i
+    | i < 0     = Nothing
+    | otherwise = go i xs
+  where
+    go :: Int -> [a] -> Maybe a
+    go 0 (x:_)  = Just x
+    go j (_:ys) = go (j - 1) ys
+    go _ []     = Nothing
+{-# INLINE (!!?) #-}
+
+-- | gives top left corner of the cell following directions
+layoutTreeCellToPosition :: [Int] -> LayoutTree -> Maybe (Int, Int)
+layoutTreeCellToPosition [] (Tree.Node region _) = Just (_region_left region, _region_top region)
+layoutTreeCellToPosition (x:xs) (Tree.Node _ kiddos) = kiddos !!? x >>= layoutTreeCellToPosition xs
 
 class IsLayoutReturn t b a where
   getLayoutResult :: b -> a
