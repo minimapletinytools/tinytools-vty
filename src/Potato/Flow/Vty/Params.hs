@@ -144,14 +144,16 @@ data SuperStyleCell = SSC_TL | SSC_TR | SSC_BL | SSC_BR | SSC_V | SSC_H | SSC_Fi
 
 updateFromSuperStyle :: SuperStyleCell -> (SuperStyle -> TZ.TextZipper)
 updateFromSuperStyle ssc = TZ.fromText . T.singleton . gettfn ssc where
-  gettfn SSC_TL = _superStyle_tl
-  gettfn SSC_TR = _superStyle_tr
-  gettfn SSC_BL = _superStyle_bl
-  gettfn SSC_BR = _superStyle_br
-  gettfn SSC_V = _superStyle_vertical
-  gettfn SSC_H = _superStyle_horizontal
-  gettfn SSC_Fill = (\case
-    FillStyle_Simple c -> c) . _superStyle_fill
+  gettfn ssc' = fromMaybe ' ' . gettfn' ssc'
+  gettfn' = \case
+    SSC_TL -> _superStyle_tl
+    SSC_TR -> _superStyle_tr
+    SSC_BL -> _superStyle_bl
+    SSC_BR -> _superStyle_br
+    SSC_V -> _superStyle_vertical
+    SSC_H -> _superStyle_horizontal
+    SSC_Fill -> (\case
+      FillStyle_Simple c -> Just c) . _superStyle_fill
 
 -- copy pasta from Reflex.Vty.Widget.Input.textInput a lot of stuff in here is not necessary
 -- TODO DELETE simplify.. you don't need TextZipper
@@ -219,12 +221,12 @@ makeSuperStyleEvent tl v bl h f tr br trig = pushAlways pushfn trig where
     tr' <- sample tr
     br' <- sample br
     return $ def {
-        _superStyle_tl    = tl'
-        , _superStyle_tr     = tr'
-        , _superStyle_bl        = bl'
-        , _superStyle_br         = br'
-        , _superStyle_vertical   = v'
-        , _superStyle_horizontal = h'
+        _superStyle_tl    = Just tl'
+        , _superStyle_tr     = Just tr'
+        , _superStyle_bl        = Just bl'
+        , _superStyle_br         = Just br'
+        , _superStyle_vertical   = Just v'
+        , _superStyle_horizontal = Just h'
         --, _superStyle_point      :: PChar
         , _superStyle_fill       = FillStyle_Simple f'
       }
