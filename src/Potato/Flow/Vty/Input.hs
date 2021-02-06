@@ -29,7 +29,7 @@ convertKey :: V.Key -> Maybe KeyboardKey
 convertKey = \case
   V.KEsc   -> Just KeyboardKey_Esc
   V.KChar c -> Just $   KeyboardKey_Char c
-  V.KBS   -> Just KeyboardKey_Space
+  V.KBS   -> Just KeyboardKey_Backspace
   V.KEnter   -> Just KeyboardKey_Return
   V.KLeft   -> Just KeyboardKey_Left
   V.KRight   -> Just KeyboardKey_Right

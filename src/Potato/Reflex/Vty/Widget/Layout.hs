@@ -35,7 +35,7 @@ module Potato.Reflex.Vty.Widget.Layout
   , tabNavigation
   , askOrientation
   , LayoutVtyWidget(..)
-  , LayoutTree(..)
+  , LayoutTree
   , dynLayoutTreeInDynRegion
   , layoutTreeCellToPosition
   , IsLayoutVtyWidget(..)
@@ -451,6 +451,25 @@ beginLayout
   => LayoutVtyWidget t m (LayoutReturnData t a)
   -> VtyWidget t m a
 beginLayout = fmap _layoutReturnData_value . beginLayoutL
+
+
+{- something like this
+beginLayoutL
+  :: (Reflex t, MonadHold t m, MonadFix m)
+  => LayoutVtyWidget t m (LayoutReturnData t a)
+  -> Maybe (Event t Int)
+  -> VtyWidget t m (LayoutReturnData t a)
+beginLayoutL mNavEv child = mdo
+  -- TODO consider unfocusing if this loses focus
+  --focussed <- focus
+  let
+    focusChildEv = case mNavEv of
+      Just navEv -> layoutFocusEvFromNavigation navEv lrd
+      Nothing -> never
+  lrd <- runIsLayoutVtyWidget child focusChildEv
+  return lrd
+-}
+
 
 -- | Retrieve the current orientation of a 'Layout'
 askOrientation :: Monad m => Layout t m (Dynamic t Orientation)

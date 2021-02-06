@@ -375,5 +375,5 @@ holdParamsWidget ParamsWidgetConfig {..} = do
   outputEv <- paramsLayout . fmap catMaybes . mconcat . (fmap (fmap (:[]))) $ [textAlignmentWidget, superStyleWidget2, constDyn $ Just superStyleWidget]
 
   return ParamsWidget {
-    _paramsWidget_paramsEvent = traceEvent "wtf" $ outputEv
+    _paramsWidget_paramsEvent = outputEv
   }
