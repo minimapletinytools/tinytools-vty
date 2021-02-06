@@ -166,6 +166,24 @@ focusWidgetNoMouse focus child = VtyWidget $ do
   tellImages images
   return result
 
+-- | block all or some input events, always focused if parent is focused
+captureInputEvents :: forall t m a. (MonadWidget t m)
+  => Either (Event t ()) (Behavior t Bool) -- ^ Left ev is event indicating input should be capture. Right beh is behavior gating input (true means captured)
+  -> VtyWidget t m a
+  -> VtyWidget t m a
+captureInputEvents capture child = VtyWidget $ do
+  ctx <- lift ask
+  let ctx' = VtyWidgetCtx {
+      _vtyWidgetCtx_input = case capture of
+        Left ev -> difference (_vtyWidgetCtx_input ctx) ev
+        Right beh -> gate (fmap not beh) (_vtyWidgetCtx_input ctx)
+      , _vtyWidgetCtx_focus = liftA2 (&&) (_vtyWidgetCtx_focus ctx) $ constDyn True
+      , _vtyWidgetCtx_width = _vtyWidgetCtx_width ctx
+      , _vtyWidgetCtx_height = _vtyWidgetCtx_height ctx
+    }
+  (result, images) <- lift . lift $ runVtyWidget ctx' child
+  tellImages images
+  return result
 
 mainPFWidget :: forall t m. (MonadWidget t m)
   => VtyWidget t m (Event t ())
@@ -185,7 +203,6 @@ mainPFWidget = mdo
         , _pFWidgetCtx_goatWidget = everythingW
         , _pFWidgetCtx_pFState = fmap goatState_pFState $ _goatWidget_DEBUG_goatState everythingW
         , _pFWidgetCtx_initialPFState = pfstate_basic1
-        , _pFWidgetCtx_inputCapturedByPopupDyn = inputCapturedByPopupDyn
       }
 
 
@@ -251,7 +268,7 @@ mainPFWidget = mdo
         , _canvasWidgetConfig_handles = _goatWidget_handlerRenderOutput everythingW
       }
 
-  (keyboardEv, ((layersW, toolsW, paramsW), canvasW)) <- focusWidgetNoMouse inputCapturedByPopupDyn $ do
+  (keyboardEv, ((layersW, toolsW, paramsW), canvasW)) <- captureInputEvents (Right inputCapturedByPopupBeh) $ do
     inp <- input
     let
       kb = fforMaybe inp $ \case
@@ -266,7 +283,7 @@ mainPFWidget = mdo
   (_, popupStateDyn1) <- popupPaneSimple def (postBuildEv $> welcomeWidget)
 
   let
-    inputCapturedByPopupDyn = fmap not . fmap getAny . mconcat . fmap (fmap Any) $ [popupStateDyn1]
+    inputCapturedByPopupBeh = current . fmap getAny . mconcat . fmap (fmap Any) $ [popupStateDyn1]
 
 
 
