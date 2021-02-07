@@ -26,6 +26,7 @@ import           Control.Concurrent
 import           Control.Monad.Fix
 import           Control.Monad.NodeId
 import qualified Data.Aeson                        as Aeson
+import qualified Data.Aeson.Encode.Pretty as PrettyAeson
 import           Data.Maybe
 import           Data.Monoid                       (Any)
 import qualified Data.Text.Encoding                as T
@@ -33,7 +34,7 @@ import qualified Data.Text.Lazy                    as LT
 import qualified Data.Text.Lazy.Encoding           as LT
 import qualified Data.Text.IO as T
 import           Data.Time.Clock
-
+import qualified Data.ByteString.Lazy as LBS
 import Data.These
 
 import           Network.HTTP.Simple
@@ -221,7 +222,7 @@ mainPFWidget = mdo
   let
     goatWidgetConfig = GoatWidgetConfig {
         _goatWidgetConfig_initialState = _pFWidgetCtx_initialPFState pfctx
-        , _goatWidgetConfig_load = fmapMaybe id (traceEvent "hi" mLoadFileEv)
+        , _goatWidgetConfig_load = fmapMaybe id mLoadFileEv
 
         -- canvas direct input
         , _goatWidgetConfig_mouse = leftmostWarn "mouse" [_layerWidget_mouse layersW, _canvasWidget_mouse canvasW]
@@ -247,7 +248,8 @@ mainPFWidget = mdo
           let saveEv = tag (current $ _goatWidget_DEBUG_goatState everythingW) click
           performEvent_ $ ffor saveEv $ \gs -> do
              let spf = pFState_to_sPotatoFlow . _pFWorkspace_pFState . _goatState_pFWorkspace $ gs
-             liftIO $ Aeson.encodeFile "potato.flow" spf
+             --liftIO $ Aeson.encodeFile "potato.flow" spf
+             liftIO $ LBS.writeFile "potato.flow" $ PrettyAeson.encodePretty spf
         stretch $ text "|"
         stretch $ do
           text "print"
