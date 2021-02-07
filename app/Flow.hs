@@ -167,7 +167,6 @@ focusWidgetNoMouse focus child = VtyWidget $ do
   tellImages images
   return result
 
--- TODO change to These
 -- | block all or some input events, always focused if parent is focused
 captureInputEvents :: forall t m a. (MonadWidget t m)
   => These (Event t ()) (Behavior t Bool) -- ^ Left ev is event indicating input should be capture. Right beh is behavior gating input (true means captured)
@@ -238,6 +237,16 @@ mainPFWidget = mdo
   -- main panels
   let
     leftPanel = col $ do
+      fixed 1 $ row $ do
+        stretch $ do
+          text "save"
+          click <- mouseDown V.BLeft
+          let saveEv = tag (current $ _goatWidget_DEBUG_goatState everythingW) click
+          performEvent_ $ ffor saveEv $ \gs -> do
+             let spf = pFState_to_sPotatoFlow . _pFWorkspace_pFState . _goatState_pFWorkspace $ gs
+             liftIO $ Aeson.encodeFile "potato.flow" spf
+
+        stretch $ text "|"
       fixed 5 $ debugStream [
         never
         ]
