@@ -107,6 +107,7 @@ executables:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
+    - -j
     dependencies:
     - potato-flow-vty
 
@@ -128,6 +129,7 @@ tests:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
+    - -j
     dependencies:
     - potato-flow-vty
     - HUnit

@@ -75,9 +75,10 @@ extra-deps:
 # - github: pdlla/reflex-vty
 #  commit: 1bfd8f985e832d26c7360beae913dda07e477642
 
-
-
-
+# :O enables stack traces
+build:
+  library-profiling: true
+  executable-profiling: true
 
 # Override default flag values for local packages and extra-deps
 # flags: {}

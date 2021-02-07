@@ -8,3 +8,4 @@ potato.flow
 potato.txt
 stderr.txt
 *_termwidthfile
+*.prof

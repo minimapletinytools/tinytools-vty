@@ -1,5 +1,6 @@
+stack build  --profile -- potato-flow-vty-exe +RTS -xc
 
-
+stack --work-dir .stack-work-profile --profile  exec -- potato-flow-vty-exe +RTS -xc
 
 
 ::TEXT-ICU nonsense::
