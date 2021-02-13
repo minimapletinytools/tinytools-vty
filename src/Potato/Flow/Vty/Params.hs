@@ -192,6 +192,16 @@ cellInput modifyEv c0 = mdo
       tellImages $ (\imgs st -> (:[]) . V.vertCat $ drop st imgs) <$> current img <*> scrollTop
   return $ TZ.value <$> v
 
+-- remember that input dyn can't update the same time the output updates or you will have infinite loop
+numInput
+  :: (Reflex t, MonadHold t m, MonadFix m)
+  => Dynamic t Int
+  -> VtyWidget t m (Dynamic t Int)
+numInput valueDyn = mdo
+  -- TODO
+  text "TODO"
+  return (constDyn 0)
+
 makeSuperStyleTextEntry :: (Reflex t, MonadHold t m, MonadFix m) => SuperStyleCell -> Dynamic t (Maybe SuperStyle) -> VtyWidget t m (Behavior t PChar)
 makeSuperStyleTextEntry ssc mssDyn = do
   mss0 <- sample . current $ mssDyn
@@ -231,6 +241,7 @@ makeSuperStyleEvent tl v bl h f tr br trig = pushAlways pushfn trig where
         , _superStyle_fill       = FillStyle_Simple f'
       }
 
+-- TODO presets/custom
 holdSuperStyleWidget :: (Reflex t, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m) => MaybeParamsWidgetFn t m SuperStyle
 holdSuperStyleWidget inputDyn = constDyn . Just $ mdo
   -- TODO need to ignore tab events or something
@@ -269,9 +280,6 @@ holdSuperStyleWidget inputDyn = constDyn . Just $ mdo
   return (4, outputEv)
 
 
-
-
-
 -- Text Alignment stuff
 holdTextAlignmentWidget :: forall t m. (MonadWidget t m) => MaybeParamsWidgetFn t m TextAlign
 holdTextAlignmentWidget taDyn = ffor taDyn $ \(selection, mta) -> Just $ do
@@ -303,6 +311,34 @@ holdTextAlignmentWidget taDyn = ffor taDyn $ \(selection, mta) -> Just $ do
     alignmentParamsEv = push pushAlignmentFn setAlignmentEv
   return (1, alignmentParamsEv)
 
+
+-- TODO this is a problem, we need to get input canvas size...
+holdCanvasSizeWidget :: forall t m. (MonadWidget t m) => Dynamic t PFState -> MaybeParamsWidgetFn t m ()
+holdCanvasSizeWidget pFStateDyn nothingDyn = ffor nothingDyn $ \_ -> Just $ do
+  let
+    cSizeDyn = fmap (_lBox_size . _sCanvas_box . _pFState_canvas) pFStateDyn
+    cWidthDyn = fmap (\(V2 x _) -> x) cSizeDyn
+    cHeightDyn = fmap (\(V2 _ y) -> y) cSizeDyn
+  (focusDyn, (wDyn,hDyn)) <- beginParamsLayout $ col $ do
+    wDyn' <- fixedL 1 $ row $ do
+      fixed 10 $ text "width:"
+      stretch $ numInput cWidthDyn
+    hDyn' <- fixedL 1 $ row $ do
+      fixed 10 $ text "height:"
+      stretch $ numInput cHeightDyn
+    return (wDyn',hDyn')
+  let
+    outputEv = flip pushAlways (void $ updated focusDyn) $ \_ -> do
+      cw <- sample . current $ cWidthDyn
+      ch <- sample . current $ cHeightDyn
+      w <- sample . current $ wDyn
+      h <- sample . current $ hDyn
+      return $ if cw /= w || ch /= h
+        -- TODO actually update the canvas... need to change MaybeParamsWidgetFn...
+        then Nothing
+        else Nothing
+  return (2, never)
+
 data SEltParams = SEltParams {
     --_sEltParams_sBox =
   }
@@ -315,7 +351,7 @@ data ParamsWidget t = ParamsWidget {
   _paramsWidget_paramsEvent :: Event t ControllersWithId
 }
 
-presetStyles = ["╔╗╚╝║═█","****|-*"]
+presetStyles = ["╔╗╚╝║═ ","****|- ", "┌┐└┘│─ ", "██████ "]
 
 
 holdParamsWidget :: forall t m. (MonadWidget t m)
@@ -325,14 +361,17 @@ holdParamsWidget ParamsWidgetConfig {..} = do
 
   let
     selectionDyn = _goatWidget_selection (_pFWidgetCtx_goatWidget _paramsWidgetConfig_pfctx)
+    pFStateDyn = fmap (_pFWorkspace_pFState . _goatState_pFWorkspace) . _goatWidget_DEBUG_goatState . _pFWidgetCtx_goatWidget $ _paramsWidgetConfig_pfctx
 
     textAlignSelector = (fmap (\(TextStyle ta) -> ta)) . getSEltLabelBoxTextStyle . thd3
     mTextAlignInputDyn = fmap ( selectParamsFromSelection textAlignSelector) selectionDyn
-
     mSuperStyleInputDyn = fmap (selectParamsFromSelection (getSEltLabelSuperStyle . thd3)) selectionDyn
+    -- show canvas params when nothing is selected
+    mCanvasSizeInputDyn = fmap (\s -> if Seq.null s then Just (Seq.empty, Nothing) else Nothing) selectionDyn
 
   textAlignmentWidget <- holdMaybeParamsWidget mTextAlignInputDyn holdTextAlignmentWidget
   superStyleWidget2 <- holdMaybeParamsWidget mSuperStyleInputDyn holdSuperStyleWidget
+  canvasSizeWidget <- holdMaybeParamsWidget mCanvasSizeInputDyn (holdCanvasSizeWidget pFStateDyn)
 
 
 
@@ -372,7 +411,7 @@ holdParamsWidget ParamsWidgetConfig {..} = do
       return (4, ssparamsEv)
 
   -- do some magic to collapse MaybeParamsWidgetOutputDyn and render it with paramsLayout
-  outputEv <- paramsLayout . fmap catMaybes . mconcat . (fmap (fmap (:[]))) $ [textAlignmentWidget, superStyleWidget2, constDyn $ Just superStyleWidget]
+  outputEv <- paramsLayout . fmap catMaybes . mconcat . (fmap (fmap (:[]))) $ [textAlignmentWidget, superStyleWidget2, canvasSizeWidget, constDyn $ Just superStyleWidget]
 
   return ParamsWidget {
     _paramsWidget_paramsEvent = outputEv

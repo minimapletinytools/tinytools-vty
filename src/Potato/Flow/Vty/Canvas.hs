@@ -79,6 +79,7 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
     canvasRegion = dynLBox_to_dynRegion canvasRegion'
     --canvasRegion = translate_dynRegion _canvasWidgetConfig_pan $ dynLBox_to_dynRegion (fmap renderedCanvas_box renderedCanvas)
   fill '░'
+  -- TODO render out of bounds stuff with gray background or whatveer
   pane canvasRegion (constDyn True) $ do
     text $ current (fmap renderedCanvasToText renderedCanvas)
   tellImages $ ffor3 (current _canvasWidgetConfig_handles) (current _pFWidgetCtx_attr_manipulator) (current canvasRegion')
