@@ -77,7 +77,8 @@ beginParamsLayout ::
   -> VtyWidget t m (Dynamic t (Maybe Int), a)
 beginParamsLayout child = mdo
   navEv <- paramsNavigation
-  let focusChildEv = layoutFocusEvFromNavigation navEv lrd
+  focusDyn <- focus
+  let focusChildEv = layoutFocusEvFromNavigation navEv (fmapMaybe (\x -> if x then Nothing else Just ()) (updated focusDyn)) lrd
   lrd@LayoutReturnData {..} <- runIsLayoutVtyWidget child focusChildEv
   return (_layoutReturnData_focus, _layoutReturnData_value)
 
@@ -244,7 +245,6 @@ makeSuperStyleEvent tl v bl h f tr br trig = pushAlways pushfn trig where
 -- TODO presets/custom
 holdSuperStyleWidget :: (Reflex t, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m) => MaybeParamsWidgetFn t m SuperStyle
 holdSuperStyleWidget inputDyn = constDyn . Just $ mdo
-  -- TODO need to ignore tab events or something
   let
     mssDyn = fmap snd inputDyn
     selectionDyn = fmap fst inputDyn
@@ -276,7 +276,7 @@ holdSuperStyleWidget inputDyn = constDyn . Just $ mdo
       [] -> Nothing
       x  -> Just $ IM.fromList x
     -- TODO maybe just do it when any of the cell dynamics are updated rather than when focus changes...
-    outputEv = fforMaybe (attach (current selectionDyn) $ makeSuperStyleEvent tl v bl h f tr br (void $ updated focusDyn)) fforfn
+    outputEv = fforMaybe (attach (current selectionDyn) $ makeSuperStyleEvent tl v bl h f tr br (void $ traceEvent "focus" $ updated focusDyn)) fforfn
   return (4, outputEv)
 
 
@@ -348,6 +348,7 @@ data ParamsWidgetConfig t = ParamsWidgetConfig {
 }
 
 data ParamsWidget t = ParamsWidget {
+  -- TODO make into generic WSEvent bc we want to modify canvas as well
   _paramsWidget_paramsEvent :: Event t ControllersWithId
 }
 
