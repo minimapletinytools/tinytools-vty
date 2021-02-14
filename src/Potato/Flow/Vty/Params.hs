@@ -25,6 +25,7 @@ import qualified Data.Sequence                     as Seq
 import qualified Data.Text                         as T
 import qualified Data.Text.Zipper                  as TZ
 import           Data.Tuple.Extra
+import Data.Char (isNumber)
 
 import qualified Graphics.Vty                      as V
 import           Potato.Reflex.Vty.Widget.Layout
@@ -62,6 +63,21 @@ updateTextZipperForSingleCharacter ev = case ev of
   V.EvKey (V.KChar 'u') [V.MCtrl] -> const TZ.empty
   _ -> id
 
+-- | Default vty event handler for text inputs
+updateTextZipperForNumberInput
+  :: V.Event -- ^ The vty event to handle
+  -> TZ.TextZipper -- ^ The zipper to modify
+  -> TZ.TextZipper
+updateTextZipperForNumberInput ev = case ev of
+  V.EvKey (V.KChar k) [] | isNumber k -> TZ.insertChar k
+  V.EvKey V.KBS [] -> TZ.deleteLeft
+  V.EvKey V.KDel [] -> TZ.deleteRight
+  V.EvKey V.KLeft [] -> TZ.left
+  V.EvKey V.KRight [] -> TZ.right
+  V.EvKey V.KHome [] -> TZ.home
+  V.EvKey V.KEnd [] -> TZ.end
+  V.EvKey (V.KChar 'u') [V.MCtrl] -> const TZ.empty
+  _ -> id
 
 paramsNavigation :: (Reflex t, Monad m) => VtyWidget t m (Event t Int)
 paramsNavigation = do
@@ -118,6 +134,8 @@ type MaybeParamsWidgetFn t m a = Dynamic t (Selection, Maybe a) -> MaybeParamsWi
 
 -- |
 -- returned Dynamic contains Nothing if selection was Nothing, otherwise contains Just the widget to modify parameters
+-- remember that input dynamic must not be disconnected from output event or there will be an infinite loop!
+-- maybe use delayEvent :: forall t m a. (Adjustable t m) => Event t a -> m) (Event t a) 😱
 holdMaybeParamsWidget :: forall t m a. (MonadWidget t m)
   => Dynamic t (Maybe (Selection, Maybe a)) -- ^ selection/params input
   -> MaybeParamsWidgetFn t m a -- ^ function creating widget, note that it should always return non-nothing but using Maybe type makes life easier
@@ -156,21 +174,43 @@ updateFromSuperStyle ssc = TZ.fromText . T.singleton . gettfn ssc where
     SSC_Fill -> (\case
       FillStyle_Simple c -> Just c) . _superStyle_fill
 
--- copy pasta from Reflex.Vty.Widget.Input.textInput a lot of stuff in here is not necessary
--- TODO DELETE simplify.. you don't need TextZipper
-cellInput
+singleCellTextInput
   :: (Reflex t, MonadHold t m, MonadFix m)
   => Event t (TZ.TextZipper -> TZ.TextZipper)
   -> TZ.TextZipper
   -> VtyWidget t m (Dynamic t Text)
-cellInput modifyEv c0 = mdo
+singleCellTextInput modifyEv c0 = do
   i <- input
+  textInputCustom (mergeWith (.) [fmap updateTextZipperForSingleCharacter i, modifyEv]) c0
+
+
+-- remember that input dyn can't update the same time the output updates or you will have infinite loop
+dimensionInput
+  :: (Reflex t, MonadHold t m, MonadFix m)
+  => Dynamic t Int
+  -> VtyWidget t m (Dynamic t Int)
+dimensionInput valueDyn = do
+  let
+    toText = TZ.fromText . show
+    modifyEv = fmap (\v -> const (toText v)) (updated valueDyn)
+  v0 <- sample . current $ valueDyn
+  i <- input
+  --tDyn <- textInputCustom (mergeWith (.) [fmap updateTextZipperForNumberInput i, modifyEv]) (toText v0)
+  tDyn <- textInputCustom (mergeWith (.) [fmap updateTextZipperForNumberInput i, modifyEv]) (toText v0)
+  --tDyn <- fmap _textInput_value $ textInput (def { _textInputConfig_initialValue = (toText v0)})
+  return $ ffor2 valueDyn tDyn $ \v t -> fromMaybe v (readMaybe (T.unpack t))
+
+textInputCustom
+  :: (Reflex t, MonadHold t m, MonadFix m)
+  => Event t (TZ.TextZipper -> TZ.TextZipper)
+  -> TZ.TextZipper
+  -> VtyWidget t m (Dynamic t Text)
+textInputCustom modifyEv c0 = mdo
   f <- focus
   dh <- displayHeight
   dw <- displayWidth
   rec v <- foldDyn ($) c0 $ mergeWith (.)
-        [ fmap updateTextZipperForSingleCharacter i
-        , modifyEv
+        [ modifyEv
         , let displayInfo = (,) <$> current rows <*> scrollTop
           in ffor (attach displayInfo click) $ \((dl, st), MouseDown _ (mx, my) _) ->
             TZ.goToDisplayLinePosition mx (st + my) dl
@@ -193,21 +233,12 @@ cellInput modifyEv c0 = mdo
       tellImages $ (\imgs st -> (:[]) . V.vertCat $ drop st imgs) <$> current img <*> scrollTop
   return $ TZ.value <$> v
 
--- remember that input dyn can't update the same time the output updates or you will have infinite loop
-numInput
-  :: (Reflex t, MonadHold t m, MonadFix m)
-  => Dynamic t Int
-  -> VtyWidget t m (Dynamic t Int)
-numInput valueDyn = mdo
-  -- TODO
-  text "TODO"
-  return (constDyn 0)
 
 makeSuperStyleTextEntry :: (Reflex t, MonadHold t m, MonadFix m) => SuperStyleCell -> Dynamic t (Maybe SuperStyle) -> VtyWidget t m (Behavior t PChar)
 makeSuperStyleTextEntry ssc mssDyn = do
   mss0 <- sample . current $ mssDyn
   let modifyEv = (fmap (maybe id (\ss -> const (updateFromSuperStyle ssc ss))) (updated mssDyn))
-  ti <- cellInput modifyEv $ case mss0 of
+  ti <- singleCellTextInput modifyEv $ case mss0 of
     Nothing  -> ""
     Just ss0 -> updateFromSuperStyle ssc ss0
   return . current . fmap (\t -> maybe ' ' (\(c,_) -> c) (T.uncons t)) $ ti
@@ -313,19 +344,19 @@ holdTextAlignmentWidget taDyn = ffor taDyn $ \(selection, mta) -> Just $ do
 
 
 -- TODO this is a problem, we need to get input canvas size...
-holdCanvasSizeWidget :: forall t m. (MonadWidget t m) => Dynamic t PFState -> MaybeParamsWidgetFn t m ()
-holdCanvasSizeWidget pFStateDyn nothingDyn = ffor nothingDyn $ \_ -> Just $ do
+holdCanvasSizeWidget :: forall t m. (MonadWidget t m) => Dynamic t SCanvas -> MaybeParamsWidgetFn t m ()
+holdCanvasSizeWidget canvasDyn nothingDyn = ffor nothingDyn $ \_ -> Just $ do
   let
-    cSizeDyn = fmap (_lBox_size . _sCanvas_box . _pFState_canvas) pFStateDyn
+    cSizeDyn = fmap (_lBox_size . _sCanvas_box) canvasDyn
     cWidthDyn = fmap (\(V2 x _) -> x) cSizeDyn
     cHeightDyn = fmap (\(V2 _ y) -> y) cSizeDyn
   (focusDyn, (wDyn,hDyn)) <- beginParamsLayout $ col $ do
     wDyn' <- fixedL 1 $ row $ do
-      fixed 10 $ text "width:"
-      stretch $ numInput cWidthDyn
+      fixedNoFocus 8 $ text " width:"
+      stretch $ dimensionInput cWidthDyn
     hDyn' <- fixedL 1 $ row $ do
-      fixed 10 $ text "height:"
-      stretch $ numInput cHeightDyn
+      fixedNoFocus 8 $ text "height:"
+      stretch $ dimensionInput cHeightDyn
     return (wDyn',hDyn')
   let
     outputEv = flip pushAlways (void $ updated focusDyn) $ \_ -> do
@@ -352,7 +383,8 @@ data ParamsWidget t = ParamsWidget {
   _paramsWidget_paramsEvent :: Event t ControllersWithId
 }
 
-presetStyles = ["╔╗╚╝║═ ","****|- ", "┌┐└┘│─ ", "██████ "]
+presetStyles :: [[Char]]
+presetStyles = ["╔╗╚╝║═ ","****|- ", "██████ ", "┌┐└┘│─ "]
 
 
 holdParamsWidget :: forall t m. (MonadWidget t m)
@@ -362,7 +394,7 @@ holdParamsWidget ParamsWidgetConfig {..} = do
 
   let
     selectionDyn = _goatWidget_selection (_pFWidgetCtx_goatWidget _paramsWidgetConfig_pfctx)
-    pFStateDyn = fmap (_pFWorkspace_pFState . _goatState_pFWorkspace) . _goatWidget_DEBUG_goatState . _pFWidgetCtx_goatWidget $ _paramsWidgetConfig_pfctx
+    canvasDyn = _goatWidget_canvas . _pFWidgetCtx_goatWidget $ _paramsWidgetConfig_pfctx
 
     textAlignSelector = (fmap (\(TextStyle ta) -> ta)) . getSEltLabelBoxTextStyle . thd3
     mTextAlignInputDyn = fmap ( selectParamsFromSelection textAlignSelector) selectionDyn
@@ -372,7 +404,7 @@ holdParamsWidget ParamsWidgetConfig {..} = do
 
   textAlignmentWidget <- holdMaybeParamsWidget mTextAlignInputDyn holdTextAlignmentWidget
   superStyleWidget2 <- holdMaybeParamsWidget mSuperStyleInputDyn holdSuperStyleWidget
-  canvasSizeWidget <- holdMaybeParamsWidget mCanvasSizeInputDyn (holdCanvasSizeWidget pFStateDyn)
+  canvasSizeWidget <- holdMaybeParamsWidget mCanvasSizeInputDyn (holdCanvasSizeWidget canvasDyn)
 
 
 
@@ -409,7 +441,7 @@ holdParamsWidget ParamsWidgetConfig {..} = do
             [] -> Nothing
             x  -> Just $ IM.fromList x
         ssparamsEv = push pushSuperStyleFn setStyleEv
-      return (4, ssparamsEv)
+      return (5, ssparamsEv)
 
   -- do some magic to collapse MaybeParamsWidgetOutputDyn and render it with paramsLayout
   outputEv <- paramsLayout . fmap catMaybes . mconcat . (fmap (fmap (:[]))) $ [textAlignmentWidget, superStyleWidget2, canvasSizeWidget, constDyn $ Just superStyleWidget]
