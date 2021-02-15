@@ -46,12 +46,15 @@ convertKey = \case
   V.KPause -> Nothing
   V.KIns -> Nothing
   V.KHome -> Just KeyboardKey_Home
-  V.KPageUp -> Just KeyboardKey_PageUp
   V.KDel -> Just KeyboardKey_Delete
   V.KEnd -> Just KeyboardKey_End
-  V.KPageDown -> Just KeyboardKey_PageDown
   V.KBegin -> Nothing
   V.KMenu -> Nothing
+  -- disabled for now cuz I use for debugging
+  -- TODO enable
+  --V.KPageUp -> Just KeyboardKey_PageUp
+  --V.KPageDown -> Just KeyboardKey_PageDown
+  _ -> Nothing
 
 
 convertButton :: V.Button -> Maybe MouseButton

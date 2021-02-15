@@ -76,6 +76,7 @@ type MonadVtyApp t m =
   , PerformEvent t m
   , MonadIO m
   , MonadIO (Performable m)
+  , MonadSample t (Performable m)
   , Adjustable t m
   )
 

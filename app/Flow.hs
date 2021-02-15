@@ -6,6 +6,7 @@ module Flow (
 ) where
 import           Relude
 
+
 import           Potato.Flow
 import           Potato.Flow.Controller
 import           Potato.Flow.TestStates
@@ -22,6 +23,7 @@ import           Potato.Reflex.Vty.Widget.Popup
 import           Potato.Reflex.Vty.Widget
 import qualified Potato.Reflex.Vty.Host
 
+import System.IO (stderr, hFlush)
 import           Control.Concurrent
 import           Control.Monad.Fix
 import           Control.Monad.NodeId
@@ -29,6 +31,7 @@ import qualified Data.Aeson                        as Aeson
 import qualified Data.Aeson.Encode.Pretty as PrettyAeson
 import           Data.Maybe
 import           Data.Monoid                       (Any)
+import qualified Data.Text                as T
 import qualified Data.Text.Encoding                as T
 import qualified Data.Text.Lazy                    as LT
 import qualified Data.Text.Lazy.Encoding           as LT
@@ -52,7 +55,7 @@ import           Reflex.Vty
 -- | Sets up the top-level context for a 'VtyWidget' and runs it with that context
 potatoMainWidgetWithHandle
   :: V.Vty
-  -> (forall t m. (MonadVtyApp t m, MonadNodeId m) => VtyWidget t m (Event t ()))
+  -> (forall t m. (Potato.Reflex.Vty.Host.MonadVtyApp t m, MonadNodeId m) => VtyWidget t m (Event t ()))
   -> IO ()
 potatoMainWidgetWithHandle vty child =
   Potato.Reflex.Vty.Host.runVtyAppWithHandle vty $ \dr0 inp -> do
@@ -79,7 +82,7 @@ potatoMainWidgetWithHandle vty child =
 -- | run a VtyWidget using term width map written to disk with write-term-width for the current terminal
 -- uses default if the file does not exist
 potatoMainWidget
-  :: (forall t m. (MonadVtyApp t m, MonadNodeId m) => VtyWidget t m (Event t ()))
+  :: (forall t m. (Potato.Reflex.Vty.Host.MonadVtyApp t m, MonadNodeId m) => VtyWidget t m (Event t ()))
   -> IO ()
 potatoMainWidget child = do
   cfg'' <- V.standardIOConfig
@@ -202,8 +205,8 @@ mainPFWidget = mdo
   flowInput <- input
   postBuildEv <- getPostBuild
 
-  -- force redraw of handles, needed in some cases
-  tickOnEvent flowInput
+  -- need this to force redraw of handles in some cases
+  tickOnEvent (updated . _goatWidget_selection $ everythingW)
 
   let
     pfctx = PFWidgetCtx {
@@ -215,15 +218,25 @@ mainPFWidget = mdo
         , _pFWidgetCtx_initialPFState = pfstate_basic1
       }
 
-
-  -- ::save/load file potato::
-  -- TODO
-  --performEvent_ $ ffor (_pfo_saved pfo) $ \spf -> do
-  --  liftIO $ Aeson.encodeFile "potato.flow" spf
-
+  -- load file on start
   mLoadFileEv <- performEvent $ ffor postBuildEv $ \_ -> do
     mspf :: Maybe SPotatoFlow <- liftIO $ Aeson.decodeFileStrict "potato.flow"
     return $ mspf >>= return . (,emptyControllerMeta)
+
+
+  -- debug stuff (temp)
+  let
+    debugKeyEv = fforMaybe flowInput $ \case
+      V.EvKey (V.KPageDown) [] -> Just ()
+      _ -> Nothing
+  performEvent_ $ ffor debugKeyEv $ \_ -> do
+    handler <- sample . current . fmap _goatState_handler . _goatWidget_DEBUG_goatState $ everythingW
+    liftIO $ do
+      T.hPutStr stderr $ pHandlerDebugShow handler
+      hFlush stderr
+
+
+
 
   let
     goatWidgetConfig = GoatWidgetConfig {

@@ -36,7 +36,7 @@ import qualified Graphics.Vty             as V
 import           Reflex
 import           Reflex.Vty
 
-type MonadWidget t m = (Reflex t, MonadHold t m, MonadFix m, NotReady t m, Adjustable t m, PostBuild t m, PerformEvent t m, TriggerEvent t m, MonadNodeId m, MonadIO (Performable m), MonadIO m)
+type MonadWidget t m = (Reflex t, MonadHold t m, MonadFix m, NotReady t m, Adjustable t m, PostBuild t m, PerformEvent t m, TriggerEvent t m, MonadNodeId m, MonadIO (Performable m), MonadSample t (Performable m), MonadIO m)
 
 debugFocus :: (Reflex t, Monad m) => VtyWidget t m ()
 debugFocus = do

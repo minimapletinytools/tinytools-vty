@@ -74,7 +74,7 @@ For pkg-config to find icu4c you may need to set:
       -this can happen off screen too, maybe you can capture release events off screen? not sure
         -if not, you'll have to check for a new click event and see if there was a prior release event
     DONE-i.e. modify pane implementation to ignore drag events that started off pane
-  -text box that takes return key as confirming a text box and firing off a confirm event, also loses focus?
+  DONE-text box that takes return key as confirming a text box and firing off a confirm event, also loses focus?
   -pop up panes (e.g. to save to file or whatever)
     -needs to take away focus from panes in the background
       -we could ad-hoc solves this by having panes always out of focus if the pop up is in focus
