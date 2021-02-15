@@ -99,9 +99,9 @@ potatoMainWidget child = do
   potatoMainWidgetWithHandle vty child
 
 
-
-
-
+-- | tick once (redraw widgets) upon event firing
+tickOnEvent :: (Reflex t, Adjustable t m) => Event t a -> m ()
+tickOnEvent ev = void $ runWithReplace (return ()) (ev $> return ())
 
 
 flowMain :: IO ()
@@ -194,10 +194,16 @@ mainPFWidget :: forall t m. (MonadWidget t m)
 mainPFWidget = mdo
   -- external inputs
   currentTime <- liftIO $ getCurrentTime
-  tickEv <- tickLossy 1 currentTime
-  ticks <- foldDyn (+) (0 :: Int) (fmap (const 1) tickEv)
+
+  -- note tickEv triggers 2 ticks
+  --tickEv <- tickLossy 1 currentTime
+  --ticks <- foldDyn (+) (0 :: Int) (fmap (const 1) tickEv)
+
   flowInput <- input
   postBuildEv <- getPostBuild
+
+  -- force redraw of handles, needed in some cases
+  tickOnEvent flowInput
 
   let
     pfctx = PFWidgetCtx {
