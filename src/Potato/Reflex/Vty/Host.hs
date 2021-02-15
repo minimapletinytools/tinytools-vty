@@ -21,6 +21,7 @@ module Potato.Reflex.Vty.Host
 
 import Prelude
 
+import System.IO
 import Control.Concurrent (forkIO, killThread, MVar, newMVar, putMVar, readMVar, modifyMVar_)
 import Control.Concurrent.Chan (newChan, readChan, writeChan)
 import Control.Exception (onException)
@@ -92,6 +93,7 @@ type VtyApp t m = MonadVtyApp t m
   -- occurrences of events ('PerformEvent').
 
 -- | Runs a 'VtyApp' in a given 'Graphics.Vty.Vty'.
+-- Same as Reflex.Vty.runVtyAppWithHandle except does some bonus potato stuff
 runVtyAppWithHandle
   :: V.Vty
   -- ^ A 'Graphics.Vty.Vty' handle.
@@ -199,6 +201,9 @@ runVtyAppWithHandle vty vtyGuest = flip onException (V.shutdown vty) $
       writeChan events ev
       modifyMVar_ chanSizeVar (return . (+1))
 
+
+    numFramesVar :: MVar Int <- liftIO $ newMVar 0
+
     -- The main application loop. We wait for new events, fire those that
     -- have subscribers, and update the display. If we detect a shutdown
     -- request, the application terminates.
@@ -213,6 +218,16 @@ runVtyAppWithHandle vty vtyGuest = flip onException (V.shutdown vty) $
           readEvent shutdown >>= \case
             Nothing -> return False
             Just _ -> return True
+
+      -- potato debug logging
+      {-
+      liftIO $ do
+        nFrames <- readMVar numFramesVar
+        hPutStrLn stderr $ "frame: " <> show nFrames <> " ticks: " <> show (length stop)
+        hFlush stderr
+        modifyMVar_ numFramesVar (return . (+1))
+      -}
+
       if or stop
         then liftIO $ do             -- If we received a shutdown 'Event'
           killThread nextEventThread -- then stop reading input events and
