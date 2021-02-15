@@ -69,16 +69,16 @@ extra-deps:
 - github: pdlla/reflex-potatoes
   commit: ca25ecfcf6a651f7ee91f4c278ac8035fd48d9a5
 - github: pdlla/potato-flow
-  commit: 2c30da72c4f63b4daaa30e02417be86e0738f1a6
+  commit: c9642b987fe39bf5c561fae02376e3e23be1a208
 
 # - /Users/user/kitchen/faucet/reflex-vty
 # - github: pdlla/reflex-vty
 #  commit: 1bfd8f985e832d26c7360beae913dda07e477642
 
 # :O enables stack traces
-build:
-  library-profiling: true
-  executable-profiling: true
+#build:
+#  library-profiling: true
+#  executable-profiling: true
 
 # Override default flag values for local packages and extra-deps
 # flags: {}

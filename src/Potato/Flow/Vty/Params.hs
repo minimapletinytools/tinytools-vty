@@ -172,7 +172,8 @@ updateFromSuperStyle ssc = TZ.fromText . T.singleton . gettfn ssc where
     SSC_V -> _superStyle_vertical
     SSC_H -> _superStyle_horizontal
     SSC_Fill -> (\case
-      FillStyle_Simple c -> Just c) . _superStyle_fill
+      FillStyle_Simple c -> Just c
+      _ -> Nothing) . _superStyle_fill
 
 singleCellTextInput
   :: (Reflex t, MonadHold t m, MonadFix m)
@@ -307,7 +308,7 @@ holdSuperStyleWidget inputDyn = constDyn . Just $ mdo
       [] -> Nothing
       x  -> Just $ IM.fromList x
     -- TODO maybe just do it when any of the cell dynamics are updated rather than when focus changes...
-    outputEv = fforMaybe (attach (current selectionDyn) $ makeSuperStyleEvent tl v bl h f tr br (void $ traceEvent "focus" $ updated focusDyn)) fforfn
+    outputEv = fforMaybe (attach (current selectionDyn) $ makeSuperStyleEvent tl v bl h f tr br (void $ updated focusDyn)) fforfn
   return (4, outputEv)
 
 
