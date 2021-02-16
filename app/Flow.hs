@@ -161,17 +161,25 @@ focusWidgetNoMouse :: forall t m a. (MonadWidget t m)
   => Dynamic t Bool -- ^ whether widget should be focused or not, note events that change focus are not captured!
   -> VtyWidget t m a
   -> VtyWidget t m a
-focusWidgetNoMouse focus child = VtyWidget $ do
+focusWidgetNoMouse f child = VtyWidget $ do
   ctx <- lift ask
   let ctx' = VtyWidgetCtx {
-      _vtyWidgetCtx_input = gate (current focus) (_vtyWidgetCtx_input ctx)
-      , _vtyWidgetCtx_focus = liftA2 (&&) (_vtyWidgetCtx_focus ctx) focus
+      _vtyWidgetCtx_input = gate (current f) (_vtyWidgetCtx_input ctx)
+      , _vtyWidgetCtx_focus = liftA2 (&&) (_vtyWidgetCtx_focus ctx) f
       , _vtyWidgetCtx_width = _vtyWidgetCtx_width ctx
       , _vtyWidgetCtx_height = _vtyWidgetCtx_height ctx
     }
   (result, images) <- lift . lift $ runVtyWidget ctx' child
   tellImages images
   return result
+
+-- | ignores mouse input unless widget is focused
+ignoreMouseUnlessFocused :: forall t m a. (MonadWidget t m)
+  => VtyWidget t m a
+  -> VtyWidget t m a
+ignoreMouseUnlessFocused child = do
+  f <- focus
+  focusWidgetNoMouse f child
 
 -- | block all or some input events, always focused if parent is focused
 captureInputEvents :: forall t m a. (MonadWidget t m)
@@ -301,14 +309,19 @@ mainPFWidget = mdo
         }
       return (layers', tools', params')
 
-    rightPanel = holdCanvasWidget $ CanvasWidgetConfig {
-        _canvasWidgetConfig_pfctx = pfctx
-        , _canvasWidgetConfig_pan = _goatWidget_pan everythingW
-        , _canvasWidgetConfig_broadPhase = _goatWidget_broadPhase everythingW
-        , _canvasWidgetConfig_renderedCanvas = _goatWidget_renderedCanvas everythingW
-        , _canvasWidgetConfig_canvas = _goatWidget_canvas everythingW
-        , _canvasWidgetConfig_handles = _goatWidget_handlerRenderOutput everythingW
-      }
+    rightPanel = do
+      dreg <- displayRegion
+      f <- focus
+      -- temp ignoreMouseUnlessFocused as when we click from one panel to the other, it will tigger events in both panels
+      -- TODO remove this once we do proper Endo style folding in Goat...
+      ignoreMouseUnlessFocused $ pane2 dreg f $ holdCanvasWidget $ CanvasWidgetConfig {
+          _canvasWidgetConfig_pfctx = pfctx
+          , _canvasWidgetConfig_pan = _goatWidget_pan everythingW
+          , _canvasWidgetConfig_broadPhase = _goatWidget_broadPhase everythingW
+          , _canvasWidgetConfig_renderedCanvas = _goatWidget_renderedCanvas everythingW
+          , _canvasWidgetConfig_canvas = _goatWidget_canvas everythingW
+          , _canvasWidgetConfig_handles = _goatWidget_handlerRenderOutput everythingW
+        }
 
   (keyboardEv, ((layersW, toolsW, paramsW), canvasW)) <- captureInputEvents (That inputCapturedByPopupBeh) $ do
     inp <- input

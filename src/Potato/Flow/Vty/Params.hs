@@ -277,6 +277,8 @@ makeSuperStyleEvent tl v bl h f tr br trig = pushAlways pushfn trig where
 -- TODO presets/custom
 holdSuperStyleWidget :: (Reflex t, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m) => MaybeParamsWidgetFn t m SuperStyle
 holdSuperStyleWidget inputDyn = constDyn . Just $ mdo
+  -- TODO the awesome version of this has a toggle box so that you can choose to do horiz/vertical together (once you support separate horiz/vert left/right/top/down styles)
+  -- TODO also a toggle for setting corners to common sets
   let
     mssDyn = fmap snd inputDyn
     selectionDyn = fmap fst inputDyn
@@ -290,11 +292,11 @@ holdSuperStyleWidget inputDyn = constDyn . Just $ mdo
     (h'',f'') <- fixedL 1 $ col $ do
       h' <- fixed 1 $ makeSuperStyleTextEntry SSC_H mssDyn
       f' <- fixed 1 $ makeSuperStyleTextEntry SSC_Fill mssDyn
-      _ <- fixedNoFocus 1 $ emptyWidget
+      _ <- fixedNoFocus 1 $ emptyWidget -- TODO you can modify this too, why not, 2 boxes for the same thing
       return (h',f')
     (tr'',br'') <- fixedL 1 $ col $ do
       tr' <- fixed 1 $ makeSuperStyleTextEntry SSC_TR mssDyn
-      _ <- fixedNoFocus 1 $ emptyWidget
+      _ <- fixedNoFocus 1 $ emptyWidget -- TODO you can modify this too, why not, 2 boxes for the same thing
       br' <- fixed 1 $ makeSuperStyleTextEntry SSC_BR mssDyn
       return (tr',br')
     return (tl'',v'',bl'',h'',f'',tr'',br'')
@@ -308,6 +310,7 @@ holdSuperStyleWidget inputDyn = constDyn . Just $ mdo
       [] -> Nothing
       x  -> Just $ IM.fromList x
     -- TODO maybe just do it when any of the cell dynamics are updated rather than when focus changes...
+    -- TODO if we do it on focus change, you don't want to set when escape is pressed... so maybe it's better just to do 🖕
     outputEv = fforMaybe (attach (current selectionDyn) $ makeSuperStyleEvent tl v bl h f tr br (void $ updated focusDyn)) fforfn
   return (4, outputEv)
 

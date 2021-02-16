@@ -14,7 +14,9 @@
 {-# LANGUAGE UndecidableInstances       #-}
 
 module Potato.Reflex.Vty.Widget
-  ( SingleClick(..)
+  ( displayRegion
+
+  , SingleClick(..)
   , singleClick
   , behaviorToggleWidget
 
@@ -44,7 +46,11 @@ import           Control.Monad.NodeId
 import           Control.Monad.Reader
 
 
-
+displayRegion :: (HasDisplaySize t m) => m (DynRegion t)
+displayRegion = do
+  dw <- displayWidth
+  dh <- displayHeight
+  return $ DynRegion 0 0 dw dh
 
 -- currently only works for a SINGLE POINT
 -- TODO integrate with pane2 so it reports clicks that happen on pane.
