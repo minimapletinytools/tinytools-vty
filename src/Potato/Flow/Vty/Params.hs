@@ -25,6 +25,7 @@ import qualified Data.Sequence                     as Seq
 import qualified Data.Text                         as T
 import qualified Data.Text.Zipper                  as TZ
 import           Data.Tuple.Extra
+import Data.Align
 import Data.Char (isNumber)
 
 import qualified Graphics.Vty                      as V
@@ -94,6 +95,7 @@ beginParamsLayout ::
 beginParamsLayout child = mdo
   navEv <- paramsNavigation
   focusDyn <- focus
+  -- TODO instead of layoutFocusEvFromNavigation we want to lose focus after we complete a full round of navigation :O
   let focusChildEv = layoutFocusEvFromNavigation navEv (fmapMaybe (\x -> if x then Nothing else Just ()) (updated focusDyn)) lrd
   lrd@LayoutReturnData {..} <- runIsLayoutVtyWidget child focusChildEv
   return (_layoutReturnData_focus, _layoutReturnData_value)
@@ -128,18 +130,18 @@ selectParamsFromSelection ps selection = r where
       else Just (subSelection, Nothing)
 
 
-type MaybeParamsWidgetOutputDyn t m = Dynamic t (Maybe (VtyWidget t m (Dynamic t Int, Event t ControllersWithId)))
+type MaybeParamsWidgetOutputDyn t m b = Dynamic t (Maybe (VtyWidget t m (Dynamic t Int, Event t b)))
 
-type MaybeParamsWidgetFn t m a = Dynamic t (Selection, Maybe a) -> MaybeParamsWidgetOutputDyn t m
+type MaybeParamsWidgetFn t m a b = Dynamic t (Selection, Maybe a) -> MaybeParamsWidgetOutputDyn t m b
 
 -- |
 -- returned Dynamic contains Nothing if selection was Nothing, otherwise contains Just the widget to modify parameters
 -- remember that input dynamic must not be disconnected from output event or there will be an infinite loop!
 -- maybe use delayEvent :: forall t m a. (Adjustable t m) => Event t a -> m) (Event t a) 😱
-holdMaybeParamsWidget :: forall t m a. (MonadWidget t m)
+holdMaybeParamsWidget :: forall t m a b. (MonadWidget t m)
   => Dynamic t (Maybe (Selection, Maybe a)) -- ^ selection/params input
-  -> MaybeParamsWidgetFn t m a -- ^ function creating widget, note that it should always return non-nothing but using Maybe type makes life easier
-  -> VtyWidget t m (MaybeParamsWidgetOutputDyn t m)
+  -> MaybeParamsWidgetFn t m a b -- ^ function creating widget, note that it should always return non-nothing but using Maybe type makes life easier
+  -> VtyWidget t m (MaybeParamsWidgetOutputDyn t m b)
 holdMaybeParamsWidget mInputDyn widgetFn = do
   uniqDyn <- holdUniqDynBy (\a b -> isJust a == isJust b) mInputDyn
   return . join . ffor uniqDyn $ \case
@@ -149,14 +151,6 @@ holdMaybeParamsWidget mInputDyn widgetFn = do
 
 emptyWidget :: (Monad m) => VtyWidget t m ()
 emptyWidget = return ()
-
-paramsLayout :: (MonadWidget t m) => Dynamic t [VtyWidget t m (Dynamic t Int, Event t ControllersWithId)] -> VtyWidget t m (Event t ControllersWithId)
-paramsLayout widgets' = (switchHold never =<<) . networkView . ffor widgets' $ \widgets -> fmap snd $ beginNoNavLayout $ col $ do
-  outputs <- forM widgets $ \w -> mdo
-    (sz, ev) <- fixed sz w
-    return ev
-  return $ leftmostWarn "paramsLayout" outputs
-
 
 -- SuperStyle stuff
 data SuperStyleCell = SSC_TL | SSC_TR | SSC_BL | SSC_BR | SSC_V | SSC_H | SSC_Fill
@@ -275,7 +269,7 @@ makeSuperStyleEvent tl v bl h f tr br trig = pushAlways pushfn trig where
       }
 
 -- TODO presets/custom
-holdSuperStyleWidget :: (Reflex t, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m) => MaybeParamsWidgetFn t m SuperStyle
+holdSuperStyleWidget :: (Reflex t, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m) => MaybeParamsWidgetFn t m SuperStyle ControllersWithId
 holdSuperStyleWidget inputDyn = constDyn . Just $ mdo
   -- TODO the awesome version of this has a toggle box so that you can choose to do horiz/vertical together (once you support separate horiz/vert left/right/top/down styles)
   -- TODO also a toggle for setting corners to common sets
@@ -316,7 +310,7 @@ holdSuperStyleWidget inputDyn = constDyn . Just $ mdo
 
 
 -- Text Alignment stuff
-holdTextAlignmentWidget :: forall t m. (MonadWidget t m) => MaybeParamsWidgetFn t m TextAlign
+holdTextAlignmentWidget :: forall t m. (MonadWidget t m) => MaybeParamsWidgetFn t m TextAlign ControllersWithId
 holdTextAlignmentWidget taDyn = ffor taDyn $ \(selection, mta) -> Just $ do
   let
     startAlign = case mta of
@@ -348,7 +342,7 @@ holdTextAlignmentWidget taDyn = ffor taDyn $ \(selection, mta) -> Just $ do
 
 
 -- TODO this is a problem, we need to get input canvas size...
-holdCanvasSizeWidget :: forall t m. (MonadWidget t m) => Dynamic t SCanvas -> MaybeParamsWidgetFn t m ()
+holdCanvasSizeWidget :: forall t m. (MonadWidget t m) => Dynamic t SCanvas -> MaybeParamsWidgetFn t m () XY
 holdCanvasSizeWidget canvasDyn nothingDyn = ffor nothingDyn $ \_ -> Just $ do
   let
     cSizeDyn = fmap (_lBox_size . _sCanvas_box) canvasDyn
@@ -363,16 +357,15 @@ holdCanvasSizeWidget canvasDyn nothingDyn = ffor nothingDyn $ \_ -> Just $ do
       stretch $ dimensionInput cHeightDyn
     return (wDyn',hDyn')
   let
-    outputEv = flip pushAlways (void $ updated focusDyn) $ \_ -> do
+    outputEv = flip push (void $ updated focusDyn) $ \_ -> do
       cw <- sample . current $ cWidthDyn
       ch <- sample . current $ cHeightDyn
       w <- sample . current $ wDyn
       h <- sample . current $ hDyn
       return $ if cw /= w || ch /= h
-        -- TODO actually update the canvas... need to change MaybeParamsWidgetFn...
-        then Nothing
+        then Just $ V2 (w-cw) (h-ch) -- it's a delta D:
         else Nothing
-  return (2, never)
+  return (2, outputEv)
 
 data SEltParams = SEltParams {
     --_sEltParams_sBox =
@@ -385,11 +378,14 @@ data ParamsWidgetConfig t = ParamsWidgetConfig {
 data ParamsWidget t = ParamsWidget {
   -- TODO make into generic WSEvent bc we want to modify canvas as well
   _paramsWidget_paramsEvent :: Event t ControllersWithId
+  , _paramsWidget_canvasSizeEvent :: Event t XY
 }
 
 presetStyles :: [[Char]]
 presetStyles = ["╔╗╚╝║═ ","****|- ", "██████ ", "┌┐└┘│─ "]
 
+switchHoldPair :: (Reflex t, MonadHold t m) => Event t a -> Event t b -> Event t (Event t a, Event t b) -> m (Event t a, Event t b)
+switchHoldPair eva evb evin = fmap fanThese $ switchHold (align eva evb) $ fmap (uncurry align) evin
 
 holdParamsWidget :: forall t m. (MonadWidget t m)
   => ParamsWidgetConfig t
@@ -447,9 +443,23 @@ holdParamsWidget ParamsWidgetConfig {..} = do
         ssparamsEv = push pushSuperStyleFn setStyleEv
       return (5, ssparamsEv)
 
-  -- do some magic to collapse MaybeParamsWidgetOutputDyn and render it with paramsLayout
-  outputEv <- paramsLayout . fmap catMaybes . mconcat . (fmap (fmap (:[]))) $ [textAlignmentWidget, superStyleWidget2, canvasSizeWidget, constDyn $ Just superStyleWidget]
+
+  let controllersWithIdParamsWidgets = fmap catMaybes . mconcat . (fmap (fmap (:[]))) $ [textAlignmentWidget, superStyleWidget2, constDyn $ Just superStyleWidget]
+
+
+  (paramsOutputEv, canvasSizeOutputEv) <- (switchHoldPair never never =<<) . networkView . ffor2 controllersWithIdParamsWidgets canvasSizeWidget $ \widgets mcsw -> fmap snd $ beginNoNavLayout $ col $ do
+    outputs <- forM widgets $ \w -> mdo
+      (sz, ev) <- fixed sz w
+      return ev
+    cssev <- case mcsw of
+      Nothing -> return never
+      Just csw -> mdo
+        (cssz, cssev') <- fixed cssz csw
+        return cssev'
+    return $ (leftmostWarn "paramsLayout" outputs, cssev)
+
 
   return ParamsWidget {
-    _paramsWidget_paramsEvent = outputEv
+    _paramsWidget_paramsEvent = paramsOutputEv
+    , _paramsWidget_canvasSizeEvent = canvasSizeOutputEv
   }

@@ -257,7 +257,7 @@ mainPFWidget = mdo
 
         , _goatWidgetConfig_selectTool = _toolWidget_setTool toolsW
         , _goatWidgetConfig_paramsEvent = _paramsWidget_paramsEvent paramsW
-        , _goatWidgetConfig_canvasSize = never
+        , _goatWidgetConfig_canvasSize = _paramsWidget_canvasSizeEvent paramsW
 
         -- debugging/deprecated stuff
         , _goatWidgetConfig_setDebugLabel = never
