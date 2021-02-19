@@ -167,10 +167,10 @@ emptyWidget :: (Monad m) => VtyWidget t m ()
 emptyWidget = return ()
 
 -- SuperStyle stuff
-data SuperStyleCell = SSC_TL | SSC_TR | SSC_BL | SSC_BR | SSC_V | SSC_H | SSC_Fill
+data SuperStyleCell = SSC_TL | SSC_TR | SSC_BL | SSC_BR | SSC_V | SSC_H | SSC_Fill deriving (Show)
 
 updateFromSuperStyle :: SuperStyleCell -> (SuperStyle -> TZ.TextZipper)
-updateFromSuperStyle ssc = TZ.fromText . T.singleton . gettfn ssc where
+updateFromSuperStyle ssc = TZ.top . TZ.fromText . T.singleton . gettfn ssc where
   gettfn ssc' = fromMaybe ' ' . gettfn' ssc'
   gettfn' = \case
     SSC_TL -> _superStyle_tl
@@ -204,7 +204,6 @@ dimensionInput valueDyn = do
     modifyEv = fmap (\v -> const (toText v)) (updated valueDyn)
   v0 <- sample . current $ valueDyn
   i <- input
-  --tDyn <- textInputCustom (mergeWith (.) [fmap updateTextZipperForNumberInput i, modifyEv]) (toText v0)
   tDyn <- textInputCustom (mergeWith (.) [fmap updateTextZipperForNumberInput i, modifyEv]) (toText v0)
   --tDyn <- fmap _textInput_value $ textInput (def { _textInputConfig_initialValue = (toText v0)})
   return $ ffor2 valueDyn tDyn $ \v t -> fromMaybe v (readMaybe (T.unpack t))
@@ -220,9 +219,9 @@ textInputCustom modifyEv c0 = mdo
   dw <- displayWidth
   rec v <- foldDyn ($) c0 $ mergeWith (.)
         [ modifyEv
-        , let displayInfo = (,) <$> current rows <*> scrollTop
-          in ffor (attach displayInfo click) $ \((dl, st), MouseDown _ (mx, my) _) ->
-            TZ.goToDisplayLinePosition mx (st + my) dl
+        , let displayInfo = current rows
+          in ffor (attach displayInfo click) $ \(dl, MouseDown _ (mx, my) _) ->
+            TZ.goToDisplayLinePosition mx my dl
         ]
       click <- mouseDown V.BLeft
       let cursorAttrs = ffor f $ \x -> if x then cursorAttributes else V.defAttr
@@ -231,15 +230,7 @@ textInputCustom modifyEv c0 = mdo
             <*> (TZ.mapZipper <$> (constDyn id) <*> v)
             <*> cursorAttrs
           img = images . TZ._displayLines_spans <$> rows
-      y <- holdUniqDyn $ TZ._displayLines_cursorY <$> rows
-      let newScrollTop :: Int -> (Int, Int) -> Int
-          newScrollTop st (h, cursorY)
-            | cursorY < st = cursorY
-            | cursorY >= st + h = cursorY - h + 1
-            | otherwise = st
-      let hy = attachWith newScrollTop scrollTop $ updated $ zipDyn dh y
-      scrollTop <- hold 0 hy
-      tellImages $ (\imgs st -> (:[]) . V.vertCat $ drop st imgs) <$> current img <*> scrollTop
+      tellImages $ (\imgs -> (:[]) . V.vertCat $ imgs) <$> current img
   return $ TZ.value <$> v
 
 
@@ -272,6 +263,7 @@ makeSuperStyleEvent tl v bl h f tr br trig = pushAlways pushfn trig where
     tr' <- sample tr
     br' <- sample br
     return $ def {
+        -- TODO Nothing is text cell was blank...
         _superStyle_tl    = Just tl'
         , _superStyle_tr     = Just tr'
         , _superStyle_bl        = Just bl'
@@ -291,7 +283,9 @@ holdSuperStyleWidget inputDyn = constDyn . Just $ mdo
     mssDyn = fmap snd inputDyn
     selectionDyn = fmap fst inputDyn
   -- TODO change this so it's left to right
+  -- TODO arrow nav would be super cool
   (focusDyn,(tl,v,bl,h,f,tr,br)) <- beginParamsLayout $ row $ do
+    --fixed 1 $ text (fmap (T.pack . superStyle_toListFormat . Data.Maybe.fromJust) $ current mssDyn)
     (tl'',v'',bl'') <- fixedL 1 $ col $ do
       tl' <- fixed 1 $ makeSuperStyleTextEntry SSC_TL mssDyn
       v' <- fixed 1 $ makeSuperStyleTextEntry SSC_V mssDyn
@@ -324,7 +318,7 @@ holdSuperStyleWidget inputDyn = constDyn . Just $ mdo
 
 
     captureEv = leftmost [void outputEv, captureEv1]
-  traceShow "remaking" $ return (4, captureEv, outputEv)
+  return (4, captureEv, outputEv)
 
 
 -- Text Alignment stuff
@@ -486,7 +480,7 @@ holdParamsWidget ParamsWidgetConfig {..} = do
 
 
   -- apparently textAlignmentWidget gets updated after any change which causes the whole network to rerender and we lose our focus state...
-  let controllersWithIdParamsWidgets = fmap catMaybes . mconcat . (fmap (fmap (:[]))) $ [traceDynWith (const "crappo1") $ textAlignmentWidget, traceDynWith (const "crappo2") $ superStyleWidget2, traceDynWith (const "crappo3") $ constDyn $ Just superStyleWidget]
+  let controllersWithIdParamsWidgets = fmap catMaybes . mconcat . (fmap (fmap (:[]))) $ [textAlignmentWidget, superStyleWidget2, constDyn $ Just superStyleWidget]
 
 
   (paramsOutputEv, captureEv, canvasSizeOutputEv) <- (switchHoldTriple never never never =<<) . networkView . ffor2 controllersWithIdParamsWidgets canvasSizeWidget $ \widgets mcsw -> fmap snd $ beginNoNavLayout $ col $ do
