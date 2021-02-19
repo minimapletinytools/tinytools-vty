@@ -25,6 +25,7 @@ import qualified Data.Sequence                     as Seq
 import qualified Data.Text                         as T
 import qualified Data.Text.Zipper                  as TZ
 import           Data.Tuple.Extra
+import Data.These
 import Data.Align
 import Data.Char (isNumber)
 
@@ -63,6 +64,18 @@ updateTextZipperForSingleCharacter ev = case ev of
   V.EvKey V.KDel [] -> const TZ.empty
   V.EvKey (V.KChar 'u') [V.MCtrl] -> const TZ.empty
   _ -> id
+
+-- | capture matches updateTextZipperForSingleCharacter
+singleCharacterCapture :: (Reflex t, MonadFix m, MonadNodeId m) => VtyWidget t m (Event t ())
+singleCharacterCapture = do
+  inp <- input
+  return $ fforMaybe inp $ \case
+    V.EvKey (V.KChar '\t') [] -> Nothing
+    V.EvKey (V.KChar k) [] -> Just ()
+    V.EvKey V.KBS [] -> Just ()
+    V.EvKey V.KDel [] -> Just ()
+    V.EvKey (V.KChar 'u') [V.MCtrl] -> Just ()
+    _ -> Nothing
 
 -- | Default vty event handler for text inputs
 updateTextZipperForNumberInput
@@ -130,7 +143,7 @@ selectParamsFromSelection ps selection = r where
       else Just (subSelection, Nothing)
 
 
-type MaybeParamsWidgetOutputDyn t m b = Dynamic t (Maybe (VtyWidget t m (Dynamic t Int, Event t b)))
+type MaybeParamsWidgetOutputDyn t m b = Dynamic t (Maybe (VtyWidget t m (Dynamic t Int, Event t (), Event t b)))
 
 type MaybeParamsWidgetFn t m a b = Dynamic t (Selection, Maybe a) -> MaybeParamsWidgetOutputDyn t m b
 
@@ -143,6 +156,7 @@ holdMaybeParamsWidget :: forall t m a b. (MonadWidget t m)
   -> MaybeParamsWidgetFn t m a b -- ^ function creating widget, note that it should always return non-nothing but using Maybe type makes life easier
   -> VtyWidget t m (MaybeParamsWidgetOutputDyn t m b)
 holdMaybeParamsWidget mInputDyn widgetFn = do
+  -- only remake the widget if it goes from Just to Nothing
   uniqDyn <- holdUniqDynBy (\a b -> isJust a == isJust b) mInputDyn
   return . join . ffor uniqDyn $ \case
     Nothing -> constDyn Nothing
@@ -294,6 +308,7 @@ holdSuperStyleWidget inputDyn = constDyn . Just $ mdo
       br' <- fixed 1 $ makeSuperStyleTextEntry SSC_BR mssDyn
       return (tr',br')
     return (tl'',v'',bl'',h'',f'',tr'',br'')
+  captureEv1 <- singleCharacterCapture
   let
     fmapfn ss (rid,_,seltl) = case getSEltLabelSuperStyle seltl of
       Nothing -> Nothing
@@ -306,20 +321,30 @@ holdSuperStyleWidget inputDyn = constDyn . Just $ mdo
     -- TODO maybe just do it when any of the cell dynamics are updated rather than when focus changes...
     -- TODO if we do it on focus change, you don't want to set when escape is pressed... so maybe it's better just to do 🖕
     outputEv = fforMaybe (attach (current selectionDyn) $ makeSuperStyleEvent tl v bl h f tr br (void $ updated focusDyn)) fforfn
-  return (4, outputEv)
+
+
+    captureEv = leftmost [void outputEv, captureEv1]
+  traceShow "remaking" $ return (4, captureEv, outputEv)
 
 
 -- Text Alignment stuff
 holdTextAlignmentWidget :: forall t m. (MonadWidget t m) => MaybeParamsWidgetFn t m TextAlign ControllersWithId
-holdTextAlignmentWidget taDyn = ffor taDyn $ \(selection, mta) -> Just $ do
+holdTextAlignmentWidget inputDyn = constDyn . Just $ do
   let
-    startAlign = case mta of
+    mtaDyn = fmap snd inputDyn
+    selectionDyn = fmap fst inputDyn
+
+  mta0 <- sample . current $ mtaDyn
+
+  let
+    startAlign = case mta0 of
       Nothing               -> []
       Just TextAlign_Left   -> [0]
       Just TextAlign_Center -> [1]
       Just TextAlign_Right  -> [2]
 
   setAlignmentEv' <- radioList (constDyn ["left","center","right"]) (constDyn startAlign)
+
   let
     setAlignmentEv = fmap (\case
         0 -> TextAlign_Left
@@ -334,14 +359,15 @@ holdTextAlignmentWidget taDyn = ffor taDyn $ \(selection, mta) -> Just $ do
           Just oldts -> if oldts == TextStyle ta
             then Nothing
             else Just (rid, CTagBoxTextStyle :=> Identity (CTextStyle (DeltaTextStyle (oldts, TextStyle ta))))
+      selection <- sample . current $ selectionDyn
       return $ case Data.Maybe.mapMaybe fmapfn . toList $ selection of
         [] -> Nothing
         x  -> Just $ IM.fromList x
     alignmentParamsEv = push pushAlignmentFn setAlignmentEv
-  return (1, alignmentParamsEv)
+
+  return (1, never, alignmentParamsEv)
 
 
--- TODO this is a problem, we need to get input canvas size...
 holdCanvasSizeWidget :: forall t m. (MonadWidget t m) => Dynamic t SCanvas -> MaybeParamsWidgetFn t m () XY
 holdCanvasSizeWidget canvasDyn nothingDyn = ffor nothingDyn $ \_ -> Just $ do
   let
@@ -365,7 +391,9 @@ holdCanvasSizeWidget canvasDyn nothingDyn = ffor nothingDyn $ \_ -> Just $ do
       return $ if cw /= w || ch /= h
         then Just $ V2 (w-cw) (h-ch) -- it's a delta D:
         else Nothing
-  return (2, outputEv)
+
+    captureEv = leftmost [void outputEv, void (updated wDyn), void (updated hDyn)]
+  return (2, captureEv, outputEv)
 
 data SEltParams = SEltParams {
     --_sEltParams_sBox =
@@ -379,6 +407,7 @@ data ParamsWidget t = ParamsWidget {
   -- TODO make into generic WSEvent bc we want to modify canvas as well
   _paramsWidget_paramsEvent :: Event t ControllersWithId
   , _paramsWidget_canvasSizeEvent :: Event t XY
+  , _paramsWidget_captureInputEv :: Event t ()
 }
 
 presetStyles :: [[Char]]
@@ -386,6 +415,18 @@ presetStyles = ["╔╗╚╝║═ ","****|- ", "██████ ", "┌┐�
 
 switchHoldPair :: (Reflex t, MonadHold t m) => Event t a -> Event t b -> Event t (Event t a, Event t b) -> m (Event t a, Event t b)
 switchHoldPair eva evb evin = fmap fanThese $ switchHold (align eva evb) $ fmap (uncurry align) evin
+
+switchHoldTriple :: forall t m a b c. (Reflex t, MonadHold t m) => Event t a -> Event t b -> Event t c -> Event t (Event t a, Event t b, Event t c) -> m (Event t a, Event t b, Event t c)
+switchHoldTriple eva evb evc evin = r where
+  evinAligned :: Event t (Event t (These a (These b c)))
+  evinAligned = fmap (\(eva', evb', evc') -> align eva' (align evb' evc')) evin
+  evabc = align eva (align evb evc)
+  switched :: m (Event t (These a (These b c)))
+  switched = switchHold evabc evinAligned
+  fanned1 :: m (Event t a, Event t (These b c))
+  fanned1 = fmap fanThese switched
+  fanned2 = fmap (\(a,bc) -> (a, fanThese bc)) fanned1
+  r = fmap (\(a, (b,c)) -> (a,b,c)) fanned2
 
 holdParamsWidget :: forall t m. (MonadWidget t m)
   => ParamsWidgetConfig t
@@ -441,25 +482,28 @@ holdParamsWidget ParamsWidgetConfig {..} = do
             [] -> Nothing
             x  -> Just $ IM.fromList x
         ssparamsEv = push pushSuperStyleFn setStyleEv
-      return (5, ssparamsEv)
+      return (5, never, ssparamsEv)
 
 
-  let controllersWithIdParamsWidgets = fmap catMaybes . mconcat . (fmap (fmap (:[]))) $ [textAlignmentWidget, superStyleWidget2, constDyn $ Just superStyleWidget]
+  -- apparently textAlignmentWidget gets updated after any change which causes the whole network to rerender and we lose our focus state...
+  let controllersWithIdParamsWidgets = fmap catMaybes . mconcat . (fmap (fmap (:[]))) $ [traceDynWith (const "crappo1") $ textAlignmentWidget, traceDynWith (const "crappo2") $ superStyleWidget2, traceDynWith (const "crappo3") $ constDyn $ Just superStyleWidget]
 
 
-  (paramsOutputEv, canvasSizeOutputEv) <- (switchHoldPair never never =<<) . networkView . ffor2 controllersWithIdParamsWidgets canvasSizeWidget $ \widgets mcsw -> fmap snd $ beginNoNavLayout $ col $ do
+  (paramsOutputEv, captureEv, canvasSizeOutputEv) <- (switchHoldTriple never never never =<<) . networkView . ffor2 controllersWithIdParamsWidgets canvasSizeWidget $ \widgets mcsw -> fmap snd $ beginNoNavLayout $ col $ do
     outputs <- forM widgets $ \w -> mdo
-      (sz, ev) <- fixed sz w
-      return ev
-    cssev <- case mcsw of
-      Nothing -> return never
+      (sz, captureEv', ev) <- fixed sz w
+      return (ev, captureEv')
+    -- canvas size widget is special becaues it's output type is different
+    (cssev, captureEv2) <- case mcsw of
+      Nothing -> return (never, never)
       Just csw -> mdo
-        (cssz, cssev') <- fixed cssz csw
-        return cssev'
-    return $ (leftmostWarn "paramsLayout" outputs, cssev)
+        (cssz, csCaptureEv', cssev') <- fixed cssz csw
+        return (cssev', csCaptureEv')
+    return $ (leftmostWarn "paramsLayout" (fmap fst outputs), leftmostWarn "paramsCapture" (fmap snd outputs), cssev)
 
 
   return ParamsWidget {
     _paramsWidget_paramsEvent = paramsOutputEv
     , _paramsWidget_canvasSizeEvent = canvasSizeOutputEv
+    , _paramsWidget_captureInputEv = captureEv
   }

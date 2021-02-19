@@ -327,8 +327,7 @@ mainPFWidget = mdo
     inp <- input
     stuff <- splitHDrag 35 (fill '*') leftPanel rightPanel
 
-    -- TODO capture from params or whatever
-    kb <- captureInputEvents (This never) $ do
+    kb <- captureInputEvents (This (_paramsWidget_captureInputEv paramsW)) $ do
       inp <- input
       return $ fforMaybe inp $ \case
         V.EvKey k mods -> convertKey k >>= (\kbd -> return $ KeyboardData kbd (convertModifiers mods))
