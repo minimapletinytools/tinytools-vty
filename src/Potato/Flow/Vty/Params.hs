@@ -274,51 +274,92 @@ makeSuperStyleEvent tl v bl h f tr br trig = pushAlways pushfn trig where
         , _superStyle_fill       = FillStyle_Simple f'
       }
 
--- TODO presets/custom
-holdSuperStyleWidget :: (Reflex t, PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m) => MaybeParamsWidgetFn t m SuperStyle ControllersWithId
+holdSuperStyleWidget :: forall t m. (MonadWidget t m) => MaybeParamsWidgetFn t m SuperStyle ControllersWithId
 holdSuperStyleWidget inputDyn = constDyn . Just $ mdo
-  -- TODO the awesome version of this has a toggle box so that you can choose to do horiz/vertical together (once you support separate horiz/vert left/right/top/down styles)
-  -- TODO also a toggle for setting corners to common sets
+
+  typeChoiceDyn <- radioListSimple 0 ["custom", "presets"]
+
+  setStyleEvEv <- networkView $ ffor typeChoiceDyn $ \case
+    1 -> do
+      setStyleEv' <- beginLayout $ col $ do
+        fixed 1 emptyWidget -- just to make a space
+        presetClicks <- forM presetStyles $ \s -> fixedL 1 $ row $ stretch $ do
+          -- TODO highlight if style matches selection
+          text (constant (T.pack s))
+          fmap (fmap (\_ -> s)) (mouseDown V.BLeft)
+        return $ fmap superStyle_fromListFormat (leftmost presetClicks)
+      return (5, never, setStyleEv')
+    0 -> do
+      -- TODO the awesome version of this has a toggle box so that you can choose to do horiz/vertical together (once you support separate horiz/vert left/right/top/down styles)
+      -- TODO also a toggle for setting corners to common sets
+      let
+        mssDyn = fmap snd inputDyn
+      -- TODO change this so it's left to right
+      -- TODO arrow nav would be super cool
+      (focusDyn,(tl,v,bl,h,f,tr,br)) <- beginParamsLayout $ col $ do
+        fixed 1 emptyWidget -- just to make a space
+        --fixed 1 $ text (fmap (T.pack . superStyle_toListFormat . Data.Maybe.fromJust) $ current mssDyn)
+        (tl'',h'',tr'') <- fixedL 1 $ row $ do
+          tl' <- fixed 1 $ makeSuperStyleTextEntry SSC_TL mssDyn
+          h' <- fixed 1 $ makeSuperStyleTextEntry SSC_H mssDyn
+          tr' <- fixed 1 $ makeSuperStyleTextEntry SSC_TR mssDyn
+          return (tl',h',tr')
+        (v'',f'') <- fixedL 1 $ row $ do
+          v' <- fixed 1 $ makeSuperStyleTextEntry SSC_V mssDyn
+          f' <- fixed 1 $ makeSuperStyleTextEntry SSC_Fill mssDyn
+          _ <- fixedNoFocus 1 $ emptyWidget -- TODO you can modify this too, why not, 2 boxes for the same thing
+          return (v',f')
+        (bl'',br'') <- fixedL 1 $ row $ do
+          bl' <- fixed 1 $ makeSuperStyleTextEntry SSC_BL mssDyn
+          _ <- fixedNoFocus 1 $ emptyWidget -- TODO you can modify this too, why not, 2 boxes for the same thing
+          br' <- fixed 1 $ makeSuperStyleTextEntry SSC_BR mssDyn
+          return (bl',br')
+        return (tl'',v'',bl'',h'',f'',tr'',br'')
+      captureEv1 <- singleCharacterCapture
+
+
+      let
+        fmapfn ss (rid,_,seltl) = case getSEltLabelSuperStyle seltl of
+          Nothing -> Nothing
+          Just oldss -> if oldss == ss
+            then Nothing
+            else Just (rid, CTagSuperStyle :=> Identity (CSuperStyle (DeltaSuperStyle (oldss, ss))))
+        fforfn (selection, ss) = case Data.Maybe.mapMaybe (fmapfn ss) . toList $ selection of
+          [] -> Nothing
+          x  -> Just $ IM.fromList x
+        outputEv = fforMaybe (attach (current selectionDyn) $ makeSuperStyleEvent tl v bl h f tr br (void $ updated focusDyn)) fforfn
+
+        -- TODO maybe just do it when any of the cell dynamics are updated rather than when focus changes...
+        -- TODO if we do it on focus change, you don't want to set when escape is pressed... so maybe it's better just to do 🖕
+        setStyleEv' = makeSuperStyleEvent tl v bl h f tr br (void $ updated focusDyn)
+        captureEv' = leftmost [void setStyleEv', captureEv1]
+      return (4, captureEv', setStyleEv')
+
+
+
+  setStyleEv <- switchHold never (fmap thd3 setStyleEvEv)
+  captureEv <- switchHold never (fmap snd3 setStyleEvEv)
+  heightDyn <- holdDyn 0 (fmap fst3 setStyleEvEv)
+
   let
-    mssDyn = fmap snd inputDyn
     selectionDyn = fmap fst inputDyn
-  -- TODO change this so it's left to right
-  -- TODO arrow nav would be super cool
-  (focusDyn,(tl,v,bl,h,f,tr,br)) <- beginParamsLayout $ row $ do
-    --fixed 1 $ text (fmap (T.pack . superStyle_toListFormat . Data.Maybe.fromJust) $ current mssDyn)
-    (tl'',v'',bl'') <- fixedL 1 $ col $ do
-      tl' <- fixed 1 $ makeSuperStyleTextEntry SSC_TL mssDyn
-      v' <- fixed 1 $ makeSuperStyleTextEntry SSC_V mssDyn
-      bl' <- fixed 1 $ makeSuperStyleTextEntry SSC_BL mssDyn
-      return (tl',v',bl')
-    (h'',f'') <- fixedL 1 $ col $ do
-      h' <- fixed 1 $ makeSuperStyleTextEntry SSC_H mssDyn
-      f' <- fixed 1 $ makeSuperStyleTextEntry SSC_Fill mssDyn
-      _ <- fixedNoFocus 1 $ emptyWidget -- TODO you can modify this too, why not, 2 boxes for the same thing
-      return (h',f')
-    (tr'',br'') <- fixedL 1 $ col $ do
-      tr' <- fixed 1 $ makeSuperStyleTextEntry SSC_TR mssDyn
-      _ <- fixedNoFocus 1 $ emptyWidget -- TODO you can modify this too, why not, 2 boxes for the same thing
-      br' <- fixed 1 $ makeSuperStyleTextEntry SSC_BR mssDyn
-      return (tr',br')
-    return (tl'',v'',bl'',h'',f'',tr'',br'')
-  captureEv1 <- singleCharacterCapture
-  let
-    fmapfn ss (rid,_,seltl) = case getSEltLabelSuperStyle seltl of
-      Nothing -> Nothing
-      Just oldss -> if oldss == ss
-        then Nothing
-        else Just (rid, CTagSuperStyle :=> Identity (CSuperStyle (DeltaSuperStyle (oldss, ss))))
-    fforfn (selection, ss) = case Data.Maybe.mapMaybe (fmapfn ss) . toList $ selection of
-      [] -> Nothing
-      x  -> Just $ IM.fromList x
-    -- TODO maybe just do it when any of the cell dynamics are updated rather than when focus changes...
-    -- TODO if we do it on focus change, you don't want to set when escape is pressed... so maybe it's better just to do 🖕
-    outputEv = fforMaybe (attach (current selectionDyn) $ makeSuperStyleEvent tl v bl h f tr br (void $ updated focusDyn)) fforfn
+    pushSuperStyleFn :: SuperStyle -> PushM t (Maybe ControllersWithId)
+    pushSuperStyleFn ss = do
+      selection <- sample . current $ selectionDyn
+      let
+        fmapfn (rid,_,seltl) = case getSEltLabelSuperStyle seltl of
+          Nothing -> Nothing
+          Just oldss -> if oldss == ss
+            then Nothing
+            else Just (rid, CTagSuperStyle :=> Identity (CSuperStyle (DeltaSuperStyle (oldss, ss))))
+      return $ case Data.Maybe.mapMaybe fmapfn . toList $ selection of
+        [] -> Nothing
+        x  -> Just $ IM.fromList x
+    ssparamsEv = push pushSuperStyleFn setStyleEv
+  return (ffor heightDyn (+1), captureEv, ssparamsEv)
 
 
-    captureEv = leftmost [void outputEv, captureEv1]
-  return (4, captureEv, outputEv)
+
 
 
 -- Text Alignment stuff
@@ -441,46 +482,8 @@ holdParamsWidget ParamsWidgetConfig {..} = do
   superStyleWidget2 <- holdMaybeParamsWidget mSuperStyleInputDyn holdSuperStyleWidget
   canvasSizeWidget <- holdMaybeParamsWidget mCanvasSizeInputDyn (holdCanvasSizeWidget canvasDyn)
 
-
-
-  let
-    superStyleWidget = do
-      typeChoiceDyn <- radioListSimple 0 ["presets", "custom"]
-
-      -- this is just a potato implementation to get us started
-      setStyleEvEv <- networkView $ ffor typeChoiceDyn $ \case
-        0 -> do
-          setStyleEv' <- beginLayout $ col $ do
-            fixed 1 emptyWidget -- just to make a space
-            presetClicks <- forM presetStyles $ \s -> fixedL 1 $ row $ stretch $ do
-              -- TODO highlight if style matches selection
-              text (constant (T.pack s))
-              fmap (fmap (\_ -> s)) (mouseDown V.BLeft)
-            return $ fmap superStyle_fromListFormat (leftmost presetClicks)
-          return setStyleEv'
-        1 -> return never
-
-      setStyleEv <- switchHold never setStyleEvEv
-
-      let
-        pushSuperStyleFn :: SuperStyle -> PushM t (Maybe ControllersWithId)
-        pushSuperStyleFn ss = do
-          selection <- sample . current $ _goatWidget_selection (_pFWidgetCtx_goatWidget _paramsWidgetConfig_pfctx)
-          let
-            fmapfn (rid,_,seltl) = case getSEltLabelSuperStyle seltl of
-              Nothing -> Nothing
-              Just oldss -> if oldss == ss
-                then Nothing
-                else Just (rid, CTagSuperStyle :=> Identity (CSuperStyle (DeltaSuperStyle (oldss, ss))))
-          return $ case Data.Maybe.mapMaybe fmapfn . toList $ selection of
-            [] -> Nothing
-            x  -> Just $ IM.fromList x
-        ssparamsEv = push pushSuperStyleFn setStyleEv
-      return (5, never, ssparamsEv)
-
-
   -- apparently textAlignmentWidget gets updated after any change which causes the whole network to rerender and we lose our focus state...
-  let controllersWithIdParamsWidgets = fmap catMaybes . mconcat . (fmap (fmap (:[]))) $ [textAlignmentWidget, superStyleWidget2, constDyn $ Just superStyleWidget]
+  let controllersWithIdParamsWidgets = fmap catMaybes . mconcat . (fmap (fmap (:[]))) $ [textAlignmentWidget, superStyleWidget2]
 
 
   (paramsOutputEv, captureEv, canvasSizeOutputEv) <- (switchHoldTriple never never never =<<) . networkView . ffor2 controllersWithIdParamsWidgets canvasSizeWidget $ \widgets mcsw -> fmap snd $ beginNoNavLayout $ col $ do
