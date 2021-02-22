@@ -17,6 +17,8 @@ import           Potato.Reflex.Vty.Helpers
 
 import           Control.Monad.Fix
 import           Control.Monad.NodeId
+import           Data.Align
+import           Data.Char                         (isNumber)
 import           Data.Dependent.Sum                (DSum ((:=>)))
 import qualified Data.IntMap                       as IM
 import qualified Data.List.Extra                   as L
@@ -24,10 +26,8 @@ import qualified Data.Maybe
 import qualified Data.Sequence                     as Seq
 import qualified Data.Text                         as T
 import qualified Data.Text.Zipper                  as TZ
+import           Data.These
 import           Data.Tuple.Extra
-import Data.These
-import Data.Align
-import Data.Char (isNumber)
 
 import qualified Graphics.Vty                      as V
 import           Potato.Reflex.Vty.Widget.Layout
@@ -35,8 +35,10 @@ import           Reflex
 import           Reflex.Network
 import           Reflex.Potato.Helpers
 import           Reflex.Vty                        hiding (Constraint (..),
-                                                    Orientation (..), col,
-                                                    fixed, row, stretch, tile, TileConfig(..), Layout(..))
+                                                    Layout (..),
+                                                    Orientation (..),
+                                                    TileConfig (..), col, fixed,
+                                                    row, stretch, tile)
 
 
 
@@ -84,14 +86,14 @@ updateTextZipperForNumberInput
   -> TZ.TextZipper
 updateTextZipperForNumberInput ev = case ev of
   V.EvKey (V.KChar k) [] | isNumber k -> TZ.insertChar k
-  V.EvKey V.KBS [] -> TZ.deleteLeft
-  V.EvKey V.KDel [] -> TZ.deleteRight
-  V.EvKey V.KLeft [] -> TZ.left
-  V.EvKey V.KRight [] -> TZ.right
-  V.EvKey V.KHome [] -> TZ.home
-  V.EvKey V.KEnd [] -> TZ.end
-  V.EvKey (V.KChar 'u') [V.MCtrl] -> const TZ.empty
-  _ -> id
+  V.EvKey V.KBS []                    -> TZ.deleteLeft
+  V.EvKey V.KDel []                   -> TZ.deleteRight
+  V.EvKey V.KLeft []                  -> TZ.left
+  V.EvKey V.KRight []                 -> TZ.right
+  V.EvKey V.KHome []                  -> TZ.home
+  V.EvKey V.KEnd []                   -> TZ.end
+  V.EvKey (V.KChar 'u') [V.MCtrl]     -> const TZ.empty
+  _                                   -> id
 
 paramsNavigation :: (Reflex t, Monad m) => VtyWidget t m (Event t Int)
 paramsNavigation = do
@@ -147,8 +149,7 @@ selectParamsFromSelection ps selection = r where
 type MaybeParamsWidgetOutputDyn t m b = Dynamic t (Maybe (VtyWidget t m (Dynamic t Int, Event t (), Event t b)))
 
 type ParamsWidgetOutputDyn t m b = Dynamic t (VtyWidget t m (Dynamic t Int, Event t (), Event t b))
--- TODO get rid of Maybe... not needed use above instead
-type MaybeParamsWidgetFn t m a b = Dynamic t (Selection, Maybe a) -> MaybeParamsWidgetOutputDyn t m b
+type ParamsWidgetFn t m a b = Dynamic t (Selection, Maybe a) -> ParamsWidgetOutputDyn t m b
 
 -- |
 -- returned Dynamic contains Nothing if selection was Nothing, otherwise contains Just the widget to modify parameters
@@ -156,7 +157,7 @@ type MaybeParamsWidgetFn t m a b = Dynamic t (Selection, Maybe a) -> MaybeParams
 -- maybe use delayEvent :: forall t m a. (Adjustable t m) => Event t a -> m) (Event t a) 😱
 holdMaybeParamsWidget :: forall t m a b. (MonadWidget t m)
   => Dynamic t (Maybe (Selection, Maybe a)) -- ^ selection/params input
-  -> MaybeParamsWidgetFn t m a b -- ^ function creating widget, note that it should always return non-nothing but using Maybe type makes life easier
+  -> ParamsWidgetFn t m a b -- ^ function creating widget, note that it should always return non-nothing but using Maybe type makes life easier
   -> VtyWidget t m (MaybeParamsWidgetOutputDyn t m b)
 holdMaybeParamsWidget mInputDyn widgetFn = do
   -- only remake the widget if it goes from Just to Nothing
@@ -164,7 +165,7 @@ holdMaybeParamsWidget mInputDyn widgetFn = do
   return . join . ffor uniqDyn $ \case
     Nothing -> constDyn Nothing
     -- eh this is weird, maybe using fromJust is ok due to laziness but I don't care to find out
-    Just _ -> widgetFn (fmap (fromMaybe (Seq.empty, Nothing)) mInputDyn)
+    Just _ -> Just <$> widgetFn (fmap (fromMaybe (Seq.empty, Nothing)) mInputDyn)
 
 emptyWidget :: (Monad m) => VtyWidget t m ()
 emptyWidget = return ()
@@ -277,8 +278,8 @@ makeSuperStyleEvent tl v bl h f tr br trig = pushAlways pushfn trig where
         , _superStyle_fill       = FillStyle_Simple f'
       }
 
-holdSuperStyleWidget :: forall t m. (MonadWidget t m) => MaybeParamsWidgetFn t m SuperStyle ControllersWithId
-holdSuperStyleWidget inputDyn = constDyn . Just $ mdo
+holdSuperStyleWidget :: forall t m. (MonadWidget t m) => ParamsWidgetFn t m SuperStyle ControllersWithId
+holdSuperStyleWidget inputDyn = constDyn $ mdo
 
   typeChoiceDyn <- radioListSimple 0 ["custom", "presets"]
 
@@ -366,8 +367,8 @@ holdSuperStyleWidget inputDyn = constDyn . Just $ mdo
 
 
 -- Text Alignment stuff
-holdTextAlignmentWidget :: forall t m. (MonadWidget t m) => MaybeParamsWidgetFn t m TextAlign ControllersWithId
-holdTextAlignmentWidget inputDyn = constDyn . Just $ do
+holdTextAlignmentWidget :: forall t m. (MonadWidget t m) => ParamsWidgetFn t m TextAlign ControllersWithId
+holdTextAlignmentWidget inputDyn = constDyn $ do
   let
     mtaDyn = fmap snd inputDyn
     selectionDyn = fmap fst inputDyn
@@ -405,18 +406,18 @@ holdTextAlignmentWidget inputDyn = constDyn . Just $ do
 
   return (1, never, alignmentParamsEv)
 
-holdSBoxTypeWidget :: forall t m. (MonadWidget t m) => MaybeParamsWidgetFn t m SBoxType ControllersWithId
-holdSBoxTypeWidget inputDyn = constDyn . Just $ do
+holdSBoxTypeWidget :: forall t m. (MonadWidget t m) => ParamsWidgetFn t m SBoxType ControllersWithId
+holdSBoxTypeWidget inputDyn = constDyn $ do
   let
     mBoxType = fmap snd inputDyn
     selectionDyn = fmap fst inputDyn
   mbt0 <- sample . current $ mBoxType
   let
     (startbox,starttext) = case mbt0 of
-      Nothing -> ([], [])
-      Just SBoxType_Box -> ([0],[0])
-      Just SBoxType_BoxText -> ([0],[1])
-      Just SBoxType_NoBox -> ([1],[0])
+      Nothing                 -> ([], [])
+      Just SBoxType_Box       -> ([0],[0])
+      Just SBoxType_BoxText   -> ([0],[1])
+      Just SBoxType_NoBox     -> ([1],[0])
       Just SBoxType_NoBoxText -> ([1],[1])
 
   _ <- beginNoNavLayout $ col $ do
@@ -431,8 +432,8 @@ holdSBoxTypeWidget inputDyn = constDyn . Just $ do
   -- TODO
   return (2, never, never)
 
-holdCanvasSizeWidget :: forall t m. (MonadWidget t m) => Dynamic t SCanvas -> MaybeParamsWidgetFn t m () XY
-holdCanvasSizeWidget canvasDyn nothingDyn = ffor nothingDyn $ \_ -> Just $ do
+holdCanvasSizeWidget :: forall t m. (MonadWidget t m) => Dynamic t SCanvas -> ParamsWidgetFn t m () XY
+holdCanvasSizeWidget canvasDyn nothingDyn = ffor nothingDyn $ \_ -> do
   let
     cSizeDyn = fmap (_lBox_size . _sCanvas_box) canvasDyn
     cWidthDyn = fmap (\(V2 x _) -> x) cSizeDyn
@@ -468,9 +469,9 @@ data ParamsWidgetConfig t = ParamsWidgetConfig {
 
 data ParamsWidget t = ParamsWidget {
   -- TODO make into generic WSEvent bc we want to modify canvas as well
-  _paramsWidget_paramsEvent :: Event t ControllersWithId
+  _paramsWidget_paramsEvent       :: Event t ControllersWithId
   , _paramsWidget_canvasSizeEvent :: Event t XY
-  , _paramsWidget_captureInputEv :: Event t ()
+  , _paramsWidget_captureInputEv  :: Event t ()
 }
 
 presetStyles :: [[Char]]
