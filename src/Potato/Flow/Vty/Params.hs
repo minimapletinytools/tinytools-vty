@@ -143,8 +143,11 @@ selectParamsFromSelection ps selection = r where
       else Just (subSelection, Nothing)
 
 
+
 type MaybeParamsWidgetOutputDyn t m b = Dynamic t (Maybe (VtyWidget t m (Dynamic t Int, Event t (), Event t b)))
 
+type ParamsWidgetOutputDyn t m b = Dynamic t (VtyWidget t m (Dynamic t Int, Event t (), Event t b))
+-- TODO get rid of Maybe... not needed use above instead
 type MaybeParamsWidgetFn t m a b = Dynamic t (Selection, Maybe a) -> MaybeParamsWidgetOutputDyn t m b
 
 -- |
@@ -402,6 +405,31 @@ holdTextAlignmentWidget inputDyn = constDyn . Just $ do
 
   return (1, never, alignmentParamsEv)
 
+holdSBoxTypeWidget :: forall t m. (MonadWidget t m) => MaybeParamsWidgetFn t m SBoxType ControllersWithId
+holdSBoxTypeWidget inputDyn = constDyn . Just $ do
+  let
+    mBoxType = fmap snd inputDyn
+    selectionDyn = fmap fst inputDyn
+  mbt0 <- sample . current $ mBoxType
+  let
+    (startbox,starttext) = case mbt0 of
+      Nothing -> ([], [])
+      Just SBoxType_Box -> ([0],[0])
+      Just SBoxType_BoxText -> ([0],[1])
+      Just SBoxType_NoBox -> ([1],[0])
+      Just SBoxType_NoBoxText -> ([1],[1])
+
+  _ <- beginNoNavLayout $ col $ do
+    b <- fixedL 1 $ row $ do
+      fixed 8 $ text "border:"
+      stretch $ text "TODO CHECKBOX"
+    t <- fixedL 1 $ row $ do
+      fixed 8 $ text "  text:"
+      stretch $ text "TODO CHECKBOX"
+    return (b,t)
+
+  -- TODO
+  return (2, never, never)
 
 holdCanvasSizeWidget :: forall t m. (MonadWidget t m) => Dynamic t SCanvas -> MaybeParamsWidgetFn t m () XY
 holdCanvasSizeWidget canvasDyn nothingDyn = ffor nothingDyn $ \_ -> Just $ do
@@ -475,11 +503,14 @@ holdParamsWidget ParamsWidgetConfig {..} = do
     textAlignSelector = (fmap (\(TextStyle ta) -> ta)) . getSEltLabelBoxTextStyle . thd3
     mTextAlignInputDyn = fmap ( selectParamsFromSelection textAlignSelector) selectionDyn
     mSuperStyleInputDyn = fmap (selectParamsFromSelection (getSEltLabelSuperStyle . thd3)) selectionDyn
+    --mSBoxTypeInputDyn = fmap (selectParamsFromSelection (getSEltLabelBoxType . thd3)) selectionDyn
+
     -- show canvas params when nothing is selected
     mCanvasSizeInputDyn = fmap (\s -> if Seq.null s then Just (Seq.empty, Nothing) else Nothing) selectionDyn
 
   textAlignmentWidget <- holdMaybeParamsWidget mTextAlignInputDyn holdTextAlignmentWidget
   superStyleWidget2 <- holdMaybeParamsWidget mSuperStyleInputDyn holdSuperStyleWidget
+  --sBoxTypeWidget <- holdMaybeParamsWidget mSBoxTypeInputDyn holdSBoxTypeWidget
   canvasSizeWidget <- holdMaybeParamsWidget mCanvasSizeInputDyn (holdCanvasSizeWidget canvasDyn)
 
   -- apparently textAlignmentWidget gets updated after any change which causes the whole network to rerender and we lose our focus state...
