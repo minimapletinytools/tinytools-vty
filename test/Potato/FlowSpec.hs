@@ -13,7 +13,7 @@ import           Test.Hspec
 import           Test.Hspec.Contrib.HUnit   (fromHUnitTest)
 import           Test.HUnit
 
-import           Potato.Reflex.Vty.Widget.Popup
+import           Potato.Flow.Vty.Main
 
 import           Control.Monad.IO.Class     (liftIO)
 import           Control.Monad.Ref
@@ -38,9 +38,9 @@ instance (MonadVtyApp t (TestGuestT t m), TestGuestConstraints t m) => ReflexVty
         _potatoNetwork_Output_exitEv :: Event t ()
       }
   getApp _ = do
-    -- TODO Flow stuff
+    exitEv <- mainPFWidget
     return PotatoNetwork_Output {
-        _potatoNetwork_Output_exitEv = never
+        _potatoNetwork_Output_exitEv = exitEv
       }
 
   makeInputs =
@@ -64,7 +64,7 @@ test_basic = TestLabel "open and quit" $ TestCase $ runSpiderHost $
 
     -- enter quit sequence and ensure there is a quit event
     queueVtyEvent $ V.EvKey (V.KChar 'q') [V.MCtrl]
-    --fireQueuedEventsAndRead readExitEv >>= \a -> liftIO (checkSingleMaybe a ())
+    fireQueuedEventsAndRead readExitEv >>= \a -> liftIO (checkSingleMaybe a ())
 
 
 spec :: Spec

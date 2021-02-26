@@ -3,6 +3,7 @@
 
 module Potato.Flow.Vty.Main (
   flowMain
+  , mainPFWidget
 ) where
 import           Relude
 
