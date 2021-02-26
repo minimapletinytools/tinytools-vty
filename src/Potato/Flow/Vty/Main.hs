@@ -211,12 +211,14 @@ captureInputEvents capture child = VtyWidget $ do
 
 data MainPFWidgetConfig t = MainPFWidgetConfig {
   _mainPFWidgetConfig_initialFile :: Maybe Text
+  , _mainPFWidgetConfig_initialState :: PFState -- ^ will be overriden by initialFile if set
   , _mainPFWidgetConfig_bypassEvent :: Event t WSEvent
 }
 
 instance (Reflex t) => Default (MainPFWidgetConfig t) where
   def = MainPFWidgetConfig {
       _mainPFWidgetConfig_initialFile = Nothing
+      , _mainPFWidgetConfig_initialState = emptyPFState
       , _mainPFWidgetConfig_bypassEvent = never
     }
 
