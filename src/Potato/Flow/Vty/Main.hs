@@ -1,7 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE RecursiveDo     #-}
 
-module Flow (
+module Potato.Flow.Vty.Main (
   flowMain
 ) where
 import           Relude

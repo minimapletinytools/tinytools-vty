@@ -8,7 +8,7 @@ import           Prelude
 import           Relude
 
 import           Example
-import           Flow
+import           Potato.Flow.Vty.Main
 import           Layout2Test
 import           Potato
 
