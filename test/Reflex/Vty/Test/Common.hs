@@ -3,6 +3,7 @@ module Reflex.Vty.Test.Common
   , readDynamic
   , checkSingle
   , checkSingleMaybe
+  , checkNothing
   )
 where
 
@@ -37,12 +38,18 @@ readDynamic (evh, b) = do
 
 
 
-checkSingle :: (HasCallStack, Eq a, Show a) => [a] -> a -> Assertion
+checkSingle :: (Eq a, Show a) => [a] -> a -> Assertion
 checkSingle values a = case nonEmpty values of
   Nothing -> assertFailure "empty list"
   Just x  -> a @=? head x
 
-checkSingleMaybe :: (HasCallStack, Eq a, Show a) => [Maybe a] -> a -> Assertion
+checkSingleMaybe :: (Eq a, Show a) => [Maybe a] -> a -> Assertion
 checkSingleMaybe values a = case nonEmpty values of
   Nothing -> assertFailure "empty list"
   Just x  -> Just a @=? head x
+
+checkNothing :: (Eq a, Show a) => [Maybe a] -> Assertion
+checkNothing values = case nonEmpty values of
+  Nothing -> assertFailure "empty list"
+  -- TODO prob check that all elts in list are Nothing
+  Just x  -> Nothing @=? head x
