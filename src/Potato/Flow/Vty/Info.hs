@@ -11,8 +11,6 @@ import           Relude
 
 import           Potato.Flow
 import           Potato.Flow.Vty.Common
-import           Potato.Flow.Vty.Manipulator.Types
-import           Potato.Flow.Vty.PFWidgetCtx
 import           Potato.Reflex.Vty.Helpers
 
 import           Control.Monad.Fix
@@ -28,8 +26,7 @@ import           Reflex.Vty
 
 
 data InfoWidgetConfig t = InfoWidgetConfig {
-  _infoWidgetConfig_pfctx       :: PFWidgetCtx t
-  , _infoWidgetConfig_selection :: Dynamic t Selection
+  _infoWidgetConfig_selection :: Dynamic t Selection
 }
 
 data InfoWidget t = InfoWidget {

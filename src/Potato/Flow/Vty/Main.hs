@@ -18,7 +18,6 @@ import           Potato.Flow.Vty.Info
 import           Potato.Flow.Vty.Input
 import           Potato.Flow.Vty.Layer
 import           Potato.Flow.Vty.Params
-import           Potato.Flow.Vty.PFWidgetCtx
 import           Potato.Flow.Vty.Tools
 import           Potato.Reflex.Vty.Helpers
 import           Potato.Reflex.Vty.Widget.Popup
@@ -239,16 +238,6 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
   -- need this to force redraw of handles in some cases
   tickOnEvent (updated . _goatWidget_selection $ everythingW)
 
-  let
-    pfctx = PFWidgetCtx {
-        _pFWidgetCtx_attr_default = constDyn lg_default
-        , _pFWidgetCtx_attr_manipulator = constDyn lg_manip
-        -- TODO don't do this, we need to break out individual changes instead so we can take advantage of holdUniqDyn
-        , _pFWidgetCtx_goatWidget = everythingW
-        , _pFWidgetCtx_pFState = fmap goatState_pFState $ _goatWidget_DEBUG_goatState everythingW
-        , _pFWidgetCtx_initialPFState = pfstate_basic1
-      }
-
   -- load file on start
   mLoadFileEv <- performEvent $ ffor
     (fforMaybe postBuildEv (const _mainPFWidgetConfig_initialFile))
@@ -273,7 +262,7 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
 
   let
     goatWidgetConfig = GoatWidgetConfig {
-        _goatWidgetConfig_initialState = _pFWidgetCtx_initialPFState pfctx
+        _goatWidgetConfig_initialState = _mainPFWidgetConfig_initialState
         , _goatWidgetConfig_load = fmapMaybe id mLoadFileEv
 
         -- canvas direct input
@@ -320,22 +309,20 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
         never
         ]
       tools' <- fixed 10 $ holdToolsWidget $  ToolWidgetConfig {
-          _toolWidgetConfig_pfctx = pfctx
-          , _toolWidgetConfig_tool =  _goatWidget_tool everythingW
+          _toolWidgetConfig_tool =  _goatWidget_tool everythingW
         }
 
       -- TODO Layout stuff messes up your mouse assumptions. You need to switch Layout to use pane2 D:
       layers' <- stretch $ holdLayerWidget $ LayerWidgetConfig {
-            _layerWidgetConfig_pfctx              = pfctx
-            , _layerWidgetConfig_layers = _goatWidget_layers everythingW
-
+            _layerWidgetConfig_layers = _goatWidget_layers everythingW
             , _layerWidgetConfig_selection = _goatWidget_selection  everythingW
           }
       _ <- fixed 5 $ holdInfoWidget $ InfoWidgetConfig {
           _infoWidgetConfig_selection = _goatWidget_selection everythingW
         }
       params' <- fixed 10 $ holdParamsWidget $ ParamsWidgetConfig {
-          _paramsWidgetConfig_pfctx = pfctx
+          _paramsWidgetConfig_selectionDyn = _goatWidget_selection everythingW
+          , _paramsWidgetConfig_canvasDyn = _goatWidget_canvas everythingW
         }
       return (layers', tools', params')
 
@@ -345,8 +332,7 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
       -- temp ignoreMouseUnlessFocused as when we click from one panel to the other, it will tigger events in both panels
       -- TODO remove this once we do proper Endo style folding in Goat...
       ignoreMouseUnlessFocused $ pane2 dreg f $ holdCanvasWidget $ CanvasWidgetConfig {
-          _canvasWidgetConfig_pfctx = pfctx
-          , _canvasWidgetConfig_pan = _goatWidget_pan everythingW
+          _canvasWidgetConfig_pan = _goatWidget_pan everythingW
           , _canvasWidgetConfig_broadPhase = _goatWidget_broadPhase everythingW
           , _canvasWidgetConfig_renderedCanvas = _goatWidget_renderedCanvas everythingW
           , _canvasWidgetConfig_canvas = _goatWidget_canvas everythingW

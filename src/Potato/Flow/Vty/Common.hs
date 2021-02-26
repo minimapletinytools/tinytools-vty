@@ -12,7 +12,6 @@ import qualified Relude.Unsafe               as Unsafe
 
 import           Potato.Flow.Controller
 import           Potato.Flow.Vty.Attrs
-import           Potato.Flow.Vty.PFWidgetCtx
 import           Potato.Reflex.Vty.Helpers
 
 import           Control.Monad.Fix

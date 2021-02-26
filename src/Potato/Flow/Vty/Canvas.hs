@@ -15,7 +15,6 @@ import           Potato.Flow.Controller
 import           Potato.Flow.Controller.Handler
 import           Potato.Flow.Math
 import           Potato.Flow.Vty.Input
-import           Potato.Flow.Vty.PFWidgetCtx
 import           Potato.Reflex.Vty.Helpers
 import           Potato.Reflex.Vty.Widget
 import           Reflex.Potato.Helpers
@@ -52,8 +51,7 @@ pan_lBox :: XY -> LBox -> LBox
 pan_lBox pan (LBox p s) = LBox (p+pan) s
 
 data CanvasWidgetConfig t = CanvasWidgetConfig {
-  _canvasWidgetConfig_pfctx            :: PFWidgetCtx t
-  , _canvasWidgetConfig_pan            :: Dynamic t XY
+  _canvasWidgetConfig_pan            :: Dynamic t XY
   -- TODO DELETE
   , _canvasWidgetConfig_broadPhase     :: Dynamic t BroadPhaseState
   , _canvasWidgetConfig_renderedCanvas :: Dynamic t RenderedCanvas
@@ -69,9 +67,6 @@ holdCanvasWidget :: forall t m. (MonadWidget t m)
   => CanvasWidgetConfig t
   -> VtyWidget t m (CanvasWidget t)
 holdCanvasWidget CanvasWidgetConfig {..} = mdo
-  let
-    PFWidgetCtx {..} = _canvasWidgetConfig_pfctx
-
   -- ::draw the canvas::
   let
     renderedCanvas = _canvasWidgetConfig_renderedCanvas
@@ -82,7 +77,8 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
   -- TODO render out of bounds stuff with gray background or whatveer
   pane canvasRegion (constDyn True) $ do
     text $ current (fmap renderedCanvasToText renderedCanvas)
-  tellImages $ ffor3 (current _canvasWidgetConfig_handles) (current _pFWidgetCtx_attr_manipulator) (current canvasRegion')
+  -- TODO proper handle Attr
+  tellImages $ ffor3 (current _canvasWidgetConfig_handles) (constant V.defAttr) (current canvasRegion')
     $ \(HandlerRenderOutput hs) attr (LBox (V2 px py) _)-> fmap (\(LBox (V2 x y) (V2 w h)) -> V.translate (x+px) (y+py) $ V.charFill attr 'X' w h) hs
 
   inp <- makeLMouseDataInputEv 0 False

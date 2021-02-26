@@ -13,7 +13,6 @@ import           Relude
 import           Potato.Flow.Controller
 import           Potato.Flow.Vty.Attrs
 import           Potato.Flow.Vty.Common
-import           Potato.Flow.Vty.PFWidgetCtx
 import           Potato.Reflex.Vty.Helpers
 
 import           Control.Monad.Fix
@@ -27,8 +26,7 @@ import           Reflex.Vty
 
 
 data ToolWidgetConfig t = ToolWidgetConfig {
-  _toolWidgetConfig_pfctx  :: PFWidgetCtx t
-  , _toolWidgetConfig_tool :: Dynamic t Tool
+  _toolWidgetConfig_tool :: Dynamic t Tool
 }
 
 data ToolWidget t = ToolWidget {

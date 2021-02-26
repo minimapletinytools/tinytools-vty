@@ -14,7 +14,6 @@ import           Potato.Flow
 import           Potato.Flow.Controller
 import           Potato.Flow.Vty.Attrs
 import           Potato.Flow.Vty.Input
-import           Potato.Flow.Vty.PFWidgetCtx
 import           Potato.Reflex.Vty.Helpers
 import           Potato.Reflex.Vty.Widget
 
@@ -59,8 +58,7 @@ if' False _ y = y
 
 
 data LayerWidgetConfig t = LayerWidgetConfig {
-  _layerWidgetConfig_pfctx       :: PFWidgetCtx t
-  , _layerWidgetConfig_layers    :: Dynamic t LayerEntries
+  _layerWidgetConfig_layers    :: Dynamic t LayerEntries
   , _layerWidgetConfig_selection :: Dynamic t Selection
 }
 

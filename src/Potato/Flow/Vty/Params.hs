@@ -11,8 +11,6 @@ import           Relude
 
 import           Potato.Flow
 import           Potato.Flow.Vty.Common
-import           Potato.Flow.Vty.Manipulator.Types
-import           Potato.Flow.Vty.PFWidgetCtx
 import           Potato.Reflex.Vty.Helpers
 
 import           Control.Monad.Fix
@@ -464,7 +462,8 @@ data SEltParams = SEltParams {
   }
 
 data ParamsWidgetConfig t = ParamsWidgetConfig {
-  _paramsWidgetConfig_pfctx              :: PFWidgetCtx t
+  _paramsWidgetConfig_selectionDyn :: Dynamic t Selection
+  , _paramsWidgetConfig_canvasDyn :: Dynamic t SCanvas
 }
 
 data ParamsWidget t = ParamsWidget {
@@ -498,9 +497,8 @@ holdParamsWidget :: forall t m. (MonadWidget t m)
 holdParamsWidget ParamsWidgetConfig {..} = do
 
   let
-    selectionDyn = _goatWidget_selection (_pFWidgetCtx_goatWidget _paramsWidgetConfig_pfctx)
-    canvasDyn = _goatWidget_canvas . _pFWidgetCtx_goatWidget $ _paramsWidgetConfig_pfctx
-
+    selectionDyn = _paramsWidgetConfig_selectionDyn
+    canvasDyn = _paramsWidgetConfig_canvasDyn
     textAlignSelector = (fmap (\(TextStyle ta) -> ta)) . getSEltLabelBoxTextStyle . thd3
     mTextAlignInputDyn = fmap ( selectParamsFromSelection textAlignSelector) selectionDyn
     mSuperStyleInputDyn = fmap (selectParamsFromSelection (getSEltLabelSuperStyle . thd3)) selectionDyn
