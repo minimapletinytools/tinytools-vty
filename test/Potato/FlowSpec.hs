@@ -38,7 +38,7 @@ instance (MonadVtyApp t (TestGuestT t m), TestGuestConstraints t m) => ReflexVty
         _potatoNetwork_Output_exitEv :: Event t ()
       }
   getApp _ = do
-    exitEv <- mainPFWidget
+    exitEv <- mainPFWidget def
     return PotatoNetwork_Output {
         _potatoNetwork_Output_exitEv = exitEv
       }

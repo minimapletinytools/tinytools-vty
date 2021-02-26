@@ -4,6 +4,7 @@
 module Potato.Flow.Vty.Main (
   flowMain
   , mainPFWidget
+  , MainPFWidgetConfig(..)
 ) where
 import           Relude
 
@@ -32,6 +33,7 @@ import qualified Data.Aeson                        as Aeson
 import qualified Data.Aeson.Encode.Pretty as PrettyAeson
 import           Data.Maybe
 import           Data.Monoid                       (Any)
+import           Data.Default
 import qualified Data.Text                as T
 import qualified Data.Text.Encoding                as T
 import qualified Data.Text.Lazy                    as LT
@@ -108,10 +110,16 @@ tickOnEvent :: (Reflex t, Adjustable t m) => Event t a -> m ()
 tickOnEvent ev = void $ runWithReplace (return ()) (ev $> return ())
 
 
+pfcfg :: MainPFWidgetConfig
+pfcfg = MainPFWidgetConfig {
+    _mainPFWidgetConfig_initialFile = Just "potato.flow"
+  }
+
+
 flowMain :: IO ()
 flowMain = do
   --mainWidget mainPFWidget
-  potatoMainWidget mainPFWidget
+  potatoMainWidget $ mainPFWidget pfcfg
 
 -- TODO
 data MainPFTestOutput t = MainPFTestOutput {
@@ -201,9 +209,19 @@ captureInputEvents capture child = VtyWidget $ do
   tellImages images
   return result
 
+data MainPFWidgetConfig = MainPFWidgetConfig {
+  _mainPFWidgetConfig_initialFile :: Maybe Text
+}
+
+instance Default MainPFWidgetConfig where
+  def = MainPFWidgetConfig {
+      _mainPFWidgetConfig_initialFile = Nothing
+    }
+
 mainPFWidget :: forall t m. (MonadWidget t m)
-  => VtyWidget t m (Event t ())
-mainPFWidget = mdo
+  => MainPFWidgetConfig
+  -> VtyWidget t m (Event t ())
+mainPFWidget MainPFWidgetConfig {..} = mdo
   -- external inputs
   currentTime <- liftIO $ getCurrentTime
 
@@ -228,9 +246,11 @@ mainPFWidget = mdo
       }
 
   -- load file on start
-  mLoadFileEv <- performEvent $ ffor postBuildEv $ \_ -> do
-    mspf :: Maybe SPotatoFlow <- liftIO $ Aeson.decodeFileStrict "potato.flow"
-    return $ mspf >>= return . (,emptyControllerMeta)
+  mLoadFileEv <- performEvent $ ffor
+    (fforMaybe postBuildEv (const _mainPFWidgetConfig_initialFile))
+    $ \fp -> do
+      mspf :: Maybe SPotatoFlow <- liftIO $ Aeson.decodeFileStrict (T.unpack fp)
+      return $ mspf >>= return . (,emptyControllerMeta)
 
 
   -- debug stuff (temp)
