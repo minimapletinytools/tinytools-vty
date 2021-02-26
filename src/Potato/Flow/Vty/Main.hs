@@ -110,8 +110,8 @@ tickOnEvent :: (Reflex t, Adjustable t m) => Event t a -> m ()
 tickOnEvent ev = void $ runWithReplace (return ()) (ev $> return ())
 
 
-pfcfg :: MainPFWidgetConfig
-pfcfg = MainPFWidgetConfig {
+pfcfg :: (Reflex t) => MainPFWidgetConfig t
+pfcfg = def {
     _mainPFWidgetConfig_initialFile = Just "potato.flow"
   }
 
@@ -209,17 +209,19 @@ captureInputEvents capture child = VtyWidget $ do
   tellImages images
   return result
 
-data MainPFWidgetConfig = MainPFWidgetConfig {
+data MainPFWidgetConfig t = MainPFWidgetConfig {
   _mainPFWidgetConfig_initialFile :: Maybe Text
+  , _mainPFWidgetConfig_bypassEvent :: Event t WSEvent
 }
 
-instance Default MainPFWidgetConfig where
+instance (Reflex t) => Default (MainPFWidgetConfig t) where
   def = MainPFWidgetConfig {
       _mainPFWidgetConfig_initialFile = Nothing
+      , _mainPFWidgetConfig_bypassEvent = never
     }
 
 mainPFWidget :: forall t m. (MonadWidget t m)
-  => MainPFWidgetConfig
+  => MainPFWidgetConfig t
   -> VtyWidget t m (Event t ())
 mainPFWidget MainPFWidgetConfig {..} = mdo
   -- external inputs
@@ -282,6 +284,11 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
 
         -- debugging/deprecated stuff
         , _goatWidgetConfig_setDebugLabel = never
+
+
+
+        -- TODO
+        --, _goatWidgetConfig_bypassEvent = _mainPFWidgetConfig_bypassEvent
       }
 
   everythingW <- holdGoatWidget goatWidgetConfig

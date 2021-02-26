@@ -14,6 +14,7 @@ import           Test.Hspec.Contrib.HUnit   (fromHUnitTest)
 import           Test.HUnit
 
 import           Potato.Flow.Vty.Main
+import Potato.Flow
 
 import           Control.Monad.IO.Class     (liftIO)
 import           Control.Monad.Ref
@@ -31,26 +32,38 @@ import Reflex.Vty.Test.Common
 data PotatoNetwork t (m :: Type -> Type)
 
 instance (MonadVtyApp t (TestGuestT t m), TestGuestConstraints t m) => ReflexVtyTestApp (PotatoNetwork t m) t m where
-  data VtyAppInputTriggerRefs (PotatoNetwork t m) = PotatoNetwork_InputTriggerRefs
-  data VtyAppInputEvents (PotatoNetwork t m) = PotatoNetwork_InputEvents
+  data VtyAppInputTriggerRefs (PotatoNetwork t m) = PotatoNetwork_InputTriggerRefs {
+      -- force an event bypassing the normal interface
+      _potatoNetwork_InputTriggerRefs_bypassEvent :: Ref m (Maybe (EventTrigger t WSEvent))
+    }
+  data VtyAppInputEvents (PotatoNetwork t m) = PotatoNetwork_InputEvents {
+      _potatoNetwork_InputEvents_InputEvents_bypassEvent :: Event t WSEvent
+    }
+
   data VtyAppOutput (PotatoNetwork t m) =
     PotatoNetwork_Output {
         _potatoNetwork_Output_exitEv :: Event t ()
       }
-  getApp _ = do
-    exitEv <- mainPFWidget def
+  getApp PotatoNetwork_InputEvents {..} = do
+    exitEv <- mainPFWidget $ MainPFWidgetConfig {
+        _mainPFWidgetConfig_initialFile = Nothing
+        , _mainPFWidgetConfig_bypassEvent = _potatoNetwork_InputEvents_InputEvents_bypassEvent
+      }
     return PotatoNetwork_Output {
         _potatoNetwork_Output_exitEv = exitEv
       }
 
-  makeInputs =
-    -- return dummy inputs since they are both empty
-    return (PotatoNetwork_InputEvents, PotatoNetwork_InputTriggerRefs)
+  makeInputs = do
+    (ev, ref) <- newEventWithTriggerRef
+    return (PotatoNetwork_InputEvents ev, PotatoNetwork_InputTriggerRefs ref)
 
 
 test_basic :: Test
 test_basic = TestLabel "open and quit" $ TestCase $ runSpiderHost $
   runReflexVtyTestApp @ (PotatoNetwork (SpiderTimeline Global) (SpiderHost Global)) (100,100) $ do
+
+    -- get our app's input triggers
+    PotatoNetwork_InputTriggerRefs {..} <- userInputTriggerRefs
 
     -- get our app's output events and subscribe to them
     PotatoNetwork_Output {..} <- userOutputs
