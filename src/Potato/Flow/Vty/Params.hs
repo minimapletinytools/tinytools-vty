@@ -5,6 +5,9 @@ module Potato.Flow.Vty.Params (
   ParamsWidgetConfig(..)
   , ParamsWidget(..)
   , holdParamsWidget
+
+  -- exposed for testing
+  , networkParamsWidgetOutputDynForTesting
 ) where
 
 import           Relude
@@ -148,6 +151,15 @@ type MaybeParamsWidgetOutputDyn t m b = Dynamic t (Maybe (VtyWidget t m (Dynamic
 
 type ParamsWidgetOutputDyn t m b = Dynamic t (VtyWidget t m (Dynamic t Int, Event t (), Event t b))
 type ParamsWidgetFn t m a b = Dynamic t (Selection, Maybe a) -> ParamsWidgetOutputDyn t m b
+
+networkParamsWidgetOutputDynForTesting :: (MonadWidget t m) => ParamsWidgetOutputDyn t m b -> VtyWidget t m (Dynamic t Int, Event t (), Event t b)
+networkParamsWidgetOutputDynForTesting p = do
+  out' <- networkView p
+  outHeightDyn <- holdDyn (constDyn 0) $ fmap fst3 out'
+  outCaptureEv <- switchHold never $ fmap snd3 out'
+  outEv <- switchHold never $ fmap thd3 out'
+  return (join outHeightDyn, outCaptureEv, outEv)
+
 
 -- |
 -- returned Dynamic contains Nothing if selection was Nothing, otherwise contains Just the widget to modify parameters
@@ -476,9 +488,11 @@ data ParamsWidget t = ParamsWidget {
 presetStyles :: [[Char]]
 presetStyles = ["╔╗╚╝║═ ","****|- ", "██████ ", "┌┐└┘│─ "]
 
+-- TODO move to potato reflex
 switchHoldPair :: (Reflex t, MonadHold t m) => Event t a -> Event t b -> Event t (Event t a, Event t b) -> m (Event t a, Event t b)
 switchHoldPair eva evb evin = fmap fanThese $ switchHold (align eva evb) $ fmap (uncurry align) evin
 
+-- TODO move to potato reflex
 switchHoldTriple :: forall t m a b c. (Reflex t, MonadHold t m) => Event t a -> Event t b -> Event t c -> Event t (Event t a, Event t b, Event t c) -> m (Event t a, Event t b, Event t c)
 switchHoldTriple eva evb evc evin = r where
   evinAligned :: Event t (Event t (These a (These b c)))
@@ -490,6 +504,8 @@ switchHoldTriple eva evb evc evin = r where
   fanned1 = fmap fanThese switched
   fanned2 = fmap (\(a,bc) -> (a, fanThese bc)) fanned1
   r = fmap (\(a, (b,c)) -> (a,b,c)) fanned2
+
+
 
 holdParamsWidget :: forall t m. (MonadWidget t m)
   => ParamsWidgetConfig t
