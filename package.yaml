@@ -91,6 +91,7 @@ dependencies:
 - aeson-pretty
 - bytestring
 
+- template-haskell
 - reflex-test-host
 - ref-tf
 - bimap
