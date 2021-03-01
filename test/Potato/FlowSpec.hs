@@ -32,15 +32,15 @@ import Reflex.Vty.Test.Common
 data PotatoNetwork t (m :: Type -> Type)
 
 instance (MonadVtyApp t (TestGuestT t m), TestGuestConstraints t m) => ReflexVtyTestApp (PotatoNetwork t m) t m where
-  data VtyAppInputTriggerRefs (PotatoNetwork t m) = PotatoNetwork_InputTriggerRefs {
+  data instance VtyAppInputTriggerRefs (PotatoNetwork t m) = PotatoNetwork_InputTriggerRefs {
       -- force an event bypassing the normal interface
       _potatoNetwork_InputTriggerRefs_bypassEvent :: Ref m (Maybe (EventTrigger t WSEvent))
     }
-  data VtyAppInputEvents (PotatoNetwork t m) = PotatoNetwork_InputEvents {
+  data instance VtyAppInputEvents (PotatoNetwork t m) = PotatoNetwork_InputEvents {
       _potatoNetwork_InputEvents_InputEvents_bypassEvent :: Event t WSEvent
     }
 
-  data VtyAppOutput (PotatoNetwork t m) =
+  data instance VtyAppOutput (PotatoNetwork t m) =
     PotatoNetwork_Output {
         _potatoNetwork_Output_exitEv :: Event t ()
       }

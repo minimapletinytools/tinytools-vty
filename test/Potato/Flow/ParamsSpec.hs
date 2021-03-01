@@ -5,10 +5,11 @@
 
 module Potato.Flow.ParamsSpec
   ( spec
+  , PotatoNetwork(..)
   )
 where
 
-import           Relude
+import           Relude hiding (Type)
 
 import           Test.Hspec
 import           Test.Hspec.Contrib.HUnit   (fromHUnitTest)
@@ -20,7 +21,7 @@ import Potato.Flow
 import           Control.Monad.IO.Class     (liftIO)
 import           Control.Monad.Ref
 import           Data.Default
-import           Data.Kind
+import qualified           Data.Kind
 import qualified Data.List                  as L
 
 import qualified Graphics.Vty               as V
@@ -31,13 +32,29 @@ import           Reflex.Vty.Test.Monad.Host
 import           Reflex.Vty.Test.Monad.Host.TH
 import Reflex.Vty.Test.Common
 
-import Language.Haskell.TH (mkName)
+import Language.Haskell.TH
 
-$(declareNetworkData (mkName "PotatoNetwork"))
---data PotatoNetwork t (m :: Type -> Type)
+-- $(declareNetworkData (mkName "PotatoNetwork"))
+data PotatoNetwork t (m :: Data.Kind.Type -> Data.Kind.Type)
 
--- $(declareNetworkInstance (mkName "PotatoNetwork"))
-
+$(declareNetworkInstance (mkName "PotatoNetwork")
+  [("bypassEvent", [t|WSEvent|])
+    , ("moop", [t|Int|])]
+  [("exitEv", [t|Event $(tv) ()|])]
+  [|
+      --getApp inputEvs = do
+      do
+        exitEv <- mainPFWidget $ MainPFWidgetConfig {
+            _mainPFWidgetConfig_initialFile = Nothing
+            , _mainPFWidgetConfig_initialState = emptyPFState
+            , _mainPFWidgetConfig_bypassEvent = $(varE $ mkName "_potatoNetwork_InputEvents_bypassEvent") $(varE $ mkName "inputEvs")
+          }
+        return ($(conE $ mkName "PotatoNetwork_Output") exitEv)
+        --return ($(ConT $ mkName "PotatoNetwork_Output") { $(VarT $ mkName "_potatoNetwork_Output_exitEv") = exitEv })
+    |]
+  )
+-- $(declareOutputs "_potatoNetwork_" [("exitEv", [|Event t ()|])])
+{-
 instance (MonadVtyApp t (TestGuestT t m), TestGuestConstraints t m) => ReflexVtyTestApp (PotatoNetwork t m) t m where
   data VtyAppInputTriggerRefs (PotatoNetwork t m) = PotatoNetwork_InputTriggerRefs {
       -- force an event bypassing the normal interface
@@ -51,11 +68,12 @@ instance (MonadVtyApp t (TestGuestT t m), TestGuestConstraints t m) => ReflexVty
     PotatoNetwork_Output {
         _potatoNetwork_Output_exitEv :: Event t ()
       }
+
   getApp PotatoNetwork_InputEvents {..} = do
     exitEv <- mainPFWidget $ MainPFWidgetConfig {
         _mainPFWidgetConfig_initialFile = Nothing
         , _mainPFWidgetConfig_initialState = emptyPFState
-        , _mainPFWidgetConfig_bypassEvent = _potatoNetwork_InputEvents_InputEvents_bypassEvent
+        , _mainPFWidgetConfig_bypassEvent = _potatoNetwork_InputEvents_bypassEvent
       }
     return PotatoNetwork_Output {
         _potatoNetwork_Output_exitEv = exitEv
@@ -65,6 +83,7 @@ instance (MonadVtyApp t (TestGuestT t m), TestGuestConstraints t m) => ReflexVty
     (ev, ref) <- newEventWithTriggerRef
     return (PotatoNetwork_InputEvents ev, PotatoNetwork_InputTriggerRefs ref)
 
+-}
 
 test_basic :: Test
 test_basic = TestLabel "open and quit" $ TestCase $ runSpiderHost $
@@ -87,7 +106,7 @@ test_basic = TestLabel "open and quit" $ TestCase $ runSpiderHost $
     queueVtyEvent $ V.EvKey (V.KChar 'q') [V.MCtrl]
     fireQueuedEventsAndRead readExitEv >>= \a -> liftIO (checkSingleMaybe a ())
 
-
 spec :: Spec
 spec = do
+  --fromHUnitTest $ TestLabel "Reifying..." $ TestCase $ liftIO $ putStrLn $(stringE . show =<< reifyInstances ''ReflexVtyTestApp [VarT $ mkName "a"])
   fromHUnitTest test_basic

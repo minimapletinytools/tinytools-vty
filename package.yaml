@@ -131,6 +131,7 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     - -j
+    - -ddump-splices
     dependencies:
     - potato-flow-vty
     - HUnit
