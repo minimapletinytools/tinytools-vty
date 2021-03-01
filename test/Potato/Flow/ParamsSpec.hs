@@ -42,6 +42,9 @@ $(declareNetworkInstance (mkName "PotatoNetwork")
     , ("moop", [t|Int|])]
   [("exitEv", [t|Event $(tv) ()|])]
   [|
+      -- TODO just force user to define it like this whatever
+      -- OR make helper var for $(varE $ mkName "inputEvs")
+      -- AND also make helper method for  $(VarE $ mkName "_potatoNetwork_Output_exitEv")
       --getApp inputEvs = do
       do
         exitEv <- mainPFWidget $ MainPFWidgetConfig {
@@ -50,9 +53,15 @@ $(declareNetworkInstance (mkName "PotatoNetwork")
             , _mainPFWidgetConfig_bypassEvent = $(varE $ mkName "_potatoNetwork_InputEvents_bypassEvent") $(varE $ mkName "inputEvs")
           }
         return ($(conE $ mkName "PotatoNetwork_Output") exitEv)
-        --return ($(ConT $ mkName "PotatoNetwork_Output") { $(VarT $ mkName "_potatoNetwork_Output_exitEv") = exitEv })
+        -- splicing within record initializer does not seem to work :(
+        --return $(ConT $ mkName "PotatoNetwork_Output") { $(VarE $ mkName "_potatoNetwork_Output_exitEv") = exitEv })
     |]
   )
+
+--data SomeData = SomeData { someField :: () }
+-- $([d| y = SomeData { someField = () } |])
+-- $([d| x = SomeData { $(VarE $ mkName "someField") = () } |])
+
 -- $(declareOutputs "_potatoNetwork_" [("exitEv", [|Event t ()|])])
 {-
 instance (MonadVtyApp t (TestGuestT t m), TestGuestConstraints t m) => ReflexVtyTestApp (PotatoNetwork t m) t m where
@@ -84,6 +93,7 @@ instance (MonadVtyApp t (TestGuestT t m), TestGuestConstraints t m) => ReflexVty
     return (PotatoNetwork_InputEvents ev, PotatoNetwork_InputTriggerRefs ref)
 
 -}
+
 
 test_basic :: Test
 test_basic = TestLabel "open and quit" $ TestCase $ runSpiderHost $
