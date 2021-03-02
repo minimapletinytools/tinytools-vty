@@ -2,6 +2,7 @@
 
 module Reflex.Vty.Test.Monad.Host.TH (
   declareStuff
+  , tinput
   , tv
 
   -- for testing
@@ -27,6 +28,14 @@ tv = varT $ mkName "t"
 --tv = do
 --  Just r <- lookupTypeName "t"
 --  varT r
+
+
+getAppInputEventsArgName :: Name
+getAppInputEventsArgName = mkName "inputEvs_____donotusethisvariablenameforanythingelse"
+
+-- |
+tinput :: String -> String -> Q Exp
+tinput name suffix = return $ AppE (VarE $ convertNameToPrefixedNameField (mkName name) ("InputEvents_"<>suffix)) (VarE $ getAppInputEventsArgName)
 
 declareNetworkData :: Name -> Q [Dec]
 declareNetworkData name = do
@@ -59,6 +68,7 @@ declareNetworkInstance name inputEventTypes outputTypes body = do
 
 normalBang :: Bang
 normalBang = Bang NoSourceUnpackedness NoSourceStrictness
+
 
 convertNameToPrefixedNameField :: Name -> String -> Name
 convertNameToPrefixedNameField name suffix = r where
@@ -135,7 +145,7 @@ declareGetApp name body' = do
   body <- body'
   let
     b = NormalB $ body
-    c = Clause [VarP $ mkName "inputEvs"] b []
+    c = Clause [VarP $ getAppInputEventsArgName] b []
   return $ FunD (mkName "getApp") [c]
 
 
@@ -144,8 +154,9 @@ declareStuff :: String -> [(String, Q Type)] -> [(String, Q Type)] -> Q Exp -> Q
 declareStuff name' inputEventTypes outputTypes body = do
   let
     name = mkName name'
-  declareNetworkData name
-  declareNetworkInstance name inputEventTypes outputTypes body
+  nd <- declareNetworkData name
+  ni <- declareNetworkInstance name inputEventTypes outputTypes body
+  return (nd<>ni)
 
 
 --ReflexVtyTestApp (PotatoNetwork t m) t m
