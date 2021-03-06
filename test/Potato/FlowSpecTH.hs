@@ -1,15 +1,14 @@
--- DELETE ME, use TH variant instead
-
 {-# LANGUAGE RankNTypes           #-}
 {-# LANGUAGE RecordWildCards      #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE TemplateHaskell          #-}
 
-module Potato.FlowSpec
+module Potato.FlowSpecTH
   ( spec
   )
 where
 
-import           Relude
+import           Relude hiding (Type)
 
 import           Test.Hspec
 import           Test.Hspec.Contrib.HUnit   (fromHUnitTest)
@@ -21,7 +20,7 @@ import Potato.Flow
 import           Control.Monad.IO.Class     (liftIO)
 import           Control.Monad.Ref
 import           Data.Default
-import           Data.Kind
+import qualified           Data.Kind
 import qualified Data.List                  as L
 
 import qualified Graphics.Vty               as V
@@ -29,37 +28,37 @@ import           Reflex
 import           Reflex.Host.Class
 import           Reflex.Vty
 import           Reflex.Vty.Test.Monad.Host
+import           Reflex.Vty.Test.Monad.Host.TH
 import Reflex.Vty.Test.Common
 
-data PotatoNetwork t (m :: Type -> Type)
+import Language.Haskell.TH
 
-instance (MonadVtyApp t (TestGuestT t m), TestGuestConstraints t m) => ReflexVtyTestApp (PotatoNetwork t m) t m where
-  data instance VtyAppInputTriggerRefs (PotatoNetwork t m) = PotatoNetwork_InputTriggerRefs {
-      -- force an event bypassing the normal interface
-      _potatoNetwork_InputTriggerRefs_bypassEvent :: Ref m (Maybe (EventTrigger t WSEvent))
-    }
-  data instance VtyAppInputEvents (PotatoNetwork t m) = PotatoNetwork_InputEvents {
-      _potatoNetwork_InputEvents_InputEvents_bypassEvent :: Event t WSEvent
-    }
+$(declareStuff "PotatoNetwork"
+  [("bypassEvent", [t|WSEvent|])
+    , ("moop", [t|Int|])]
+  [("exitEv", [t|Event $(tv) ()|])]
+  [|
+      do
+        exitEv <- mainPFWidget $ MainPFWidgetConfig {
+            _mainPFWidgetConfig_initialFile = Nothing
+            , _mainPFWidgetConfig_initialState = emptyPFState
+            , _mainPFWidgetConfig_bypassEvent = $(tinput "PotatoNetwork" "bypassEvent")
+          }
+        return $ $(toutputcon "PotatoNetwork") exitEv
 
-  data instance VtyAppOutput (PotatoNetwork t m) =
-    PotatoNetwork_Output {
-        _potatoNetwork_Output_exitEv :: Event t ()
-      }
-  getApp PotatoNetwork_InputEvents {..} = do
-    exitEv <- mainPFWidget $ MainPFWidgetConfig {
-        _mainPFWidgetConfig_initialFile = Nothing
-        , _mainPFWidgetConfig_initialState = emptyPFState
-        , _mainPFWidgetConfig_bypassEvent = _potatoNetwork_InputEvents_InputEvents_bypassEvent
-      }
-    return PotatoNetwork_Output {
-        _potatoNetwork_Output_exitEv = exitEv
-      }
+        -- you can also do it yourself
+        --return ($(conE $ mkName "PotatoNetwork_Output") exitEv)
 
-  makeInputs = do
-    (ev, ref) <- newEventWithTriggerRef
-    return (PotatoNetwork_InputEvents ev, PotatoNetwork_InputTriggerRefs ref)
+        -- splicing within record initializer does not seem to work :(
+        --return $(ConT $ mkName "PotatoNetwork_Output") { $(VarE $ mkName "_potatoNetwork_Output_exitEv") = exitEv })
+    |]
+  )
 
+-- DELETE
+--data SomeData = SomeData { someField :: () }
+-- $([d| y = SomeData { someField = () } |])
+-- splicing inside quasi-quoted record initialization (i.e. RecordType { ... }) does not work
+-- $([d| x = SomeData { $(VarE $ mkName "someField") = () } |])
 
 test_basic :: Test
 test_basic = TestLabel "open and quit" $ TestCase $ runSpiderHost $
@@ -82,7 +81,7 @@ test_basic = TestLabel "open and quit" $ TestCase $ runSpiderHost $
     queueVtyEvent $ V.EvKey (V.KChar 'q') [V.MCtrl]
     fireQueuedEventsAndRead readExitEv >>= \a -> liftIO (checkSingleMaybe a ())
 
-
 spec :: Spec
 spec = do
+  --fromHUnitTest $ TestLabel "Reifying..." $ TestCase $ liftIO $ putStrLn $(stringE . show =<< reifyInstances ''ReflexVtyTestApp [VarT $ mkName "a"])
   fromHUnitTest test_basic

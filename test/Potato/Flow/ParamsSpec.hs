@@ -5,7 +5,6 @@
 
 module Potato.Flow.ParamsSpec
   ( spec
-  , PotatoNetwork(..)
   )
 where
 
@@ -15,7 +14,7 @@ import           Test.Hspec
 import           Test.Hspec.Contrib.HUnit   (fromHUnitTest)
 import           Test.HUnit
 
-import           Potato.Flow.Vty.Main
+import           Potato.Flow.Vty.Params
 import Potato.Flow
 
 import           Control.Monad.IO.Class     (liftIO)
@@ -23,6 +22,7 @@ import           Control.Monad.Ref
 import           Data.Default
 import qualified           Data.Kind
 import qualified Data.List                  as L
+import qualified Data.Sequence as Seq
 
 import qualified Graphics.Vty               as V
 import           Reflex
@@ -36,91 +36,46 @@ import Language.Haskell.TH
 
 
 
-$(declareStuff "PotatoNetwork"
-  [("bypassEvent", [t|WSEvent|])
-    , ("moop", [t|Int|])]
-  [("exitEv", [t|Event $(tv) ()|])]
+$(declareStuff "ParamsNetwork"
+  [("setSelection", [t|Selection|])
+    , ("setCanvas", [t|SCanvas|])]
+  [("paramsWidget", [t|ParamsWidget $(tv)|])]
   [|
       do
-        exitEv <- mainPFWidget $ MainPFWidgetConfig {
-            _mainPFWidgetConfig_initialFile = Nothing
-            , _mainPFWidgetConfig_initialState = emptyPFState
-            , _mainPFWidgetConfig_bypassEvent = $(tinput "PotatoNetwork" "bypassEvent")
+        setSelectionDyn <- holdDyn Seq.empty $(tinput "ParamsNetwork" "setSelection")
+        setCanvasDyn <- holdDyn (SCanvas (LBox (V2 0 0) (V2 100 100))) $(tinput "ParamsNetwork" "setCanvas")
+        paramsWidget <- holdParamsWidget $ ParamsWidgetConfig {
+            _paramsWidgetConfig_selectionDyn = setSelectionDyn
+            , _paramsWidgetConfig_canvasDyn = setCanvasDyn
           }
-        return $ $(toutputcon "PotatoNetwork") exitEv
-
-        -- you can also do it yourself
-        --return ($(conE $ mkName "PotatoNetwork_Output") exitEv)
-
-        -- splicing within record initializer does not seem to work :(
-        --return $(ConT $ mkName "PotatoNetwork_Output") { $(VarE $ mkName "_potatoNetwork_Output_exitEv") = exitEv })
+        return $ $(toutputcon "ParamsNetwork") paramsWidget
     |]
   )
 
--- DELETE
---data SomeData = SomeData { someField :: () }
--- $([d| y = SomeData { someField = () } |])
--- splicing inside quasi-quoted record initialization (i.e. RecordType { ... }) does not work
--- $([d| x = SomeData { $(VarE $ mkName "someField") = () } |])
-
-
-
-{-
--- DELETE or leave for reference
-data PotatoNetwork t (m :: Data.Kind.Type -> Data.Kind.Type)
-instance (MonadVtyApp t (TestGuestT t m), TestGuestConstraints t m) => ReflexVtyTestApp (PotatoNetwork t m) t m where
-  data VtyAppInputTriggerRefs (PotatoNetwork t m) = PotatoNetwork_InputTriggerRefs {
-      -- force an event bypassing the normal interface
-      _potatoNetwork_InputTriggerRefs_bypassEvent :: Ref m (Maybe (EventTrigger t WSEvent))
-    }
-  data VtyAppInputEvents (PotatoNetwork t m) = PotatoNetwork_InputEvents {
-      _potatoNetwork_InputEvents_InputEvents_bypassEvent :: Event t WSEvent
-    }
-
-  data VtyAppOutput (PotatoNetwork t m) =
-    PotatoNetwork_Output {
-        _potatoNetwork_Output_exitEv :: Event t ()
-      }
-
-  getApp PotatoNetwork_InputEvents {..} = do
-    exitEv <- mainPFWidget $ MainPFWidgetConfig {
-        _mainPFWidgetConfig_initialFile = Nothing
-        , _mainPFWidgetConfig_initialState = emptyPFState
-        , _mainPFWidgetConfig_bypassEvent = _potatoNetwork_InputEvents_bypassEvent
-      }
-    return PotatoNetwork_Output {
-        _potatoNetwork_Output_exitEv = exitEv
-      }
-
-  makeInputs = do
-    (ev, ref) <- newEventWithTriggerRef
-    return (PotatoNetwork_InputEvents ev, PotatoNetwork_InputTriggerRefs ref)
-
--}
-
 
 test_basic :: Test
-test_basic = TestLabel "open and quit" $ TestCase $ runSpiderHost $
-  runReflexVtyTestApp @ (PotatoNetwork (SpiderTimeline Global) (SpiderHost Global)) (100,100) $ do
+test_basic = TestLabel "set canvas size" $ TestCase $ runSpiderHost $
+  runReflexVtyTestApp @ (ParamsNetwork (SpiderTimeline Global) (SpiderHost Global)) (100,100) $ do
 
     -- get our app's input triggers
-    PotatoNetwork_InputTriggerRefs {..} <- userInputTriggerRefs
+    ParamsNetwork_InputTriggerRefs {..} <- userInputTriggerRefs
 
     -- get our app's output events and subscribe to them
-    PotatoNetwork_Output {..} <- userOutputs
-    exitH <- subscribeEvent _potatoNetwork_Output_exitEv
+    ParamsNetwork_Output (ParamsWidget {..}) <- userOutputs
+    canvasSizeH <- subscribeEvent _paramsWidget_canvasSizeEvent
 
     let
-      readExitEv = sequence =<< readEvent exitH
+      readCanvasSizeH = sequence =<< readEvent canvasSizeH
 
-    -- fire an empty event and ensure there is no quit event
-    fireQueuedEventsAndRead readExitEv >>= \a -> liftIO (checkNothing a)
+    -- fire an empty event and ensure there is no canvas change event
+    fireQueuedEventsAndRead readCanvasSizeH >>= \a -> liftIO (checkNothing a)
 
-    -- enter quit sequence and ensure there is a quit event
-    queueVtyEvent $ V.EvKey (V.KChar 'q') [V.MCtrl]
-    fireQueuedEventsAndRead readExitEv >>= \a -> liftIO (checkSingleMaybe a ())
+    -- set the canvas size and ensure there is no canvas change event
+    queueEventTriggerRef _paramsNetwork_InputTriggerRefs_setCanvas (SCanvas (LBox (V2 0 0) (V2 50 50)))
+    fireQueuedEventsAndRead readCanvasSizeH >>= \a -> liftIO (checkNothing a)
+
+    -- TODO actually test stuff
 
 spec :: Spec
 spec = do
-  --fromHUnitTest $ TestLabel "Reifying..." $ TestCase $ liftIO $ putStrLn $(stringE . show =<< reifyInstances ''ReflexVtyTestApp [VarT $ mkName "a"])
   fromHUnitTest test_basic
