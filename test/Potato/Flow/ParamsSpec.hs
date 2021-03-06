@@ -47,7 +47,11 @@ $(declareStuff "PotatoNetwork"
             , _mainPFWidgetConfig_initialState = emptyPFState
             , _mainPFWidgetConfig_bypassEvent = $(tinput "PotatoNetwork" "bypassEvent")
           }
-        return ($(conE $ mkName "PotatoNetwork_Output") exitEv)
+        return $ $(toutputcon "PotatoNetwork") exitEv
+
+        -- you can also do it yourself
+        --return ($(conE $ mkName "PotatoNetwork_Output") exitEv)
+
         -- splicing within record initializer does not seem to work :(
         --return $(ConT $ mkName "PotatoNetwork_Output") { $(VarE $ mkName "_potatoNetwork_Output_exitEv") = exitEv })
     |]
@@ -56,6 +60,7 @@ $(declareStuff "PotatoNetwork"
 -- DELETE
 --data SomeData = SomeData { someField :: () }
 -- $([d| y = SomeData { someField = () } |])
+-- splicing inside quasi-quoted record initialization (i.e. RecordType { ... }) does not work
 -- $([d| x = SomeData { $(VarE $ mkName "someField") = () } |])
 
 

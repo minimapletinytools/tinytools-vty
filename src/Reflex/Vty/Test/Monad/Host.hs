@@ -208,9 +208,6 @@ runReflexVtyTestT r0 (uinput, uinputtrefs) app rtm = do
 -- analogous to ReflexTestApp
 class ReflexVtyTestApp app t m | app -> t m where
 
-  -- NOTE only use this if you really need custom input types
-  -- it's a lot easier just to use the vty input events instead
-  -- if you really want to use them see examples in reflex-test-host
   data VtyAppInputTriggerRefs app :: Type
   data VtyAppInputEvents app :: Type
 

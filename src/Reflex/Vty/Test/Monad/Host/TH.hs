@@ -3,12 +3,8 @@
 module Reflex.Vty.Test.Monad.Host.TH (
   declareStuff
   , tinput
+  , toutputcon
   , tv
-
-  -- for testing
-  , declareNetworkData
-  , declareNetworkInstance
-  , declareOutputs
 ) where
 
 import Prelude (foldl)
@@ -22,6 +18,7 @@ import           Reflex.Vty.Test.Monad.Host
 import           Reflex.Host.Class (EventTrigger, newEventWithTriggerRef)
 import           Control.Monad.Ref
 
+-- | reference the 't' variable your quasi-quotes. e.g. 'Event $(tv) ()'
 tv :: Q Type
 tv = varT $ mkName "t"
 -- does this capture types in generated scope? Probably not???
@@ -29,13 +26,28 @@ tv = varT $ mkName "t"
 --  Just r <- lookupTypeName "t"
 --  varT r
 
+-- | reference a specific input event
+tinput :: String -> String -> Q Exp
+tinput name suffix = return $ AppE (VarE $ convertNameToPrefixedNameField (mkName name) ("InputEvents_"<>suffix)) (VarE $ getAppInputEventsArgName)
+
+-- | reference the output constructor
+toutputcon :: String -> Q Exp
+toutputcon name = conE $ mkName (name <> "_Output")
+
+-- | call me to generate code
+declareStuff :: String -> [(String, Q Type)] -> [(String, Q Type)] -> Q Exp -> Q [Dec]
+declareStuff name' inputEventTypes outputTypes body = do
+  let
+    name = mkName name'
+  nd <- declareNetworkData name
+  ni <- declareNetworkInstance name inputEventTypes outputTypes body
+  return (nd<>ni)
+
+
+
 
 getAppInputEventsArgName :: Name
 getAppInputEventsArgName = mkName "inputEvs_____donotusethisvariablenameforanythingelse"
-
--- |
-tinput :: String -> String -> Q Exp
-tinput name suffix = return $ AppE (VarE $ convertNameToPrefixedNameField (mkName name) ("InputEvents_"<>suffix)) (VarE $ getAppInputEventsArgName)
 
 declareNetworkData :: Name -> Q [Dec]
 declareNetworkData name = do
@@ -147,48 +159,3 @@ declareGetApp name body' = do
     b = NormalB $ body
     c = Clause [VarP $ getAppInputEventsArgName] b []
   return $ FunD (mkName "getApp") [c]
-
-
-
-declareStuff :: String -> [(String, Q Type)] -> [(String, Q Type)] -> Q Exp -> Q [Dec]
-declareStuff name' inputEventTypes outputTypes body = do
-  let
-    name = mkName name'
-  nd <- declareNetworkData name
-  ni <- declareNetworkInstance name inputEventTypes outputTypes body
-  return (nd<>ni)
-
-
---ReflexVtyTestApp (PotatoNetwork t m) t m
-
-{-
-
-data BasicNetworkTest1 t (m :: Type -> Type)
-
-instance (MonadVtyApp t (TestGuestT t m), TestGuestConstraints t m) => ReflexVtyTestApp (BasicNetworkTest1 t m) t m where
-
-  -- I just wanted to try using VtyAppInputEvents/VtyAppInputTriggerRefs
-  -- it would have been a lot easier to use a vty event to trigger the popup
-  data VtyAppInputTriggerRefs (BasicNetworkTest1 t m) = BasicNetworkTest1_InputTriggerRefs {
-      _basicNetworkTest1_InputTriggerRefs_makePopup :: Ref m (Maybe (EventTrigger t ()))
-    }
-  data VtyAppInputEvents (BasicNetworkTest1 t m) = BasicNetworkTest1_InputEvents {
-      _basicNetworkTest1_InputEvents_makePopup :: Event t ()
-    }
-  data VtyAppOutput (BasicNetworkTest1 t m) =
-    BasicNetworkTest1_Output {
-        _basicNetworkTest1_Output_cancelEv :: Event t ()
-        , _basicNetworkTest1_Output_popupOutEv :: Event t Int
-        , _basicNetworkTest1_Output_popupStateDyn :: Dynamic t Bool
-      }
-  getApp BasicNetworkTest1_InputEvents {..} = do
-    let
-      someWidget = fmap (const 123) <$> key V.KEnter
-      someWidgetEv = fmap (const someWidget) _basicNetworkTest1_InputEvents_makePopup
-    -- popup that closes when you press enter
-    (popupEv, popupStateDyn) <- popupPaneSimple def someWidgetEv
-    -- gotta make the popup look pretty :D
-    fill '#'
-    return $ BasicNetworkTest1_Output never popupEv popupStateDyn
-
--}
