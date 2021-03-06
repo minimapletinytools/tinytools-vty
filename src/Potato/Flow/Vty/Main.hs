@@ -273,13 +273,9 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
         , _goatWidgetConfig_paramsEvent = _paramsWidget_paramsEvent paramsW
         , _goatWidgetConfig_canvasSize = _paramsWidget_canvasSizeEvent paramsW
 
-        -- debugging/deprecated stuff
+        -- debugging stuff
         , _goatWidgetConfig_setDebugLabel = never
-
-
-
-        -- TODO
-        --, _goatWidgetConfig_bypassEvent = _mainPFWidgetConfig_bypassEvent
+        , _goatWidgetConfig_bypassEvent = _mainPFWidgetConfig_bypassEvent
       }
 
   everythingW <- holdGoatWidget goatWidgetConfig
