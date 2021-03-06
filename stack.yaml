@@ -68,8 +68,13 @@ extra-deps:
   commit: 4ca36f1122576ec42723315f3124d3ca3e321a16
 - github: pdlla/reflex-potatoes
   commit: ca25ecfcf6a651f7ee91f4c278ac8035fd48d9a5
-- github: pdlla/potato-flow
-  commit: 934960be1696c543d7017427ab918d3cd5806f4b
+
+# use git submodule to speed up development flow
+- potato_flow
+
+# switch to this when your done with development kthxbye
+#- github: pdlla/potato-flow
+#  commit: 934960be1696c543d7017427ab918d3cd5806f4b
 
 # - /Users/user/kitchen/faucet/reflex-vty
 # - github: pdlla/reflex-vty
