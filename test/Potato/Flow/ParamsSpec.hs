@@ -65,16 +65,33 @@ test_basic = TestLabel "set canvas size" $ TestCase $ runSpiderHost $
     canvasSizeH <- subscribeEvent _paramsWidget_canvasSizeEvent
 
     let
-      readCanvasSizeH = sequence =<< readEvent canvasSizeH
+      readCanvasSize = sequence =<< readEvent canvasSizeH
 
     -- fire an empty event and ensure there is no canvas change event
-    fireQueuedEventsAndRead readCanvasSizeH >>= \a -> liftIO (checkNothing a)
+    fireQueuedEventsAndRead readCanvasSize >>= \a -> liftIO (checkNothing a)
 
     -- set the canvas size and ensure there is no canvas change event
     queueEventTriggerRef _paramsNetwork_InputTriggerRefs_setCanvas (SCanvas (LBox (V2 0 0) (V2 50 50)))
-    fireQueuedEventsAndRead readCanvasSizeH >>= \a -> liftIO (checkNothing a)
+    fireQueuedEventsAndRead readCanvasSize >>= \a -> liftIO (checkNothing a)
 
-    -- TODO actually test stuff
+    -- we have nothing selected so canvas size should be first thing in ParamsWidget
+    queueVtyEvent (V.EvMouseDown 10 0 V.BLeft []) >> fireQueuedEvents
+    queueVtyEvent (V.EvMouseUp 10 0 Nothing) >> fireQueuedEvents
+    queueVtyEvent (V.EvKey V.KBS []) >> fireQueuedEvents
+    queueVtyEvent (V.EvKey V.KBS []) >> fireQueuedEvents
+    queueVtyEvent (V.EvKey (V.KChar '2') []) >> fireQueuedEvents
+    queueVtyEvent (V.EvKey (V.KChar '0') []) >> fireQueuedEvents
+    queueVtyEvent (V.EvKey V.KEnter [])
+    fireQueuedEventsAndRead readCanvasSize >>= \a -> liftIO (checkSingleMaybe a (V2 (-30) 0))
+    queueVtyEvent (V.EvKey V.KBS []) >> fireQueuedEvents
+    queueVtyEvent (V.EvKey V.KBS []) >> fireQueuedEvents
+    queueVtyEvent (V.EvKey (V.KChar '3') []) >> fireQueuedEvents
+    queueVtyEvent (V.EvKey (V.KChar '0') []) >> fireQueuedEvents
+    queueVtyEvent (V.EvKey V.KEnter [])
+    fireQueuedEventsAndRead readCanvasSize >>= \a -> liftIO (checkSingleMaybe a (V2 (-30) (-20)))
+
+    -- TODO test other stuff 😥
+
 
 spec :: Spec
 spec = do

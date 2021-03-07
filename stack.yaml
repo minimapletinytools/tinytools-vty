@@ -60,21 +60,20 @@ extra-deps:
 - these-1.0.1@sha256:58dba2446b57dde711c5e7f63910d18bc28b9a5831a89772986bb184a3e7851b,3266
 
 
-
-
 - github: pdlla/reflex-test-host
-  commit: 8b12d1963162dda636afac0551768d2e00f34c8a
+  commit: ab29da3af975a37b96964a10d4877588773cabb6
+#why do I still need this???
 - github: pdlla/reflex-dynamic-containers
-  commit: 4ca36f1122576ec42723315f3124d3ca3e321a16
+  commit: 607cf12fe2b0df1eb3bf3ccdc49e62744cba95ba
 - github: pdlla/reflex-potatoes
-  commit: ca25ecfcf6a651f7ee91f4c278ac8035fd48d9a5
+  commit: c7a77eafa2212de4b36fa351cdb18852a42e5d2b
 
 # use git submodule to speed up development flow
 - potato_flow
 
 # switch to this when your done with development kthxbye
 #- github: pdlla/potato-flow
-#  commit: 934960be1696c543d7017427ab918d3cd5806f4b
+# commit: 09769ed59761f4511fad3873c3f72c667dc6c225
 
 # - /Users/user/kitchen/faucet/reflex-vty
 # - github: pdlla/reflex-vty

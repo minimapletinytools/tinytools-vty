@@ -104,6 +104,20 @@ paramsNavigation = do
   back <- fmap (const (-1)) <$> key V.KBackTab
   return $ leftmost [fwd, back]
 
+
+-- | create a focus event (to be used with runIsLayoutVtyWidget) from a navigation event
+layoutFocusEvFromNavigationNoRepeat
+  :: (Reflex t)
+  => Event t Int
+  -> Event t ()
+  -> LayoutReturnData t a
+  -> Event t (Maybe Int)
+layoutFocusEvFromNavigationNoRepeat navEv unfocusEv LayoutReturnData {..} = r where
+  focusInd nKiddos shift cur = if shift+cur >= nKiddos then Nothing else Just (shift+cur)
+  fmapfn (nKiddos, (mcur, shift)) = maybe (Just 0) (focusInd nKiddos shift) mcur
+  navEv' = attach (current _layoutReturnData_children) $ attach (current _layoutReturnData_focus) navEv
+  r = leftmost [unfocusEv $> Nothing, fmap fmapfn navEv']
+
 beginParamsLayout ::
   forall m t a. (MonadHold t m, PostBuild t m, MonadFix m, MonadNodeId m)
   => LayoutVtyWidget t m (LayoutReturnData t a)
@@ -111,8 +125,7 @@ beginParamsLayout ::
 beginParamsLayout child = mdo
   navEv <- paramsNavigation
   focusDyn <- focus
-  -- TODO instead of layoutFocusEvFromNavigation we want to lose focus after we complete a full round of navigation :O
-  let focusChildEv = layoutFocusEvFromNavigation navEv (fmapMaybe (\x -> if x then Nothing else Just ()) (updated focusDyn)) lrd
+  let focusChildEv = layoutFocusEvFromNavigationNoRepeat navEv (fmapMaybe (\x -> if x then Nothing else Just ()) (updated focusDyn)) lrd
   lrd@LayoutReturnData {..} <- runIsLayoutVtyWidget child focusChildEv
   return (_layoutReturnData_focus, _layoutReturnData_value)
 
@@ -457,7 +470,7 @@ holdCanvasSizeWidget canvasDyn nothingDyn = ffor nothingDyn $ \_ -> do
       stretch $ dimensionInput cHeightDyn
     return (wDyn',hDyn')
   let
-    outputEv = flip push (void $ updated focusDyn) $ \_ -> do
+    outputEv = flip push (void $ traceEvent "poop" $ updated focusDyn) $ \_ -> do
       cw <- sample . current $ cWidthDyn
       ch <- sample . current $ cHeightDyn
       w <- sample . current $ wDyn
