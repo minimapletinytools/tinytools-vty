@@ -7,7 +7,9 @@ module Potato.Flow.Vty.Params (
   , holdParamsWidget
 
   -- exposed for testing
+  , selectParamsFromSelection
   , networkParamsWidgetOutputDynForTesting
+  , holdSuperStyleWidget
 ) where
 
 import           Relude
@@ -470,7 +472,7 @@ holdCanvasSizeWidget canvasDyn nothingDyn = ffor nothingDyn $ \_ -> do
       stretch $ dimensionInput cHeightDyn
     return (wDyn',hDyn')
   let
-    outputEv = flip push (void $ traceEvent "poop" $ updated focusDyn) $ \_ -> do
+    outputEv = flip push (void $ updated focusDyn) $ \_ -> do
       cw <- sample . current $ cWidthDyn
       ch <- sample . current $ cHeightDyn
       w <- sample . current $ wDyn

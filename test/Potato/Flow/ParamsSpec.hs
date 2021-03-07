@@ -23,6 +23,7 @@ import           Data.Default
 import qualified           Data.Kind
 import qualified Data.List                  as L
 import qualified Data.Sequence as Seq
+import Data.Tuple.Extra (thd3)
 
 import qualified Graphics.Vty               as V
 import           Reflex
@@ -53,8 +54,8 @@ $(declareStuff "ParamsNetwork"
   )
 
 
-test_basic :: Test
-test_basic = TestLabel "set canvas size" $ TestCase $ runSpiderHost $
+test_params_set_canvas_size :: Test
+test_params_set_canvas_size = TestLabel "set canvas size" $ TestCase $ runSpiderHost $
   runReflexVtyTestApp @ (ParamsNetwork (SpiderTimeline Global) (SpiderHost Global)) (100,100) $ do
 
     -- get our app's input triggers
@@ -93,6 +94,62 @@ test_basic = TestLabel "set canvas size" $ TestCase $ runSpiderHost $
     -- TODO test other stuff 😥
 
 
+
+
+
+$(declareStuff "SuperStyleWidgetNetwork"
+  [("setSelection", [t|Selection|])]
+  [("height", [t|Dynamic $(tv) Int|])
+  , ("capture", [t|Event $(tv) ()|])
+  , ("output", [t|Event $(tv) ControllersWithId|])]
+  [|
+      do
+        selectionDyn <- holdDyn Seq.empty $(tinput "SuperStyleWidgetNetwork" "setSelection")
+
+        let
+          selectFn s = case selectParamsFromSelection (getSEltLabelSuperStyle . thd3) s of
+            Nothing -> (Seq.empty, Nothing)
+            Just x -> x
+          mSuperStyleInputDyn = fmap selectFn selectionDyn
+        (heightDyn, captureEv, outputEv) <- networkParamsWidgetOutputDynForTesting (holdSuperStyleWidget mSuperStyleInputDyn)
+        -- TODO consider convert outputEv back to Event t SuperStyle...
+        return $ $(toutputcon "SuperStyleWidgetNetwork") heightDyn captureEv outputEv
+    |]
+  )
+
+test_superStyleWidget_basic :: Test
+test_superStyleWidget_basic = TestLabel "set canvas size" $ TestCase $ runSpiderHost $
+  runReflexVtyTestApp @ (SuperStyleWidgetNetwork (SpiderTimeline Global) (SpiderHost Global)) (100,100) $ do
+
+    let queueVtyEventAndFire x = queueVtyEvent x >> fireQueuedEvents
+
+    -- get our app's input triggers
+    SuperStyleWidgetNetwork_InputTriggerRefs {..} <- userInputTriggerRefs
+
+    -- get our app's output events and subscribe to them
+    SuperStyleWidgetNetwork_Output heightDyn captureEv outputEv <- userOutputs
+    heightDynH <- subscribeDynamic heightDyn
+    captureEvH <- subscribeEvent captureEv
+    outputEvH <- subscribeEvent outputEv
+
+    let
+      --readHeightDyn = readDynamic heightDynH
+      readCaptureEv = sequence =<< readEvent captureEvH
+      readOutputEv = sequence =<< readEvent outputEvH
+
+    -- fire an empty event and ensure there is no output or capture ev
+    fireQueuedEventsAndRead readCaptureEv >>= \a -> liftIO (checkNothing a)
+    fireQueuedEventsAndRead readOutputEv >>= \a -> liftIO (checkNothing a)
+
+    -- set the canvas size and ensure there is no canvas change event
+    --queueEventTriggerRef _paramsNetwork_InputTriggerRefs_setCanvas (SCanvas (LBox (V2 0 0) (V2 50 50)))
+    --fireQueuedEventsAndRead readCanvasSize >>= \a -> liftIO (checkNothing a)
+
+
+    -- TODO test other stuff 😥
+
+
 spec :: Spec
 spec = do
-  fromHUnitTest test_basic
+  fromHUnitTest test_params_set_canvas_size
+  fromHUnitTest test_superStyleWidget_basic
