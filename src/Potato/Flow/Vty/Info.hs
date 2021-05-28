@@ -39,13 +39,16 @@ holdInfoWidget InfoWidgetConfig {..} = do
   let
     -- TODO read canvasSelection and figure out what the preset is
     infoDyn = ffor _infoWidgetConfig_selection $ \selection -> case () of
-      _ | Seq.length selection == 0 -> return ()
-      _ | Seq.length selection > 1 -> text "many"
+      _ | isParliament_length selection == 0 -> return ()
+      _ | isParliament_length selection > 1 -> text "many"
       _ -> do
         let
-          (rid,lp,SEltLabel label selt) = selectionToSuperSEltLabel selection
+          sowl = selectionToSuperOwl selection
+          rid = _superOwl_id sowl
+          label = isOwl_name sowl
+          selt = superOwl_toSElt_hack sowl
         col $ do
-          fixed 1 $ text (constant ("rid: " <> show rid <> " lp: " <> show lp <> " name: " <> label))
+          fixed 1 $ text (constant ("rid: " <> show rid <> " name: " <> label))
           case selt of
             SEltBox SBox {..} -> fixed 1 $ text (constant (_sBoxText_text _sBox_text))
             _                 -> fixed 1 $ text (constant "something else")

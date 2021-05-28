@@ -43,7 +43,7 @@ $(declareStuff "ParamsNetwork"
   [("paramsWidget", [t|ParamsWidget $(tv)|])]
   [|
       do
-        setSelectionDyn <- holdDyn Seq.empty $(tinput "ParamsNetwork" "setSelection")
+        setSelectionDyn <- holdDyn isParliament_empty $(tinput "ParamsNetwork" "setSelection")
         setCanvasDyn <- holdDyn (SCanvas (LBox (V2 0 0) (V2 100 100))) $(tinput "ParamsNetwork" "setCanvas")
         paramsWidget <- holdParamsWidget $ ParamsWidgetConfig {
             _paramsWidgetConfig_selectionDyn = setSelectionDyn
@@ -104,11 +104,11 @@ $(declareStuff "SuperStyleWidgetNetwork"
   , ("output", [t|Event $(tv) ControllersWithId|])]
   [|
       do
-        selectionDyn <- holdDyn Seq.empty $(tinput "SuperStyleWidgetNetwork" "setSelection")
+        selectionDyn <- holdDyn isParliament_empty $(tinput "SuperStyleWidgetNetwork" "setSelection")
 
         let
-          selectFn s = case selectParamsFromSelection (getSEltLabelSuperStyle . thd3) s of
-            Nothing -> (Seq.empty, Nothing)
+          selectFn s = case selectParamsFromSelection (getSEltLabelSuperStyle . superOwl_toSEltLabel_hack) s of
+            Nothing -> (isParliament_empty, Nothing)
             Just x -> x
           mSuperStyleInputDyn = fmap selectFn selectionDyn
         (heightDyn, captureEv, outputEv) <- networkParamsWidgetOutputDynForTesting (holdSuperStyleWidget mSuperStyleInputDyn)

@@ -210,14 +210,14 @@ captureInputEvents capture child = VtyWidget $ do
 
 data MainPFWidgetConfig t = MainPFWidgetConfig {
   _mainPFWidgetConfig_initialFile :: Maybe Text
-  , _mainPFWidgetConfig_initialState :: PFState -- ^ will be overriden by initialFile if set
+  , _mainPFWidgetConfig_initialState :: OwlPFState -- ^ will be overriden by initialFile if set
   , _mainPFWidgetConfig_bypassEvent :: Event t WSEvent
 }
 
 instance (Reflex t) => Default (MainPFWidgetConfig t) where
   def = MainPFWidgetConfig {
       _mainPFWidgetConfig_initialFile = Nothing
-      , _mainPFWidgetConfig_initialState = emptyPFState
+      , _mainPFWidgetConfig_initialState = emptyOwlPFState
       , _mainPFWidgetConfig_bypassEvent = never
     }
 
@@ -290,7 +290,7 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
           click <- mouseDown V.BLeft
           let saveEv = tag (current $ _goatWidget_DEBUG_goatState everythingW) click
           performEvent_ $ ffor saveEv $ \gs -> do
-             let spf = pFState_to_sPotatoFlow . _pFWorkspace_pFState . _goatState_pFWorkspace $ gs
+             let spf = owlPFState_to_sPotatoFlow . _owlPFWorkspace_pFState . _goatState_workspace $ gs
              --liftIO $ Aeson.encodeFile "potato.flow" spf
              liftIO $ LBS.writeFile "potato.flow" $ PrettyAeson.encodePretty spf
         stretch $ text "|"

@@ -49,7 +49,7 @@ instance (MonadVtyApp t (TestGuestT t m), TestGuestConstraints t m) => ReflexVty
   getApp PotatoNetwork_InputEvents {..} = do
     exitEv <- mainPFWidget $ MainPFWidgetConfig {
         _mainPFWidgetConfig_initialFile = Nothing
-        , _mainPFWidgetConfig_initialState = emptyPFState
+        , _mainPFWidgetConfig_initialState = emptyOwlPFState
         , _mainPFWidgetConfig_bypassEvent = _potatoNetwork_InputEvents_InputEvents_bypassEvent
       }
     return PotatoNetwork_Output {

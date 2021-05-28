@@ -143,17 +143,17 @@ beginNoNavLayout child = mdo
 -- Maybe Params stuff
 
 -- | method type for picking out params from SuperSEltLabel
-type ParamsSelector a = (Eq a) => SuperSEltLabel -> Maybe a
+type ParamsSelector a = (Eq a) => SuperOwl -> Maybe a
 
 -- | method to extract common parameters from a selection
 -- returns Nothing if nothing in the selection has the selected param
 -- returns Just (selection, Nothing) if selection that has the selected param do not share the same value
 selectParamsFromSelection :: (Eq a) => ParamsSelector a -> Selection -> Maybe (Selection, Maybe a)
-selectParamsFromSelection ps selection = r where
+selectParamsFromSelection ps (SuperOwlParliament selection) = r where
   -- TODO don't do list conversion in between whataver ugh
-  params = catMaybes . toList . fmap (\ssl@(rid,_,_) -> ps ssl >>= \a -> Just (ssl, a)) $ selection
+  params = catMaybes . toList . fmap (\sowl -> ps sowl >>= \a -> Just (sowl, a)) $ selection
   values = fmap snd params
-  subSelection = Seq.fromList $ fmap fst params
+  subSelection = SuperOwlParliament $ Seq.fromList $ fmap fst params
   r = case values of
     [] -> Nothing
     x:xs -> if L.allSame values
@@ -190,7 +190,7 @@ holdMaybeParamsWidget mInputDyn widgetFn = do
   return . join . ffor uniqDyn $ \case
     Nothing -> constDyn Nothing
     -- eh this is weird, maybe using fromJust is ok due to laziness but I don't care to find out
-    Just _ -> Just <$> widgetFn (fmap (fromMaybe (Seq.empty, Nothing)) mInputDyn)
+    Just _ -> Just <$> widgetFn (fmap (fromMaybe (isParliament_empty, Nothing)) mInputDyn)
 
 emptyWidget :: (Monad m) => VtyWidget t m ()
 emptyWidget = return ()
@@ -348,12 +348,12 @@ holdSuperStyleWidget inputDyn = constDyn $ mdo
 
 
       let
-        fmapfn ss (rid,_,seltl) = case getSEltLabelSuperStyle seltl of
+        fmapfn ss sowl = case getSEltLabelSuperStyle (superOwl_toSEltLabel_hack sowl) of
           Nothing -> Nothing
           Just oldss -> if oldss == ss
             then Nothing
-            else Just (rid, CTagSuperStyle :=> Identity (CSuperStyle (DeltaSuperStyle (oldss, ss))))
-        fforfn (selection, ss) = case Data.Maybe.mapMaybe (fmapfn ss) . toList $ selection of
+            else Just (_superOwl_id sowl, CTagSuperStyle :=> Identity (CSuperStyle (DeltaSuperStyle (oldss, ss))))
+        fforfn (SuperOwlParliament selection, ss) = case Data.Maybe.mapMaybe (fmapfn ss) . toList $ selection of
           [] -> Nothing
           x  -> Just $ IM.fromList x
         outputEv = fforMaybe (attach (current selectionDyn) $ makeSuperStyleEvent tl v bl h f tr br (void $ updated focusDyn)) fforfn
@@ -374,13 +374,13 @@ holdSuperStyleWidget inputDyn = constDyn $ mdo
     selectionDyn = fmap fst inputDyn
     pushSuperStyleFn :: SuperStyle -> PushM t (Maybe ControllersWithId)
     pushSuperStyleFn ss = do
-      selection <- sample . current $ selectionDyn
+      SuperOwlParliament selection <- sample . current $ selectionDyn
       let
-        fmapfn (rid,_,seltl) = case getSEltLabelSuperStyle seltl of
+        fmapfn sowl = case getSEltLabelSuperStyle (superOwl_toSEltLabel_hack sowl) of
           Nothing -> Nothing
           Just oldss -> if oldss == ss
             then Nothing
-            else Just (rid, CTagSuperStyle :=> Identity (CSuperStyle (DeltaSuperStyle (oldss, ss))))
+            else Just (_superOwl_id sowl, CTagSuperStyle :=> Identity (CSuperStyle (DeltaSuperStyle (oldss, ss))))
       return $ case Data.Maybe.mapMaybe fmapfn . toList $ selection of
         [] -> Nothing
         x  -> Just $ IM.fromList x
@@ -418,12 +418,12 @@ holdTextAlignmentWidget inputDyn = constDyn $ do
     pushAlignmentFn :: TextAlign -> PushM t (Maybe ControllersWithId)
     pushAlignmentFn ta = do
       let
-        fmapfn (rid,_,seltl) = case getSEltLabelBoxTextStyle seltl of
+        fmapfn sowl = case getSEltLabelBoxTextStyle (superOwl_toSEltLabel_hack sowl) of
           Nothing -> Nothing
           Just oldts -> if oldts == TextStyle ta
             then Nothing
-            else Just (rid, CTagBoxTextStyle :=> Identity (CTextStyle (DeltaTextStyle (oldts, TextStyle ta))))
-      selection <- sample . current $ selectionDyn
+            else Just (_superOwl_id sowl, CTagBoxTextStyle :=> Identity (CTextStyle (DeltaTextStyle (oldts, TextStyle ta))))
+      SuperOwlParliament selection <- sample . current $ selectionDyn
       return $ case Data.Maybe.mapMaybe fmapfn . toList $ selection of
         [] -> Nothing
         x  -> Just $ IM.fromList x
@@ -530,13 +530,13 @@ holdParamsWidget ParamsWidgetConfig {..} = do
   let
     selectionDyn = _paramsWidgetConfig_selectionDyn
     canvasDyn = _paramsWidgetConfig_canvasDyn
-    textAlignSelector = (fmap (\(TextStyle ta) -> ta)) . getSEltLabelBoxTextStyle . thd3
+    textAlignSelector = (fmap (\(TextStyle ta) -> ta)) . getSEltLabelBoxTextStyle . superOwl_toSEltLabel_hack
     mTextAlignInputDyn = fmap ( selectParamsFromSelection textAlignSelector) selectionDyn
-    mSuperStyleInputDyn = fmap (selectParamsFromSelection (getSEltLabelSuperStyle . thd3)) selectionDyn
-    --mSBoxTypeInputDyn = fmap (selectParamsFromSelection (getSEltLabelBoxType . thd3)) selectionDyn
+    mSuperStyleInputDyn = fmap (selectParamsFromSelection (getSEltLabelSuperStyle . superOwl_toSEltLabel_hack)) selectionDyn
+    --mSBoxTypeInputDyn = fmap (selectParamsFromSelection (getSEltLabelBoxType . superOwl_toSEltLabel_hack)) selectionDyn
 
     -- show canvas params when nothing is selected
-    mCanvasSizeInputDyn = fmap (\s -> if Seq.null s then Just (Seq.empty, Nothing) else Nothing) selectionDyn
+    mCanvasSizeInputDyn = fmap (\s -> if isParliament_null s then Just (isParliament_empty, Nothing) else Nothing) selectionDyn
 
   textAlignmentWidget <- holdMaybeParamsWidget mTextAlignInputDyn holdTextAlignmentWidget
   superStyleWidget2 <- holdMaybeParamsWidget mSuperStyleInputDyn holdSuperStyleWidget

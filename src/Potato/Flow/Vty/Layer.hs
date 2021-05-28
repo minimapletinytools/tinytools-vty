@@ -83,15 +83,17 @@ holdLayerWidget LayerWidgetConfig {..} = do
 
     makeLayerImage :: Int -> LayerEntry -> V.Image
     makeLayerImage width lentry@LayerEntry {..} = r where
-      ident = _layerEntry_depth
-      (rid,_,SEltLabel label _) = _layerEntry_superSEltLabel
+      ident = layerEntry_depth lentry
+      sowl = _layerEntry_superOwl
+      rid = _superOwl_id sowl
+      label = isOwl_name sowl
       -- TODO selected state
       attr = if False then lg_layer_selected else lg_default
 
       r = V.text' attr . T.pack . L.take width
         $ replicate ident ' '
         -- <> [moveChar]
-        <> if' (layerEntry_isFolderStart lentry) (if' _layerEntry_isCollapsed [expandChar] [closeChar]) []
+        <> if' (layerEntry_isFolder lentry) (if' _layerEntry_isCollapsed [expandChar] [closeChar]) []
         <> if' (lockHiddenStateToBool _layerEntry_hideState) [hiddenChar] [visibleChar]
         <> if' (lockHiddenStateToBool _layerEntry_lockState) [lockedChar] [unlockedChar]
         <> " "
