@@ -99,9 +99,11 @@ splitHDrag splitter0 wS wA wB = mdo
     [ True <$ mA
     , False <$ mB
     ]
+    
   (mA, rA) <- pane2 regA focA $ withMouseDown wA
   pane regS (pure False) wS
   (mB, rB) <- pane2 regB (not <$> focA) $ withMouseDown wB
+
   return (rA, rB)
   where
     withMouseDown x = do
@@ -154,21 +156,6 @@ drag2 btn = mdo
     newDrag = attachWithMaybe f (current dragD) inp
   dragD <- holdDyn Nothing $ Just <$> newDrag
   return (fmapMaybe id $ updated dragD)
-
-
--- DELETE
--- copied from Reflex.Vty.Widget
--- | Translates and crops an 'Image' so that it is contained by
--- the given 'Region'.
-{-
-withinImage
-  :: Region
-  -> Image
-  -> Image
-withinImage (Region left top width height)
-  | width < 0 || height < 0 = withinImage (Region left top 0 0)
-  | otherwise = V.translate left top . V.crop width height
--}
 
 -- |
 -- * 'Tracking' state means actively tracking the current stream of mouse events

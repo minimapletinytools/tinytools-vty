@@ -315,7 +315,8 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
       return (layers', tools', params')
 
     rightPanel = do
-      dreg <- askRegion
+      dreg' <- askRegion
+      let dreg = fmap (\region -> region { _region_left = 0, _region_top = 0}) dreg'
       f <- focus
       -- temp ignoreMouseUnlessFocused as when we click from one panel to the other, it will tigger events in both panels
       -- TODO remove this once we do proper Endo style folding in Goat...
