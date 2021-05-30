@@ -66,10 +66,10 @@ convertButton = \case
   V.BScrollDown -> Nothing
 
 makeLMouseDataInputEv
-  :: (Reflex t, MonadFix m, MonadHold t m)
+  :: (Reflex t, MonadFix m, MonadHold t m, HasInput t m)
   => XY
   -> Bool
-  -> VtyWidget t m (Event t LMouseData)
+  -> m (Event t LMouseData)
 makeLMouseDataInputEv offset isLayerMouse = do
   -- NOTE, must report both mouse down and up for any given drag or things will break
   -- button/mods is always the same button as mouse down, even if it changes during a drag

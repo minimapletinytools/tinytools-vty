@@ -35,8 +35,6 @@ import Reflex.Vty.Test.Common
 
 import Language.Haskell.TH
 
-
-
 $(declareStuff "ParamsNetwork"
   [("setSelection", [t|Selection|])
     , ("setCanvas", [t|SCanvas|])]
@@ -103,7 +101,7 @@ $(declareStuff "SuperStyleWidgetNetwork"
   , ("capture", [t|Event $(tv) ()|])
   , ("output", [t|Event $(tv) ControllersWithId|])]
   [|
-      do
+      initManager_ $ col $ do
         selectionDyn <- holdDyn isParliament_empty $(tinput "SuperStyleWidgetNetwork" "setSelection")
 
         let

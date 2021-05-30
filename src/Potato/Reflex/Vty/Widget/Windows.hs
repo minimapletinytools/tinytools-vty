@@ -56,7 +56,7 @@ data FreeWindow = FreeWindow {
   , _freeWindow_size :: (Int, Int)
 }
 
-type WindowWidgetMap t m a = Map WidgetId (VtyWidget t m a)
+type WindowWidgetMap t m a = Map WidgetId (m a)
 data WindowManagerState t m a = WindowManagerState {
   _windowManagerState_docked :: [DockedTab]
   , _windowManagerState_free :: [FreeWindow]
@@ -77,13 +77,8 @@ type Position = (Int, Int)
 type Dimension = (Int, Int)
 type PosDim = (Position, Dimension)
 
-makeDynRegion :: (Reflex t) => Dynamic t Position -> Dynamic t Dimension -> DynRegion t
-makeDynRegion dp dd = DynRegion {
-    _dynRegion_left = fmap fst dp
-    , _dynRegion_top = fmap snd dp
-    , _dynRegion_width = fmap fst dd
-    , _dynRegion_height = fmap snd dd
-  }
+makeDynRegion :: (Reflex t) => Dynamic t Position -> Dynamic t Dimension -> Dynamic t Region
+makeDynRegion dp dd = ffor2 dp dd $ \(x,y) (w,h) -> Region x y w h
 
 --(:+) :: (Int, Int) -> (Int, Int) -> (Int, Int)
 --(a,b) :+ (x,y) = (a+x, b+y)
@@ -119,7 +114,7 @@ computeDockDimensions dim = snd . mapAccumL mapAccumFn dim where
 
 
 data WindowManagerConfig t m a = WindowManagerConfig {
- _windowManagerConfig_initialWidgets :: Map WidgetId (VtyWidget t m a)
+ _windowManagerConfig_initialWidgets :: Map WidgetId (m a)
 
  -- TODO initial widget configuration
 
@@ -131,10 +126,11 @@ data WindowManagerConfig t m a = WindowManagerConfig {
 
 data WMCmd = WMCmd_None
 
+{- TODO fix for new layout stuff
 windowManager ::
   forall t m a. (Reflex t, Adjustable t m, NotReady t m, PostBuild t m, MonadFix m, MonadHold t m, MonadNodeId m, Monad m)
   => WindowManagerConfig t m a
-  ->  VtyWidget t m (Event t (NonEmpty a))
+  ->  m (Event t (NonEmpty a))
 windowManager WindowManagerConfig {..} = mdo
 
   inpEv <- input
@@ -161,20 +157,20 @@ windowManager WindowManagerConfig {..} = mdo
 
   -- next render floating widgets
   let
-    freeWindowFn :: WindowWidgetMap t m a -> Dynamic t Bool -> Dynamic t FreeWindow -> VtyWidget t m a
+    freeWindowFn :: WindowWidgetMap t m a -> Dynamic t Bool -> Dynamic t FreeWindow -> m a
     freeWindowFn wwm focussedDyn freeWindowDyn  = do
-      -- TODO change return type to Dynamic t (VtyWidget t m a) so that these params can change too
+      -- TODO change return type to Dynamic t (m a) so that these params can change too
       Window {..} <- sample . current $ fmap _freeWindow_window freeWindowDyn
       let
         child = case Map.lookup _window_widgetId wwm of
-          -- TODO pretty sure you should just change to VtyWidget t m ()
+          -- TODO pretty sure you should just change to m ()
           Nothing -> return undefined
           Just w -> w
         dynRegion = makeDynRegion (_freeWindow_position <$> freeWindowDyn) (_freeWindow_size <$> freeWindowDyn)
       pane dynRegion focussedDyn $ do
         -- TODO add close button
         -- TODO proper window widget, this is just temp render for testing
-        boxTitle (constant roundedBoxStyle) _window_name child
+        boxTitle (constant roundedBoxStyle) (constant _window_name) child
 
   let
     freeWindowsDyn = fmap _windowManagerState_free wmsDyn
@@ -186,7 +182,7 @@ windowManager WindowManagerConfig {..} = mdo
   -- TODO fmap through wmsDyn window stack and render them
   -- TODO fanMap out window events (close/moved)
   return never
-
+-}
 -- TODO monad for making initial configuration
 {-
 dock = do

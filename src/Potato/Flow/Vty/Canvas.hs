@@ -31,21 +31,14 @@ import           Reflex.Vty
 defaultCanvasLBox :: LBox
 defaultCanvasLBox = LBox (V2 0 0) (V2 100 50)
 
-dynLBox_to_dynRegion :: (Reflex t) => Dynamic t LBox -> DynRegion t
-dynLBox_to_dynRegion dlb = r where
-  x' = flip fmap dlb $ \(LBox (V2 x _) _) -> x
-  y' = flip fmap dlb $ \(LBox (V2 _ y) _) -> y
-  w' = flip fmap dlb $ \(LBox _ (V2 w _)) -> w
-  h' = flip fmap dlb $ \(LBox _ (V2 _ h)) -> h
-  r = DynRegion x' y' w' h'
+dynLBox_to_dynRegion :: (Reflex t) => Dynamic t LBox -> Dynamic t Region
+dynLBox_to_dynRegion dlb = ffor dlb $ \(LBox (V2 x y) (V2 w h)) -> Region x y w h
 
-translate_dynRegion :: (Reflex t) => Dynamic t XY -> DynRegion t -> DynRegion t
-translate_dynRegion pos dr = dr {
-    _dynRegion_left = liftA2 (+) (_dynRegion_left dr) (fmap getx pos)
-    , _dynRegion_top = liftA2 (+) (_dynRegion_top dr) (fmap gety pos)
-  } where
-    getx (V2 x _) = x
-    gety (V2 _ y) = y
+translate_dynRegion :: (Reflex t) => Dynamic t XY -> Dynamic t Region -> Dynamic t Region
+translate_dynRegion dpos dr = ffor2 dpos dr $ \(V2 x y) region -> region {
+    _region_left = _region_left region + x
+    , _region_top = _region_top region + y
+  }
 
 pan_lBox :: XY -> LBox -> LBox
 pan_lBox pan (LBox p s) = LBox (p+pan) s
@@ -65,7 +58,7 @@ data CanvasWidget t = CanvasWidget {
 
 holdCanvasWidget :: forall t m. (MonadWidget t m)
   => CanvasWidgetConfig t
-  -> VtyWidget t m (CanvasWidget t)
+  -> m (CanvasWidget t)
 holdCanvasWidget CanvasWidgetConfig {..} = mdo
   -- ::draw the canvas::
   let
@@ -73,7 +66,7 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
     canvasRegion' = ffor2 _canvasWidgetConfig_pan renderedCanvas $ \pan rc -> pan_lBox pan (renderedCanvas_box rc)
     canvasRegion = dynLBox_to_dynRegion canvasRegion'
     --canvasRegion = translate_dynRegion _canvasWidgetConfig_pan $ dynLBox_to_dynRegion (fmap renderedCanvas_box renderedCanvas)
-  fill '░'
+  fill (constant '░')
   -- TODO render out of bounds stuff with gray background or whatveer
   pane canvasRegion (constDyn True) $ do
     text $ current (fmap renderedCanvasToText renderedCanvas)

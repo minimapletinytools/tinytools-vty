@@ -53,11 +53,18 @@ import           Reflex.Potato.Helpers
 import           Reflex.Vty
 
 
+
 -- TODO move all this into Potato.Reflex.Vty.Host or something whatever
 -- | Sets up the top-level context for a 'VtyWidget' and runs it with that context
 potatoMainWidgetWithHandle
   :: V.Vty
-  -> (forall t m. (Potato.Reflex.Vty.Host.MonadVtyApp t m, MonadNodeId m) => VtyWidget t m (Event t ()))
+  -> (forall t m. (Potato.Reflex.Vty.Host.MonadVtyApp t m
+      , HasImageWriter t m
+      , MonadNodeId m
+      , HasDisplayRegion t m
+      , HasFocusReader t m
+      , HasInput t m
+      , HasTheme t m) => m (Event t ()))
   -> IO ()
 potatoMainWidgetWithHandle vty child =
   Potato.Reflex.Vty.Host.runVtyAppWithHandle vty $ \dr0 inp -> do
@@ -67,24 +74,30 @@ potatoMainWidgetWithHandle vty child =
     let inp' = fforMaybe inp $ \case
           V.EvResize {} -> Nothing
           x -> Just x
-    let ctx = VtyWidgetCtx
-          { _vtyWidgetCtx_width = fmap fst size
-          , _vtyWidgetCtx_height = fmap snd size
-          , _vtyWidgetCtx_input = inp'
-          , _vtyWidgetCtx_focus = constDyn True
-          }
-    (shutdown, images) <- runNodeIdT $ runVtyWidget ctx $ do
-      tellImages . ffor (current size) $ \(w, h) -> [V.charFill V.defAttr ' ' w h]
-      child
+    (shutdown, images) <- runThemeReader (constant V.defAttr) $
+      runFocusReader (pure True) $
+        runDisplayRegion (fmap (\(w, h) -> Region 0 0 w h) size) $
+          runImageWriter $
+            runNodeIdT $
+              runInput inp' $ do
+                tellImages . ffor (current size) $ \(w, h) -> [V.charFill V.defAttr ' ' w h]
+                child
     return $ Potato.Reflex.Vty.Host.VtyResult
       { _vtyResult_picture = fmap (V.picForLayers . reverse) images
       , _vtyResult_shutdown = shutdown
       }
 
+
 -- | run a VtyWidget using term width map written to disk with write-term-width for the current terminal
 -- uses default if the file does not exist
 potatoMainWidget
-  :: (forall t m. (Potato.Reflex.Vty.Host.MonadVtyApp t m, MonadNodeId m) => VtyWidget t m (Event t ()))
+  :: (forall t m. (Potato.Reflex.Vty.Host.MonadVtyApp t m
+      , HasImageWriter t m
+      , MonadNodeId m
+      , HasDisplayRegion t m
+      , HasFocusReader t m
+      , HasInput t m
+      , HasTheme t m) => m (Event t ()))
   -> IO ()
 potatoMainWidget child = do
   cfg'' <- V.standardIOConfig
@@ -120,12 +133,6 @@ flowMain = do
   --mainWidget mainPFWidget
   potatoMainWidget $ mainPFWidget pfcfg
 
--- TODO
-data MainPFTestOutput t = MainPFTestOutput {
-  _mainPFTestOutput_leftPane    :: DynRegion t
-  , _mainPFTestOutput_rightPane :: DynRegion t
-}
-
 {-
 verifyInput :: (Reflex t, MonadHold t m) => Event t VtyEvent -> m (Event t VtyEvent)
 verifyInput ev = do
@@ -143,7 +150,7 @@ fetchMOTD = do
   resp <- httpLBS "https://raw.githubusercontent.com/pdlla/potato-flow-vty/potato/MOTD.txt"
   return $ LT.toStrict $ LT.decodeUtf8 (getResponseBody resp)
 
-fetchMOTDAsync :: forall t m. (MonadWidget t m) => Event t () -> VtyWidget t m (Event t Text)
+fetchMOTDAsync :: forall t m. (MonadWidget t m) => Event t () -> m (Event t Text)
 fetchMOTDAsync ev = performEventAsync $ ffor ev $ const $ \f -> liftIO $ do
     forkIO $ do
       motd <- fetchMOTD
@@ -152,39 +159,32 @@ fetchMOTDAsync ev = performEventAsync $ ffor ev $ const $ \f -> liftIO $ do
 
 -- NOTE, this will query welcome message each time you recreate this
 welcomeWidget :: forall t m. (MonadWidget t m)
-  => VtyWidget t m (Event t ())
+  => m (Event t ())
 welcomeWidget = do
   postBuildEv <- getPostBuild
   welcomeMessageEv <- fetchMOTDAsync postBuildEv
   welcomeMessageDyn <- holdDyn "loading..." welcomeMessageEv
   boxTitle (constant def) "😱😱😱" $ do
-    col $ do
-      stretch $ text (current welcomeMessageDyn)
-      fixed 3 $ textButton def (constant "bye")
+    initLayout $ col $ do
+      (grout . stretch) 1 $ text (current welcomeMessageDyn)
+      (grout . fixed) 3 $ textButton def (constant "bye")
 
 
 -- | toggle the focus of a widget
 -- also forces unfocused widget to ignore mouse inputs
 focusWidgetNoMouse :: forall t m a. (MonadWidget t m)
   => Dynamic t Bool -- ^ whether widget should be focused or not, note events that change focus are not captured!
-  -> VtyWidget t m a
-  -> VtyWidget t m a
-focusWidgetNoMouse f child = VtyWidget $ do
-  ctx <- lift ask
-  let ctx' = VtyWidgetCtx {
-      _vtyWidgetCtx_input = gate (current f) (_vtyWidgetCtx_input ctx)
-      , _vtyWidgetCtx_focus = liftA2 (&&) (_vtyWidgetCtx_focus ctx) f
-      , _vtyWidgetCtx_width = _vtyWidgetCtx_width ctx
-      , _vtyWidgetCtx_height = _vtyWidgetCtx_height ctx
-    }
-  (result, images) <- lift . lift $ runVtyWidget ctx' child
-  tellImages images
-  return result
+  -> m a
+  -> m a
+focusWidgetNoMouse f child = do
+  localFocus (liftA2 (&&) f) $
+    localInput (gate (current f)) $
+      child
 
 -- | ignores mouse input unless widget is focused
 ignoreMouseUnlessFocused :: forall t m a. (MonadWidget t m)
-  => VtyWidget t m a
-  -> VtyWidget t m a
+  => m a
+  -> m a
 ignoreMouseUnlessFocused child = do
   f <- focus
   focusWidgetNoMouse f child
@@ -192,21 +192,13 @@ ignoreMouseUnlessFocused child = do
 -- | block all or some input events, always focused if parent is focused
 captureInputEvents :: forall t m a. (MonadWidget t m)
   => These (Event t ()) (Behavior t Bool) -- ^ Left ev is event indicating input should be capture. Right beh is behavior gating input (true means captured)
-  -> VtyWidget t m a
-  -> VtyWidget t m a
-captureInputEvents capture child = VtyWidget $ do
-  ctx <- lift ask
+  -> m a
+  -> m a
+captureInputEvents capture child = do
   let
     (ev, beh) = fromThese never (constant False) capture
-    ctx' = VtyWidgetCtx {
-        _vtyWidgetCtx_input = difference (gate (fmap not beh) (_vtyWidgetCtx_input ctx)) ev
-        , _vtyWidgetCtx_focus = liftA2 (&&) (_vtyWidgetCtx_focus ctx) $ constDyn True
-        , _vtyWidgetCtx_width = _vtyWidgetCtx_width ctx
-        , _vtyWidgetCtx_height = _vtyWidgetCtx_height ctx
-      }
-  (result, images) <- lift . lift $ runVtyWidget ctx' child
-  tellImages images
-  return result
+  localInput (\inp -> difference (gate (fmap not beh) inp) ev) $
+    child
 
 data MainPFWidgetConfig t = MainPFWidgetConfig {
   _mainPFWidgetConfig_initialFile :: Maybe Text
@@ -223,7 +215,7 @@ instance (Reflex t) => Default (MainPFWidgetConfig t) where
 
 mainPFWidget :: forall t m. (MonadWidget t m)
   => MainPFWidgetConfig t
-  -> VtyWidget t m (Event t ())
+  -> m (Event t ())
 mainPFWidget MainPFWidgetConfig {..} = mdo
   -- external inputs
   currentTime <- liftIO $ getCurrentTime
@@ -248,11 +240,11 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
 
   -- debug stuff (temp)
   let
-    debugKeyEv = fforMaybe flowInput $ \case
+    debugKeyEv' = fforMaybe flowInput $ \case
       V.EvKey (V.KPageDown) [] -> Just ()
       _ -> Nothing
-  performEvent_ $ ffor debugKeyEv $ \_ -> do
-    handler <- sample . current . fmap _goatState_handler . _goatWidget_DEBUG_goatState $ everythingW
+    debugKeyEv = attach (current . fmap _goatState_handler . _goatWidget_DEBUG_goatState $ everythingW) debugKeyEv'
+  performEvent_ $ ffor debugKeyEv $ \(handler, _) -> do
     liftIO $ do
       T.hPutStr stderr $ pHandlerDebugShow handler
       hFlush stderr
@@ -283,9 +275,9 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
 
   -- main panels
   let
-    leftPanel = col $ do
-      fixed 1 $ row $ do
-        stretch $ do
+    leftPanel = initLayout $ col $ do
+      (grout . fixed) 1 $ row $ do
+        (grout . stretch) 1 $ do
           text "save"
           click <- mouseDown V.BLeft
           let saveEv = tag (current $ _goatWidget_DEBUG_goatState everythingW) click
@@ -293,37 +285,37 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
              let spf = owlPFState_to_sPotatoFlow . _owlPFWorkspace_pFState . _goatState_workspace $ gs
              --liftIO $ Aeson.encodeFile "potato.flow" spf
              liftIO $ LBS.writeFile "potato.flow" $ PrettyAeson.encodePretty spf
-        stretch $ text "|"
-        stretch $ do
+        (grout . stretch) 1 $ text "|"
+        (grout . stretch) 1 $ do
           text "print"
           click <- mouseDown V.BLeft
           let saveEv = tag (current $ _goatWidget_renderedCanvas everythingW) click
           performEvent_ $ ffor saveEv $ \rc -> do
              let t = renderedCanvasToText rc
              liftIO $ T.writeFile "potato.txt" t
-      fixed 5 $ debugStream [
+      (grout . fixed) 5 $ debugStream [
         never
         ]
-      tools' <- fixed 10 $ holdToolsWidget $  ToolWidgetConfig {
+      tools' <- (grout . fixed) 10 $ holdToolsWidget $  ToolWidgetConfig {
           _toolWidgetConfig_tool =  _goatWidget_tool everythingW
         }
 
       -- TODO Layout stuff messes up your mouse assumptions. You need to switch Layout to use pane2 D:
-      layers' <- stretch $ holdLayerWidget $ LayerWidgetConfig {
+      layers' <- (grout . stretch) 1 $ holdLayerWidget $ LayerWidgetConfig {
             _layerWidgetConfig_layers = _goatWidget_layers everythingW
             , _layerWidgetConfig_selection = _goatWidget_selection  everythingW
           }
-      _ <- fixed 5 $ holdInfoWidget $ InfoWidgetConfig {
+      _ <- (grout . fixed) 5 $ holdInfoWidget $ InfoWidgetConfig {
           _infoWidgetConfig_selection = _goatWidget_selection everythingW
         }
-      params' <- fixed 10 $ holdParamsWidget $ ParamsWidgetConfig {
+      params' <- (grout . fixed) 10 $ holdParamsWidget $ ParamsWidgetConfig {
           _paramsWidgetConfig_selectionDyn = _goatWidget_selection everythingW
           , _paramsWidgetConfig_canvasDyn = _goatWidget_canvas everythingW
         }
       return (layers', tools', params')
 
     rightPanel = do
-      dreg <- displayRegion
+      dreg <- askRegion
       f <- focus
       -- temp ignoreMouseUnlessFocused as when we click from one panel to the other, it will tigger events in both panels
       -- TODO remove this once we do proper Endo style folding in Goat...
@@ -337,7 +329,7 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
 
   (keyboardEv, ((layersW, toolsW, paramsW), canvasW)) <- captureInputEvents (That inputCapturedByPopupBeh) $ do
     inp <- input
-    stuff <- splitHDrag 35 (fill '*') leftPanel rightPanel
+    stuff <- splitHDrag 35 (fill (constant '*')) leftPanel rightPanel
 
     kb <- captureInputEvents (This (_paramsWidget_captureInputEv paramsW)) $ do
       inp <- input

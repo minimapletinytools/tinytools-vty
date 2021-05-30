@@ -7,10 +7,7 @@ module Main (
 import           Prelude
 import           Relude
 
-import           Example
 import           Potato.Flow.Vty.Main
-import           Layout2Test
-import           Potato
 
 import           GHC.IO.Handle
 import           GHC.IO.Handle.FD

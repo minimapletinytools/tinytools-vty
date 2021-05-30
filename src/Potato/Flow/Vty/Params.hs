@@ -33,29 +33,13 @@ import           Data.These
 import           Data.Tuple.Extra
 
 import qualified Graphics.Vty                      as V
-import           Potato.Reflex.Vty.Widget.Layout
 import           Reflex
 import           Reflex.Network
 import           Reflex.Potato.Helpers
-import           Reflex.Vty                        hiding (Constraint (..),
-                                                    Layout (..),
-                                                    Orientation (..),
-                                                    TileConfig (..), col, fixed,
-                                                    row, stretch, tile)
+import           Reflex.Vty
 
+-- TODO need to add initManager_ calls
 
-
-
-fixedNoFocus
-  :: (Reflex t, MonadFix m, MonadNodeId m)
-  => Dynamic t Int
-  -> VtyWidget t m a
-  -> Layout t m a
-fixedNoFocus sz = tile_ cfg . clickable where
-  cfg = TileConfig {
-      _tileConfig_constraint =  Constraint_Fixed <$> sz
-      , _tile_Config_focusable = constDyn False
-    }
 
 -- | Default vty event handler for text inputs
 updateTextZipperForSingleCharacter
@@ -71,7 +55,7 @@ updateTextZipperForSingleCharacter ev = case ev of
   _ -> id
 
 -- | capture matches updateTextZipperForSingleCharacter
-singleCharacterCapture :: (Reflex t, MonadFix m, MonadNodeId m) => VtyWidget t m (Event t ())
+singleCharacterCapture :: (Reflex t, MonadFix m, MonadNodeId m, HasInput t m) => m (Event t ())
 singleCharacterCapture = do
   inp <- input
   return $ fforMaybe inp $ \case
@@ -98,7 +82,7 @@ updateTextZipperForNumberInput ev = case ev of
   V.EvKey (V.KChar 'u') [V.MCtrl]     -> const TZ.empty
   _                                   -> id
 
-paramsNavigation :: (Reflex t, Monad m) => VtyWidget t m (Event t Int)
+paramsNavigation :: (MonadWidget t m) => m (Event t Int)
 paramsNavigation = do
   tabEv <- key (V.KChar '\t')
   returnEv <- key V.KEnter
@@ -106,38 +90,11 @@ paramsNavigation = do
   back <- fmap (const (-1)) <$> key V.KBackTab
   return $ leftmost [fwd, back]
 
-
--- | create a focus event (to be used with runIsLayoutVtyWidget) from a navigation event
-layoutFocusEvFromNavigationNoRepeat
-  :: (Reflex t)
-  => Event t Int
-  -> Event t ()
-  -> LayoutReturnData t a
-  -> Event t (Maybe Int)
-layoutFocusEvFromNavigationNoRepeat navEv unfocusEv LayoutReturnData {..} = r where
-  focusInd nKiddos shift cur = if shift+cur >= nKiddos then Nothing else Just (shift+cur)
-  fmapfn (nKiddos, (mcur, shift)) = maybe (Just 0) (focusInd nKiddos shift) mcur
-  navEv' = attach (current _layoutReturnData_children) $ attach (current _layoutReturnData_focus) navEv
-  r = leftmost [unfocusEv $> Nothing, fmap fmapfn navEv']
-
-beginParamsLayout ::
-  forall m t a. (MonadHold t m, PostBuild t m, MonadFix m, MonadNodeId m)
-  => LayoutVtyWidget t m (LayoutReturnData t a)
-  -> VtyWidget t m (Dynamic t (Maybe Int), a)
-beginParamsLayout child = mdo
+-- TODO figure out how to do norepeat
+noRepeatNavigation :: (MonadWidget t m, HasFocus t m) => m ()
+noRepeatNavigation = do
   navEv <- paramsNavigation
-  focusDyn <- focus
-  let focusChildEv = layoutFocusEvFromNavigationNoRepeat navEv (fmapMaybe (\x -> if x then Nothing else Just ()) (updated focusDyn)) lrd
-  lrd@LayoutReturnData {..} <- runIsLayoutVtyWidget child focusChildEv
-  return (_layoutReturnData_focus, _layoutReturnData_value)
-
-beginNoNavLayout ::
-  forall m t a. (MonadHold t m, PostBuild t m, MonadFix m, MonadNodeId m)
-  => LayoutVtyWidget t m (LayoutReturnData t a)
-  -> VtyWidget t m (Dynamic t (Maybe Int), a)
-beginNoNavLayout child = mdo
-  LayoutReturnData {..} <- runIsLayoutVtyWidget child never
-  return (_layoutReturnData_focus, _layoutReturnData_value)
+  requestFocus $ Refocus_Shift <$> navEv
 
 
 -- Maybe Params stuff
@@ -162,12 +119,12 @@ selectParamsFromSelection ps (SuperOwlParliament selection) = r where
 
 
 
-type MaybeParamsWidgetOutputDyn t m b = Dynamic t (Maybe (VtyWidget t m (Dynamic t Int, Event t (), Event t b)))
+type MaybeParamsWidgetOutputDyn t m b = Dynamic t (Maybe (m (Dynamic t Int, Event t (), Event t b)))
 
-type ParamsWidgetOutputDyn t m b = Dynamic t (VtyWidget t m (Dynamic t Int, Event t (), Event t b))
+type ParamsWidgetOutputDyn t m b = Dynamic t (m (Dynamic t Int, Event t (), Event t b))
 type ParamsWidgetFn t m a b = Dynamic t (Selection, Maybe a) -> ParamsWidgetOutputDyn t m b
 
-networkParamsWidgetOutputDynForTesting :: (MonadWidget t m) => ParamsWidgetOutputDyn t m b -> VtyWidget t m (Dynamic t Int, Event t (), Event t b)
+networkParamsWidgetOutputDynForTesting :: (MonadWidget t m) => ParamsWidgetOutputDyn t m b -> m (Dynamic t Int, Event t (), Event t b)
 networkParamsWidgetOutputDynForTesting p = do
   out' <- networkView p
   outHeightDyn <- holdDyn (constDyn 0) $ fmap fst3 out'
@@ -183,7 +140,7 @@ networkParamsWidgetOutputDynForTesting p = do
 holdMaybeParamsWidget :: forall t m a b. (MonadWidget t m)
   => Dynamic t (Maybe (Selection, Maybe a)) -- ^ selection/params input
   -> ParamsWidgetFn t m a b -- ^ function creating widget, note that it should always return non-nothing but using Maybe type makes life easier
-  -> VtyWidget t m (MaybeParamsWidgetOutputDyn t m b)
+  -> m (MaybeParamsWidgetOutputDyn t m b)
 holdMaybeParamsWidget mInputDyn widgetFn = do
   -- only remake the widget if it goes from Just to Nothing
   uniqDyn <- holdUniqDynBy (\a b -> isJust a == isJust b) mInputDyn
@@ -192,7 +149,7 @@ holdMaybeParamsWidget mInputDyn widgetFn = do
     -- eh this is weird, maybe using fromJust is ok due to laziness but I don't care to find out
     Just _ -> Just <$> widgetFn (fmap (fromMaybe (isParliament_empty, Nothing)) mInputDyn)
 
-emptyWidget :: (Monad m) => VtyWidget t m ()
+emptyWidget :: (Monad m) => m ()
 emptyWidget = return ()
 
 -- SuperStyle stuff
@@ -213,10 +170,10 @@ updateFromSuperStyle ssc = TZ.top . TZ.fromText . T.singleton . gettfn ssc where
       _ -> Nothing) . _superStyle_fill
 
 singleCellTextInput
-  :: (Reflex t, MonadHold t m, MonadFix m)
+  :: (MonadWidget t m)
   => Event t (TZ.TextZipper -> TZ.TextZipper)
   -> TZ.TextZipper
-  -> VtyWidget t m (Dynamic t Text)
+  -> m (Dynamic t Text)
 singleCellTextInput modifyEv c0 = do
   i <- input
   textInputCustom (mergeWith (.) [fmap updateTextZipperForSingleCharacter i, modifyEv]) c0
@@ -224,9 +181,9 @@ singleCellTextInput modifyEv c0 = do
 
 -- remember that input dyn can't update the same time the output updates or you will have infinite loop
 dimensionInput
-  :: (Reflex t, MonadHold t m, MonadFix m)
+  :: (MonadWidget t m)
   => Dynamic t Int
-  -> VtyWidget t m (Dynamic t Int)
+  -> m (Dynamic t Int)
 dimensionInput valueDyn = do
   let
     toText = TZ.fromText . show
@@ -237,11 +194,12 @@ dimensionInput valueDyn = do
   --tDyn <- fmap _textInput_value $ textInput (def { _textInputConfig_initialValue = (toText v0)})
   return $ ffor2 valueDyn tDyn $ \v t -> fromMaybe v (readMaybe (T.unpack t))
 
+-- TODO use theming here
 textInputCustom
-  :: (Reflex t, MonadHold t m, MonadFix m)
+  :: (MonadWidget t m)
   => Event t (TZ.TextZipper -> TZ.TextZipper)
   -> TZ.TextZipper
-  -> VtyWidget t m (Dynamic t Text)
+  -> m (Dynamic t Text)
 textInputCustom modifyEv c0 = mdo
   f <- focus
   dh <- displayHeight
@@ -253,7 +211,10 @@ textInputCustom modifyEv c0 = mdo
             TZ.goToDisplayLinePosition mx my dl
         ]
       click <- mouseDown V.BLeft
-      let cursorAttrs = ffor f $ \x -> if x then cursorAttributes else V.defAttr
+      let
+        -- TODO generate cursor attributes from theme
+        cursorAttributes = V.defAttr
+        cursorAttrs = ffor f $ \x -> if x then cursorAttributes else V.defAttr
       let rows = (\w s c -> TZ.displayLines w V.defAttr c s)
             <$> dw
             <*> (TZ.mapZipper <$> (constDyn id) <*> v)
@@ -263,7 +224,7 @@ textInputCustom modifyEv c0 = mdo
   return $ TZ.value <$> v
 
 
-makeSuperStyleTextEntry :: (Reflex t, MonadHold t m, MonadFix m) => SuperStyleCell -> Dynamic t (Maybe SuperStyle) -> VtyWidget t m (Behavior t PChar)
+makeSuperStyleTextEntry :: (MonadWidget t m) => SuperStyleCell -> Dynamic t (Maybe SuperStyle) -> m (Behavior t PChar)
 makeSuperStyleTextEntry ssc mssDyn = do
   mss0 <- sample . current $ mssDyn
   let modifyEv = (fmap (maybe id (\ss -> const (updateFromSuperStyle ssc ss))) (updated mssDyn))
@@ -303,16 +264,16 @@ makeSuperStyleEvent tl v bl h f tr br trig = pushAlways pushfn trig where
         , _superStyle_fill       = FillStyle_Simple f'
       }
 
-holdSuperStyleWidget :: forall t m. (MonadWidget t m) => ParamsWidgetFn t m SuperStyle ControllersWithId
+holdSuperStyleWidget :: forall t m. (MonadLayoutWidget t m) => ParamsWidgetFn t m SuperStyle ControllersWithId
 holdSuperStyleWidget inputDyn = constDyn $ mdo
 
   typeChoiceDyn <- radioListSimple 0 ["custom", "presets"]
 
   setStyleEvEv <- networkView $ ffor typeChoiceDyn $ \case
     1 -> do
-      setStyleEv' <- beginLayout $ col $ do
-        fixed 1 emptyWidget -- just to make a space
-        presetClicks <- forM presetStyles $ \s -> fixedL 1 $ row $ stretch $ do
+      setStyleEv' <- initLayout $ col $ do
+        (grout . fixed) 1 emptyWidget -- just to make a space
+        presetClicks <- forM presetStyles $ \s -> (grout . fixed) 1 $ row $ (grout . stretch) 1 $ do
           -- TODO highlight if style matches selection
           text (constant (T.pack s))
           fmap (fmap (\_ -> s)) (mouseDown V.BLeft)
@@ -325,25 +286,27 @@ holdSuperStyleWidget inputDyn = constDyn $ mdo
         mssDyn = fmap snd inputDyn
       -- TODO change this so it's left to right
       -- TODO arrow nav would be super cool
-      (focusDyn,(tl,v,bl,h,f,tr,br)) <- beginParamsLayout $ col $ do
-        fixed 1 emptyWidget -- just to make a space
-        --fixed 1 $ text (fmap (T.pack . superStyle_toListFormat . Data.Maybe.fromJust) $ current mssDyn)
-        (tl'',h'',tr'') <- fixedL 1 $ row $ do
-          tl' <- fixed 1 $ makeSuperStyleTextEntry SSC_TL mssDyn
-          h' <- fixed 1 $ makeSuperStyleTextEntry SSC_H mssDyn
-          tr' <- fixed 1 $ makeSuperStyleTextEntry SSC_TR mssDyn
+      noRepeatNavigation
+      (focusDyn,tl,v,bl,h,f,tr,br) <- col $ do
+        (tile . fixed) 1 emptyWidget -- just to make a space
+        --(tile . fixed) 1 $ text (fmap (T.pack . superStyle_toListFormat . Data.Maybe.fromJust) $ current mssDyn)
+        (tl'',h'',tr'') <- (tile . fixed) 1 $ row $ do
+          tl' <- (tile . fixed) 1 $ makeSuperStyleTextEntry SSC_TL mssDyn
+          h' <- (tile . fixed) 1 $ makeSuperStyleTextEntry SSC_H mssDyn
+          tr' <- (tile . fixed) 1 $ makeSuperStyleTextEntry SSC_TR mssDyn
           return (tl',h',tr')
-        (v'',f'') <- fixedL 1 $ row $ do
-          v' <- fixed 1 $ makeSuperStyleTextEntry SSC_V mssDyn
-          f' <- fixed 1 $ makeSuperStyleTextEntry SSC_Fill mssDyn
-          _ <- fixedNoFocus 1 $ emptyWidget -- TODO you can modify this too, why not, 2 boxes for the same thing
+        (v'',f'') <- (tile . fixed) 1 $ row $ do
+          v' <- (tile . fixed) 1 $ makeSuperStyleTextEntry SSC_V mssDyn
+          f' <- (tile . fixed) 1 $ makeSuperStyleTextEntry SSC_Fill mssDyn
+          _ <- (grout . fixed) 1 $ emptyWidget -- TODO you can modify this too, why not, 2 boxes for the same thing
           return (v',f')
-        (bl'',br'') <- fixedL 1 $ row $ do
-          bl' <- fixed 1 $ makeSuperStyleTextEntry SSC_BL mssDyn
-          _ <- fixedNoFocus 1 $ emptyWidget -- TODO you can modify this too, why not, 2 boxes for the same thing
-          br' <- fixed 1 $ makeSuperStyleTextEntry SSC_BR mssDyn
+        (bl'',br'') <- (tile . fixed) 1 $ row $ do
+          bl' <- (tile . fixed) 1 $ makeSuperStyleTextEntry SSC_BL mssDyn
+          _ <- (grout . fixed) 1 $ emptyWidget -- TODO you can modify this too, why not, 2 boxes for the same thing
+          br' <- (tile . fixed) 1 $ makeSuperStyleTextEntry SSC_BR mssDyn
           return (bl',br')
-        return (tl'',v'',bl'',h'',f'',tr'',br'')
+        focusDyn' <- focusedId
+        return (focusDyn',tl'',v'',bl'',h'',f'',tr'',br'')
       captureEv1 <- singleCharacterCapture
 
 
@@ -431,7 +394,7 @@ holdTextAlignmentWidget inputDyn = constDyn $ do
 
   return (1, never, alignmentParamsEv)
 
-holdSBoxTypeWidget :: forall t m. (MonadWidget t m) => ParamsWidgetFn t m SBoxType ControllersWithId
+holdSBoxTypeWidget :: forall t m. (MonadLayoutWidget t m) => ParamsWidgetFn t m SBoxType ControllersWithId
 holdSBoxTypeWidget inputDyn = constDyn $ do
   let
     mBoxType = fmap snd inputDyn
@@ -445,32 +408,34 @@ holdSBoxTypeWidget inputDyn = constDyn $ do
       Just SBoxType_NoBox     -> ([1],[0])
       Just SBoxType_NoBoxText -> ([1],[1])
 
-  _ <- beginNoNavLayout $ col $ do
-    b <- fixedL 1 $ row $ do
-      fixed 8 $ text "border:"
-      stretch $ text "TODO CHECKBOX"
-    t <- fixedL 1 $ row $ do
-      fixed 8 $ text "  text:"
-      stretch $ text "TODO CHECKBOX"
+  _ <- col $ do
+    b <- (grout . fixed) 1 $ row $ do
+      (grout . fixed) 8 $ text "border:"
+      (grout . stretch) 1 $ text "TODO CHECKBOX"
+    t <- (grout . fixed) 1 $ row $ do
+      (grout . fixed) 8 $ text "  text:"
+      (grout . stretch) 1 $ text "TODO CHECKBOX"
     return (b,t)
 
   -- TODO
   return (2, never, never)
 
-holdCanvasSizeWidget :: forall t m. (MonadWidget t m) => Dynamic t SCanvas -> ParamsWidgetFn t m () XY
+holdCanvasSizeWidget :: forall t m. (MonadLayoutWidget t m) => Dynamic t SCanvas -> ParamsWidgetFn t m () XY
 holdCanvasSizeWidget canvasDyn nothingDyn = ffor nothingDyn $ \_ -> do
   let
     cSizeDyn = fmap (_lBox_size . _sCanvas_box) canvasDyn
     cWidthDyn = fmap (\(V2 x _) -> x) cSizeDyn
     cHeightDyn = fmap (\(V2 _ y) -> y) cSizeDyn
-  (focusDyn, (wDyn,hDyn)) <- beginParamsLayout $ col $ do
-    wDyn' <- fixedL 1 $ row $ do
-      fixedNoFocus 8 $ text " width:"
-      stretch $ dimensionInput cWidthDyn
-    hDyn' <- fixedL 1 $ row $ do
-      fixedNoFocus 8 $ text "height:"
-      stretch $ dimensionInput cHeightDyn
-    return (wDyn',hDyn')
+  noRepeatNavigation
+  (focusDyn,wDyn,hDyn) <- col $ do
+    wDyn' <- (tile . fixed) 1 $ row $ do
+      (grout . fixed) 8 $ text " width:"
+      (tile . stretch) 1 $ dimensionInput cWidthDyn
+    hDyn' <- (tile . fixed) 1 $ row $ do
+      (grout . fixed) 8 $ text "height:"
+      (tile . stretch) 1 $ dimensionInput cHeightDyn
+    focusDyn' <- focusedId
+    return (focusDyn',wDyn',hDyn')
   let
     outputEv = flip push (void $ updated focusDyn) $ \_ -> do
       cw <- sample . current $ cWidthDyn
@@ -524,9 +489,16 @@ switchHoldTriple eva evb evc evin = r where
 
 holdParamsWidget :: forall t m. (MonadWidget t m)
   => ParamsWidgetConfig t
-  -> VtyWidget t m (ParamsWidget t)
+  -> m (ParamsWidget t)
 holdParamsWidget ParamsWidgetConfig {..} = do
 
+  return ParamsWidget {
+    _paramsWidget_paramsEvent = never
+    , _paramsWidget_canvasSizeEvent = never
+    , _paramsWidget_captureInputEv = never
+  }
+
+{-
   let
     selectionDyn = _paramsWidgetConfig_selectionDyn
     canvasDyn = _paramsWidgetConfig_canvasDyn
@@ -547,15 +519,16 @@ holdParamsWidget ParamsWidgetConfig {..} = do
   let controllersWithIdParamsWidgets = fmap catMaybes . mconcat . (fmap (fmap (:[]))) $ [textAlignmentWidget, superStyleWidget2]
 
 
-  (paramsOutputEv, captureEv, canvasSizeOutputEv) <- (switchHoldTriple never never never =<<) . networkView . ffor2 controllersWithIdParamsWidgets canvasSizeWidget $ \widgets mcsw -> fmap snd $ beginNoNavLayout $ col $ do
+  -- TODO this won't compile because widgets are loaded outside of the initManager_ call 😱
+  (paramsOutputEv, captureEv, canvasSizeOutputEv) <- (switchHoldTriple never never never =<<) . networkView . ffor2 controllersWithIdParamsWidgets canvasSizeWidget $ \widgets mcsw -> initManager_ $ col $ do
     outputs <- forM widgets $ \w -> mdo
-      (sz, captureEv', ev) <- fixed sz w
+      (sz, captureEv', ev) <- (tile . fixed) sz w
       return (ev, captureEv')
     -- canvas size widget is special becaues it's output type is different
     (cssev, captureEv2) <- case mcsw of
       Nothing -> return (never, never)
       Just csw -> mdo
-        (cssz, csCaptureEv', cssev') <- fixed cssz csw
+        (cssz, csCaptureEv', cssev') <- (tile . fixed) cssz csw
         return (cssev', csCaptureEv')
     return $ (leftmostWarn "paramsLayout" (fmap fst outputs), leftmostWarn "paramsCapture" (fmap snd outputs), cssev)
 
@@ -565,3 +538,4 @@ holdParamsWidget ParamsWidgetConfig {..} = do
     , _paramsWidget_canvasSizeEvent = canvasSizeOutputEv
     , _paramsWidget_captureInputEv = captureEv
   }
+-}

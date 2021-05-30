@@ -201,7 +201,7 @@ DONE-move TODO into vty
   -try and combine code, prob not though..
   -(note splitHDrag2 is using pane2 right now)
 -added pane2, propose to modify pane to use pane2 implementation
-MERGED-fixed an issue in `drag` where mouse down would trigger on wrong button
+MERGED-(tile . fixed) an issue in `drag` where mouse down would trigger on wrong button
   - `end && btn == btn'  -> Just $ Drag (x,y) (x,y) btn' mods' False`
 -added `Drag2` and `drag2` which can track drag start events
   -TODO implement splitVDrag with Drag2 as an example

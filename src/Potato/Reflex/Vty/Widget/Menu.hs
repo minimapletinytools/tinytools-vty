@@ -14,10 +14,7 @@ import qualified Graphics.Vty.Input.Events as V
 import           Reflex
 import           Reflex.Network
 import           Reflex.Potato.Helpers
-import           Potato.Reflex.Vty.Widget.Layout
-import           Reflex.Vty                        hiding (Constraint (..),
-                                                    Orientation (..), col,
-                                                    fixed, row, stretch, tile, TileConfig(..), Layout(..))
+import           Reflex.Vty             
 
 
 import           Data.Default
@@ -55,10 +52,10 @@ holdMenuWidget = undefined
 holdMenuWidget ::
   forall t m k. (MonadWidget t m)
   => MenuWidgetConfig t k
-  -> VtyWidget t m (MenuWidget t k)
+  -> m (MenuWidget t k)
 holdMenuWidget MenuWidgetConfig {..} = mdo
   let
-    makeMenuWidget :: [Tree (MenuTreeNode k)] -> VtyWidget t m ()
+    makeMenuWidget :: [Tree (MenuTreeNode k)] -> m ()
     makeMenuWidget roots = do
       -- TODO
       -- if line down to currently opened menu still exists, keep focus (I guess to do this really right, you should track index as well so there's no menu jump glitcehs)
@@ -76,7 +73,7 @@ holdMenuWidget MenuWidgetConfig {..} = mdo
       topLayerOut <- beginLayout $ row $
         forM roots $ \(Node MenuTreeNode {..} _) -> do
           let l = T.length _menuTreeNode_label
-          fixed (constDyn $ l + 1) $ do
+          (tile . fixed) (constDyn $ l + 1) $ do
             -- TODO highlight if selected in focusDyn
             text (constant _menuTreeNode_label)
             click <- mouseDown V.BLeft

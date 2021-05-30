@@ -34,7 +34,7 @@ data InfoWidget t = InfoWidget {
 
 holdInfoWidget :: forall t m. (MonadWidget t m)
   => InfoWidgetConfig t
-  -> VtyWidget t m (InfoWidget t)
+  -> m (InfoWidget t)
 holdInfoWidget InfoWidgetConfig {..} = do
   let
     -- TODO read canvasSelection and figure out what the preset is
@@ -47,11 +47,11 @@ holdInfoWidget InfoWidgetConfig {..} = do
           rid = _superOwl_id sowl
           label = isOwl_name sowl
           selt = superOwl_toSElt_hack sowl
-        col $ do
-          fixed 1 $ text (constant ("rid: " <> show rid <> " name: " <> label))
+        initLayout $ col $ do
+          (grout . fixed) 1 $ text (constant ("rid: " <> show rid <> " name: " <> label))
           case selt of
-            SEltBox SBox {..} -> fixed 1 $ text (constant (_sBoxText_text _sBox_text))
-            _                 -> fixed 1 $ text (constant "something else")
+            SEltBox SBox {..} -> (grout . fixed) 1 $ text (constant (_sBoxText_text _sBox_text))
+            _                 -> (grout . fixed) 1 $ text (constant "something else")
 
   networkView infoDyn
 

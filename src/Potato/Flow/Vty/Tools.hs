@@ -38,9 +38,9 @@ onlyIfBeh :: (Reflex t) => Event t a -> Behavior t Bool -> Event t a
 onlyIfBeh ev beh = fmapMaybe (\(b,e) -> if b then Just e else Nothing) $ attach beh ev
 
 
-holdToolsWidget :: forall t m. (PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m)
+holdToolsWidget :: forall t m. (PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m, MonadWidget t m)
   => ToolWidgetConfig t
-  -> VtyWidget t m (ToolWidget t)
+  -> m (ToolWidget t)
 holdToolsWidget ToolWidgetConfig {..} = mdo
 
   radioEvs <- radioList (constDyn ["s","╬","□","/","T"]) (fmap ((:[]) . fromEnum) _toolWidgetConfig_tool)

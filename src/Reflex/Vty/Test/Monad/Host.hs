@@ -18,7 +18,6 @@ module Reflex.Vty.Test.Monad.Host (
   , ReflexVtyTestApp(..)
   , runReflexVtyTestApp
   -- Reflex.Vty.Widget.Test
-  , splitHDrag_debug
 ) where
 
 import           Relude                   hiding (getFirst)
@@ -91,13 +90,13 @@ queueMouseEvent mouse = case mouse of
 
 -- | queue mouse event in a 'DynRegion'
 queueMouseEventInRegion :: (Reflex t, MonadSample t m, MonadRef m)
-  => DynRegion t
+  => Dynamic t Region
   -> Either MouseDown MouseUp -- ^ mouse coordinates are LOCAL to the input region
   -> ReflexVtyTestT t uintref uout m ()
 queueMouseEventInRegion dr mouse = do
   let
     absCoords (Region l t _ _) (x,y) = (x+l, y+t)
-  region <- sample . currentRegion $ dr
+  region <- sample . current $ dr
   case mouse of
     Left (MouseDown b c mods) -> queueVtyEvent $ uncurry V.EvMouseDown (absCoords region c) b mods
     Right (MouseUp b c) -> queueVtyEvent $ uncurry V.EvMouseUp (absCoords region c) b
@@ -105,11 +104,11 @@ queueMouseEventInRegion dr mouse = do
 -- | queue mouse event in a 'DynRegion'
 -- if (local) mouse coordinates are outside of the (absolute) region, returns False and does not queue any event
 queueMouseEventInRegionGated :: (Reflex t, MonadSample t m, MonadRef m)
-  => DynRegion t
+  => Dynamic t Region
   -> Either MouseDown MouseUp -- ^ mouse coordinates are LOCAL to the input region
   -> ReflexVtyTestT t uintref uout m Bool
 queueMouseEventInRegionGated dr mouse = do
-  region <- sample . currentRegion $ dr
+  region <- sample . current $ dr
   let
     absCoords (Region l t _ _) (x,y) = (x+l, y+t)
     coordinates = case mouse of
@@ -133,7 +132,7 @@ queueMouseDrag :: (Reflex t, MonadSample t m, MonadRef m)
   -- TODO add something like DragState to this
   -> ((Int,Int) -> ReadPhase m a) -- ^ ReadPhase to run after each normal drag
   -> ReflexVtyTestT t uintref uout m (NonEmpty [a]) -- ^ collected outputs
-queueMouseDrag = queueMouseDragInRegion (DynRegion 0 0 0 0)
+queueMouseDrag = queueMouseDragInRegion (constDyn $ Region 0 0 0 0)
 {-queueMouseDrag b mods ps rps = do
   let
     dragPs' = init ps
@@ -150,7 +149,8 @@ queueMouseDrag = queueMouseDragInRegion (DynRegion 0 0 0 0)
 
 -- | same as queueMouseDrag but coordinates are translated to a region
 queueMouseDragInRegion :: (Reflex t, MonadSample t m, MonadRef m)
-  => DynRegion t
+  => Dynamic t Region
+
   -> V.Button -- ^ button to press
   -> [V.Modifier] -- ^ modifier held during drag
   -> NonEmpty (Int,Int) -- ^ list of drag positions
@@ -171,13 +171,52 @@ queueMouseDragInRegion region b mods ps rps = do
   return $ initas <> (lastas :| [])
 
 
+
+{-
+deriving instance (MonadSubscribeEvent t m) => MonadSubscribeEvent t (Input t m)
+deriving instance (MonadReflexHost t m) => MonadReflexHost t (Input t m)
+deriving instance (MonadSubscribeEvent t m) => MonadSubscribeEvent t (ThemeReader t m)
+deriving instance (MonadReflexHost t m) => MonadReflexHost t (ThemeReader t m)
+deriving instance (MonadSubscribeEvent t m) => MonadSubscribeEvent t (FocusReader t m)
+deriving instance (MonadReflexHost t m) => MonadReflexHost t (FocusReader t m)
+deriving instance (MonadSubscribeEvent t m) => MonadSubscribeEvent t (DisplayRegion t m)
+deriving instance (MonadReflexHost t m) => MonadReflexHost t (DisplayRegion t m)
+
+
+instance MonadSubscribeEvent t m => MonadSubscribeEvent t (ImageWriter t m) where
+  subscribeEvent = lift . subscribeEvent
+instance MonadReflexHost t m => MonadReflexHost t (ImageWriter t m) where
+  type ReadPhase (ImageWriter t m) = ReadPhase m
+  fireEventsAndRead dm a = lift $ fireEventsAndRead dm a
+  runHostFrame = lift . runHostFrame
+
+instance MonadSubscribeEvent t m => MonadSubscribeEvent t (NodeIdT m) where
+  subscribeEvent = lift . subscribeEvent
+instance MonadReflexHost t m => MonadReflexHost t (NodeIdT m) where
+  type ReadPhase (NodeIdT m) = ReadPhase m
+  fireEventsAndRead dm a = lift $ fireEventsAndRead dm a
+  runHostFrame = lift . runHostFrame
+-}
+
+type InnerWidgetConstraints t widget = (
+  MonadVtyApp t widget
+  , HasImageWriter t widget
+  , MonadNodeId widget
+  , HasDisplayRegion t widget
+  , HasFocusReader t widget
+  , HasInput t widget
+  , HasTheme t widget
+  )
+
 -- | run a 'ReflexVtyTestT'
 -- analogous to runReflexTestT
-runReflexVtyTestT :: forall uintref uinev uout t m a.
-  (MonadVtyApp t (TestGuestT t m), TestGuestConstraints t m) -- ^ the reason for this constraint is that we need explicit access to both inner (m) and outer (TestGuestT m) monads
+runReflexVtyTestT :: forall uintref uinev uout t m a. (MonadVtyApp t (TestGuestT t m), TestGuestConstraints t m)
+   -- ^ the reason for this constraint is that we need explicit access to both inner (m) and outer (TestGuestT m) monads
   => (Int, Int) -- ^ initial screen size
   -> (uinev, uintref) -- ^ make sure uintref match uinev, i.e. return values of newEventWithTriggerRef
-  -> (uinev -> VtyWidget t (NodeIdT (TestGuestT t m)) uout) -- ^ VtyWidget to test
+
+  -- TODO extract widget constraints
+  -> (forall widget. (InnerWidgetConstraints t widget) => uinev -> widget uout) -- ^ VtyWidget to test
   -> ReflexVtyTestT t uintref uout m a -- ^ test monad to run
   -> m ()
 runReflexVtyTestT r0 (uinput, uinputtrefs) app rtm = do
@@ -189,18 +228,18 @@ runReflexVtyTestT r0 (uinput, uinputtrefs) app rtm = do
       V.EvResize w h -> Just (w, h)
       _ -> Nothing
 
-  -- pass it on as ctx object
-  let ctx = VtyWidgetCtx {
-      _vtyWidgetCtx_width = fmap fst size
-      , _vtyWidgetCtx_height = fmap snd size
-      , _vtyWidgetCtx_input = vinev
-      , _vtyWidgetCtx_focus = constDyn True
-    }
-
   -- unwrap VtyWidget and pass to runReflexTestT
   runReflexTestT
     ((uinput, vinev), (uinputtrefs, vintref))
-    (\(uinput',_) -> runNodeIdT $ runVtyWidget ctx (app uinput'))
+    -- TODO need ta add runVtyApp in here
+    (\(uinput',_) -> runThemeReader (constant V.defAttr) $
+      runFocusReader (pure True) $
+        runDisplayRegion (fmap (\(w, h) -> Region 0 0 w h) size) $
+          runImageWriter $
+            runNodeIdT $
+              runInput vinev $ do
+                tellImages . ffor (current size) $ \(w, h) -> [V.charFill V.defAttr ' ' w h]
+                (app uinput'))
     rtm
 
 
@@ -212,7 +251,8 @@ class ReflexVtyTestApp app t m | app -> t m where
   data VtyAppInputEvents app :: Type
 
   data VtyAppOutput app :: Type
-  getApp :: VtyAppInputEvents app -> VtyWidget t (NodeIdT (TestGuestT t m)) (VtyAppOutput app)
+  getApp :: (InnerWidgetConstraints t widget)
+    => VtyAppInputEvents app -> widget (VtyAppOutput app)
   makeInputs :: m (VtyAppInputEvents app, VtyAppInputTriggerRefs app)
 
 runReflexVtyTestApp :: (ReflexVtyTestApp app t m, MonadVtyApp t (TestGuestT t m), TestGuestConstraints t m)
@@ -223,65 +263,9 @@ runReflexVtyTestApp r0 rtm = do
   inp <- makeInputs
   runReflexVtyTestT r0 inp getApp rtm
 
--- TODO TemplateHaskell nonsense to generate ReflexVtyTestApp??
--- or maybe you want to add this in the base library
-
-
--- | creates a 'DynRegion' in absolute coordinates from a child DynRegion in the parent DynRegion coordinates
--- this method is intended for tracking the 'DynRegion' of 'VtyWidget's created through the 'pane' method
--- since the 'VtyWidgetCtx' created by 'pane' is unaware of its parent, the tracking must be handled manually by the user
-absDynRegion :: (Reflex t)
-  => DynRegion t -- ^ parent
-  -> DynRegion t -- ^ child in parent coordinates
-  -> DynRegion t -- ^ child in absolute coordinates
-absDynRegion parent child = DynRegion {
-    _dynRegion_left = ffor2 (_dynRegion_left parent) (_dynRegion_left child) (+)
-    , _dynRegion_top = ffor2 (_dynRegion_top parent) (_dynRegion_top child) (+)
-    , _dynRegion_width = _dynRegion_width child
-    , _dynRegion_height = _dynRegion_height child
-  }
-
 -- Reflex.Vty.Widget.Test
 integralFractionalDivide :: (Integral a, Fractional b) => a -> a -> b
 integralFractionalDivide n d = fromIntegral n / fromIntegral d
-
--- | debug variant of splitHDrag_debug which outputs a pair of DynRegions for each pane
-splitHDrag_debug :: (Reflex t, MonadFix m, MonadHold t m, MonadNodeId m)
-  => Int -- ^ initial width of left panel
-  -> VtyWidget t m ()
-  -> VtyWidget t m a
-  -> VtyWidget t m b
-  -> VtyWidget t m ((a,b), (DynRegion t, DynRegion t))
-splitHDrag_debug splitter0 wS wA wB = mdo
-  dh <- displayHeight
-  dw <- displayWidth
-  w0 <- sample . current $ dw
-  dragE <- drag V.BLeft
-  splitterCheckpoint <- holdDyn splitter0 $ leftmost [fst <$> ffilter snd dragSplitter, resizeSplitter]
-  splitterPos <- holdDyn splitter0 $ leftmost [fst <$> dragSplitter, resizeSplitter]
-  splitterFrac <- holdDyn (integralFractionalDivide splitter0 w0) $ ffor (attach (current dw) (fst <$> dragSplitter)) $ \(w, x) ->
-    fromIntegral x / (max 1 (fromIntegral w))
-  let dragSplitter = fforMaybe (attach (current splitterCheckpoint) dragE) $
-        \(splitterX, Drag (fromX, _) (toX, _) _ _ end) ->
-          if splitterX == fromX then Just (toX, end) else Nothing
-      regA = DynRegion 0 0 splitterPos dh
-      regS = DynRegion splitterPos 0 1 dh
-      regB = DynRegion (splitterPos + 1) 0 (dw - splitterPos - 1) dh
-      resizeSplitter = ffor (attach (current splitterFrac) (updated dw)) $
-        \(frac, w) -> round (frac * fromIntegral w)
-  focA <- holdDyn True $ leftmost
-    [ True <$ mA
-    , False <$ mB
-    ]
-  (mA, rA) <- pane2 regA focA $ withMouseDown wA
-  pane regS (pure False) wS
-  (mB, rB) <- pane2 regB (not <$> focA) $ withMouseDown wB
-  return ((rA, rB), (regA, regB))
-  where
-    withMouseDown x = do
-      m <- mouseDown V.BLeft
-      x' <- x
-      return (m, x')
 
 
 
@@ -298,7 +282,7 @@ runLayout_debug
   -> Int -- ^ The positional index of the initially focused tile
   -> Event t Int -- ^ An event that shifts focus by a given number of tiles
   -> Layout t m a -- ^ The 'Layout' widget
-  -> VtyWidget t m (a, Dynamic t (Map NodeId (DynRegion t)))
+  -> m (a, Dynamic t (Map NodeId (DynRegion t)))
 runLayout_debug ddir focus0 focusShift (Layout child) = mdo
   dw <- displayWidth
   dh <- displayHeight

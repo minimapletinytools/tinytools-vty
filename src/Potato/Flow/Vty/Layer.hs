@@ -66,9 +66,9 @@ data LayerWidget t = LayerWidget {
   _layerWidget_mouse :: Event t LMouseData
 }
 
-holdLayerWidget :: forall t m. (Adjustable t m, PostBuild t m, NotReady t m,  MonadHold t m, MonadFix m, MonadNodeId m)
+holdLayerWidget :: forall t m. (MonadWidget t m)
   => LayerWidgetConfig t
-  -> VtyWidget t m (LayerWidget t)
+  -> m (LayerWidget t)
 holdLayerWidget LayerWidgetConfig {..} = do
 
   regionWidthDyn <- displayWidth

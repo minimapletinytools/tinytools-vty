@@ -38,7 +38,7 @@ instance (MonadVtyApp t (TestGuestT t m), TestGuestConstraints t m) => ReflexVty
     inp <- input
     dw <- displayWidth
     dh <- displayHeight
-    fill '#'
+    --fill $ constant '#'
     return $ BasicNetworkTest1_Output inp dw dh
   makeInputs = do
     -- return dummy inputs since they are both empty
@@ -46,7 +46,7 @@ instance (MonadVtyApp t (TestGuestT t m), TestGuestConstraints t m) => ReflexVty
 
 test_basic :: Test
 test_basic = TestLabel "basic" $ TestCase $ runSpiderHost $
-  runReflexVtyTestApp @ (BasicNetworkTest1 (SpiderTimeline Global) (SpiderHost Global)) (100,100) $ do
+  runReflexVtyTestApp @ (BasicNetworkTest1 (SpiderTimeline Global) (SpiderHost Global)) (5,5) $ do
     -- get our app's output events and subscribe to them
     BasicNetworkTest1_Output {..} <- userOutputs
     vtyImages <- vtyOutputs
@@ -61,7 +61,9 @@ test_basic = TestLabel "basic" $ TestCase $ runSpiderHost $
       b <- sample vtyImages
       return (a,b)
     liftIO $ (fst . L.last $ a1) @?= Nothing
+    -- not sure why this produces two images now, whatever,
     liftIO $ (length . snd . L.last $ a1) @?= 1
+
 
     -- fire a vty event and ensure the output is the same as the input
     let someEvent = V.EvKey V.KEsc []

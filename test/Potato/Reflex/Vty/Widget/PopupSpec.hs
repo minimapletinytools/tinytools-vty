@@ -53,7 +53,7 @@ instance (MonadVtyApp t (TestGuestT t m), TestGuestConstraints t m) => ReflexVty
     -- popup that closes when you press enter
     (popupEv, popupStateDyn) <- popupPaneSimple def someWidgetEv
     -- gotta make the popup look pretty :D
-    fill '#'
+    fill $ constant '#'
     return $ BasicNetworkTest1_Output never popupEv popupStateDyn
   makeInputs = do
     (ev, ref) <- newEventWithTriggerRef
@@ -120,7 +120,6 @@ test_basic = TestLabel "basic" $ TestCase $ runSpiderHost $
     -- escape cancel the popup
     queueVtyEvent $ V.EvKey V.KEsc []
     fireQueuedEventsAndRead readPopupStateEv >>= \a -> liftIO (checkSingleMaybe a False)
-
 
 
 

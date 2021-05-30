@@ -23,10 +23,10 @@ import qualified Graphics.Vty                as V
 import           Reflex
 import           Reflex.Vty
 
-radioList :: forall t m. (Reflex t, MonadNodeId m)
+radioList :: forall t m. (Reflex t, MonadNodeId m, HasDisplayRegion t m, HasImageWriter t m, HasInput t m, HasTheme t m)
   => Dynamic t [Text] -- ^ list of button contents
   -> Dynamic t [Int] -- ^ which buttons are "active"
-  -> VtyWidget t m (Event t Int) -- ^ event when button is clickd
+  -> m (Event t Int) -- ^ event when button is clickd
 radioList buttonsDyn activeDyn = do
   dw <- displayWidth
   mouseDownEv <- mouseDown V.BLeft
@@ -59,10 +59,10 @@ radioList buttonsDyn activeDyn = do
     return $ L.ifindIndex (\_ ((x,y,l),_,_) -> py == y && px >= x && px < x+l) bs
 
 
-radioListSimple :: forall t m. (Reflex t, MonadFix m, MonadHold t m, MonadNodeId m)
+radioListSimple :: forall t m. (Reflex t, MonadFix m, MonadHold t m, MonadNodeId m, HasDisplayRegion t m, HasImageWriter t m, HasInput t m, HasTheme t m)
   => Int -- ^ initial choice
   -> [Text] -- ^ list of button contents (must be at least one)
-  -> VtyWidget t m (Dynamic t Int) -- ^ which radio is selected
+  -> m (Dynamic t Int) -- ^ which radio is selected
 radioListSimple initial buttons = mdo
   radioEvs <- radioList (constDyn buttons) radioDyn
   radioDyn <- holdDyn [0] $ fmap (\x->[x]) radioEvs

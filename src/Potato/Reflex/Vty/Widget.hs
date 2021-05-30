@@ -14,12 +14,9 @@
 {-# LANGUAGE UndecidableInstances       #-}
 
 module Potato.Reflex.Vty.Widget
-  ( displayRegion
-
-  , SingleClick(..)
+  (
+  SingleClick(..)
   , singleClick
-  , behaviorToggleWidget
-
 
   , splitHDrag
   , DragState(..)
@@ -39,18 +36,12 @@ import           Reflex.Class         ()
 import           Reflex.Host.Class    (MonadReflexCreateTrigger)
 import           Reflex.Vty.Host
 import           Reflex.Vty.Widget
+import           Reflex.Vty.Widget.Input.Mouse
 
 
 
 import           Control.Monad.NodeId
 import           Control.Monad.Reader
-
-
-displayRegion :: (HasDisplaySize t m) => m (DynRegion t)
-displayRegion = do
-  dw <- displayWidth
-  dh <- displayHeight
-  return $ DynRegion 0 0 dw dh
 
 -- currently only works for a SINGLE POINT
 -- TODO integrate with pane2 so it reports clicks that happen on pane.
@@ -62,7 +53,7 @@ data SingleClick = SingleClick
   }
   deriving (Eq, Ord, Show)
 
-singleClick :: (Reflex t, MonadHold t m, MonadFix m) => V.Button -> VtyWidget t m (Event t SingleClick)
+singleClick :: (Reflex t, MonadHold t m, MonadFix m, HasInput t m) => V.Button -> m (Event t SingleClick)
 singleClick btn = do
   let
     -- TODO implement for pane2 instead
@@ -75,31 +66,18 @@ singleClick btn = do
       then Just $ SingleClick btn (fromX, fromY) mods (not didStayOn)
       else Nothing
 
-
-behaviorToggleWidget :: (Reflex t, MonadNodeId m) => Behavior t Bool -> VtyWidget t m a -> VtyWidget t m a -> VtyWidget t m (Behavior t a)
-behaviorToggleWidget toggle wa wb = VtyWidget $ do
-  ctx <- lift ask
-  (a, bas) <- lift . lift $ runVtyWidget ctx wa
-  (b, bbs) <- lift . lift $ runVtyWidget ctx wa
-  tellImages $ ffor2 toggle bas (\t xs -> if t then xs else [])
-  tellImages $ ffor2 toggle bbs (\t xs -> if not t then xs else [])
-  return $ fmap (\t -> if t then a else b) toggle
-
-
-
-
 integralFractionalDivide :: (Integral a, Fractional b) => a -> a -> b
 integralFractionalDivide n d = fromIntegral n / fromIntegral d
 
 -- | A split of the available space into two parts with a draggable separator.
 -- Starts with half the space allocated to each, and the first pane has focus.
 -- Clicking in a pane switches focus.
-splitHDrag :: (Reflex t, MonadFix m, MonadHold t m, MonadNodeId m)
+splitHDrag :: (Reflex t, MonadFix m, MonadHold t m, MonadNodeId m, HasDisplayRegion t m, HasInput t m, HasImageWriter t m, HasFocusReader t m)
   => Int -- ^ initial width of left panel
-  -> VtyWidget t m ()
-  -> VtyWidget t m a
-  -> VtyWidget t m b
-  -> VtyWidget t m (a,b)
+  -> m ()
+  -> m a
+  -> m b
+  -> m (a,b)
 splitHDrag splitter0 wS wA wB = mdo
   dh <- displayHeight
   dw <- displayWidth
@@ -112,9 +90,9 @@ splitHDrag splitter0 wS wA wB = mdo
   let dragSplitter = fforMaybe (attach (current splitterCheckpoint) dragE) $
         \(splitterX, Drag (fromX, _) (toX, _) _ _ end) ->
           if splitterX == fromX then Just (toX, end) else Nothing
-      regA = DynRegion 0 0 splitterPos dh
-      regS = DynRegion splitterPos 0 1 dh
-      regB = DynRegion (splitterPos + 1) 0 (dw - splitterPos - 1) dh
+      regA = Region 0 0 <$> splitterPos <*> dh
+      regS = Region <$> splitterPos <*> 0 <*> 1 <*> dh
+      regB = Region <$> (splitterPos + 1) <*> 0 <*> (dw - splitterPos - 1) <*> dh
       resizeSplitter = ffor (attach (current splitterFrac) (updated dw)) $
         \(frac, w) -> round (frac * fromIntegral w)
   focA <- holdDyn True $ leftmost
@@ -147,9 +125,9 @@ data Drag2 = Drag2
 
 -- | Same as 'drag' but returns 'Drag2' which tracks drag start events
 drag2
-  :: (Reflex t, MonadFix m, MonadHold t m)
+  :: (Reflex t, MonadFix m, MonadHold t m, HasInput t m)
   => V.Button
-  -> VtyWidget t m (Event t Drag2)
+  -> m (Event t Drag2)
 drag2 btn = mdo
   inp <- input
   let f :: Maybe Drag2 -> V.Event -> Maybe Drag2
@@ -178,9 +156,11 @@ drag2 btn = mdo
   return (fmapMaybe id $ updated dragD)
 
 
+-- DELETE
 -- copied from Reflex.Vty.Widget
 -- | Translates and crops an 'Image' so that it is contained by
 -- the given 'Region'.
+{-
 withinImage
   :: Region
   -> Image
@@ -188,6 +168,7 @@ withinImage
 withinImage (Region left top width height)
   | width < 0 || height < 0 = withinImage (Region left top 0 0)
   | otherwise = V.translate left top . V.crop width height
+-}
 
 -- |
 -- * 'Tracking' state means actively tracking the current stream of mouse events
@@ -197,15 +178,15 @@ data MouseTrackingState = Tracking V.Button | NotTracking | WaitingForInput deri
 
 -- | same as pane except mouse drags that start off pane aren't reported and mouse drags that end off pane are reported
 pane2
-  :: forall t m a. (Reflex t, MonadHold t m, MonadNodeId m, MonadFix m)
-  => DynRegion t
+  :: forall t m a. (Reflex t, MonadHold t m, MonadNodeId m, MonadFix m, HasDisplayRegion t m, HasInput t m, HasImageWriter t m, HasFocusReader t m)
+  => Dynamic t Region
   -> Dynamic t Bool -- ^ Whether the widget should be focused when the parent is.
-  -> VtyWidget t m a
-  -> VtyWidget t m a
-pane2 dr foc child = VtyWidget $ do
-  ctx <- lift ask
+  -> m a
+  -> m a
+pane2 dr foc child = do
+  inp <- input
   let
-    reg = currentRegion dr
+    reg = current dr
     isWithin :: Region -> Int -> Int -> Bool
     isWithin (Region l t w h) x y = not . or $ [ x < l
                                                , y < t
@@ -237,14 +218,9 @@ pane2 dr foc child = VtyWidget $ do
             then Just (WaitingForInput, Just $ V.EvMouseUp (x - l) (y - t) mbtn)
             else Just (WaitingForInput, Nothing)
         _ -> Just (tracking, Just e)
-  dynInputEvTracking <- foldDynMaybeM trackMouse (WaitingForInput, Nothing) $ _vtyWidgetCtx_input ctx
-  let ctx' = VtyWidgetCtx
-        { _vtyWidgetCtx_input = fmapMaybe snd $ updated dynInputEvTracking
-        , _vtyWidgetCtx_focus = liftA2 (&&) (_vtyWidgetCtx_focus ctx) foc
-        , _vtyWidgetCtx_width = _dynRegion_width dr
-        , _vtyWidgetCtx_height = _dynRegion_height dr
-        }
-  (result, images) <- lift . lift $ runVtyWidget ctx' child
-  let images' = liftA2 (\r is -> map (withinImage r) is) reg images
-  tellImages images'
-  return result
+  dynInputEvTracking <- foldDynMaybeM trackMouse (WaitingForInput, Nothing) $ inp
+
+  localRegion (const dr) $
+    mapImages (imagesInRegion $ current dr) $
+      localFocus (const foc) $
+        localInput (const (fmapMaybe snd $ updated dynInputEvTracking)) child
