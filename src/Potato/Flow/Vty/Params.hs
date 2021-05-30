@@ -491,14 +491,6 @@ holdParamsWidget :: forall t m. (MonadWidget t m)
   => ParamsWidgetConfig t
   -> m (ParamsWidget t)
 holdParamsWidget ParamsWidgetConfig {..} = do
-
-  return ParamsWidget {
-    _paramsWidget_paramsEvent = never
-    , _paramsWidget_canvasSizeEvent = never
-    , _paramsWidget_captureInputEv = never
-  }
-
-{-
   let
     selectionDyn = _paramsWidgetConfig_selectionDyn
     canvasDyn = _paramsWidgetConfig_canvasDyn
@@ -510,32 +502,31 @@ holdParamsWidget ParamsWidgetConfig {..} = do
     -- show canvas params when nothing is selected
     mCanvasSizeInputDyn = fmap (\s -> if isParliament_null s then Just (isParliament_empty, Nothing) else Nothing) selectionDyn
 
-  textAlignmentWidget <- holdMaybeParamsWidget mTextAlignInputDyn holdTextAlignmentWidget
-  superStyleWidget2 <- holdMaybeParamsWidget mSuperStyleInputDyn holdSuperStyleWidget
-  --sBoxTypeWidget <- holdMaybeParamsWidget mSBoxTypeInputDyn holdSBoxTypeWidget
-  canvasSizeWidget <- holdMaybeParamsWidget mCanvasSizeInputDyn (holdCanvasSizeWidget canvasDyn)
+  (paramsOutputEv, captureEv, canvasSizeOutputEv) <- initManager_ $ do
+    textAlignmentWidget <- holdMaybeParamsWidget mTextAlignInputDyn holdTextAlignmentWidget
+    superStyleWidget2 <- holdMaybeParamsWidget mSuperStyleInputDyn holdSuperStyleWidget
+    --sBoxTypeWidget <- holdMaybeParamsWidget mSBoxTypeInputDyn holdSBoxTypeWidget
+    canvasSizeWidget <- holdMaybeParamsWidget mCanvasSizeInputDyn (holdCanvasSizeWidget canvasDyn)
 
-  -- apparently textAlignmentWidget gets updated after any change which causes the whole network to rerender and we lose our focus state...
-  let controllersWithIdParamsWidgets = fmap catMaybes . mconcat . (fmap (fmap (:[]))) $ [textAlignmentWidget, superStyleWidget2]
+    -- apparently textAlignmentWidget gets updated after any change which causes the whole network to rerender and we lose our focus state...
+    let controllersWithIdParamsWidgets = fmap catMaybes . mconcat . (fmap (fmap (:[]))) $ [textAlignmentWidget, superStyleWidget2]
 
+    (paramsOutputEv', captureEv', canvasSizeOutputEv') <- (switchHoldTriple never never never =<<) . networkView . ffor2 controllersWithIdParamsWidgets canvasSizeWidget $ \widgets mcsw -> col $ do
+      outputs <- forM widgets $ \w -> mdo
+        (sz, captureEv', ev) <- (tile . fixed) sz w
+        return (ev, captureEv')
+      -- canvas size widget is special becaues it's output type is different
+      (cssev, captureEv2) <- case mcsw of
+        Nothing -> return (never, never)
+        Just csw -> mdo
+          (cssz, csCaptureEv', cssev') <- (tile . fixed) cssz csw
+          return (cssev', csCaptureEv')
+      return $ (leftmostWarn "paramsLayout" (fmap fst outputs), leftmostWarn "paramsCapture" (fmap snd outputs), cssev)
 
-  -- TODO this won't compile because widgets are loaded outside of the initManager_ call 😱
-  (paramsOutputEv, captureEv, canvasSizeOutputEv) <- (switchHoldTriple never never never =<<) . networkView . ffor2 controllersWithIdParamsWidgets canvasSizeWidget $ \widgets mcsw -> initManager_ $ col $ do
-    outputs <- forM widgets $ \w -> mdo
-      (sz, captureEv', ev) <- (tile . fixed) sz w
-      return (ev, captureEv')
-    -- canvas size widget is special becaues it's output type is different
-    (cssev, captureEv2) <- case mcsw of
-      Nothing -> return (never, never)
-      Just csw -> mdo
-        (cssz, csCaptureEv', cssev') <- (tile . fixed) cssz csw
-        return (cssev', csCaptureEv')
-    return $ (leftmostWarn "paramsLayout" (fmap fst outputs), leftmostWarn "paramsCapture" (fmap snd outputs), cssev)
-
+    return (paramsOutputEv', captureEv', canvasSizeOutputEv')
 
   return ParamsWidget {
     _paramsWidget_paramsEvent = paramsOutputEv
     , _paramsWidget_canvasSizeEvent = canvasSizeOutputEv
     , _paramsWidget_captureInputEv = captureEv
   }
--}
