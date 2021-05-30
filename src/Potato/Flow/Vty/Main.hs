@@ -18,6 +18,7 @@ import           Potato.Flow.Vty.Info
 import           Potato.Flow.Vty.Input
 import           Potato.Flow.Vty.Layer
 import           Potato.Flow.Vty.Params
+import           Potato.Flow.Vty.PotatoReader
 import           Potato.Flow.Vty.Tools
 import           Potato.Reflex.Vty.Helpers
 import           Potato.Reflex.Vty.Widget.Popup
@@ -249,9 +250,6 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
       T.hPutStr stderr $ pHandlerDebugShow handler
       hFlush stderr
 
-
-
-
   let
     goatWidgetConfig = GoatWidgetConfig {
         _goatWidgetConfig_initialState = _mainPFWidgetConfig_initialState
@@ -273,7 +271,7 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
   everythingW <- holdGoatWidget goatWidgetConfig
 
 
-  -- main panels
+  -- define main panels
   let
     leftPanel = initLayout $ col $ do
       (grout . fixed) 1 $ row $ do
@@ -328,18 +326,21 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
           , _canvasWidgetConfig_handles = _goatWidget_handlerRenderOutput everythingW
         }
 
-  (keyboardEv, ((layersW, toolsW, paramsW), canvasW)) <- captureInputEvents (That inputCapturedByPopupBeh) $ do
-    inp <- input
-    stuff <- splitHDrag 35 (fill (constant '*')) leftPanel rightPanel
+  -- render main panels
 
-    kb <- captureInputEvents (This (_paramsWidget_captureInputEv paramsW)) $ do
+  (keyboardEv, ((layersW, toolsW, paramsW), canvasW)) <- runPotatoReader PotatoConfig $
+    captureInputEvents (That inputCapturedByPopupBeh) $ do
       inp <- input
-      return $ fforMaybe inp $ \case
-        V.EvKey k mods -> convertKey k >>= (\kbd -> return $ KeyboardData kbd (convertModifiers mods))
-        V.EvPaste bs -> Just $ KeyboardData (KeyboardKey_Paste (T.decodeUtf8 bs)) []
-        _ -> Nothing
+      stuff <- splitHDrag 35 (fill (constant '*')) leftPanel rightPanel
 
-    return (kb, stuff)
+      kb <- captureInputEvents (This (_paramsWidget_captureInputEv paramsW)) $ do
+        inp <- input
+        return $ fforMaybe inp $ \case
+          V.EvKey k mods -> convertKey k >>= (\kbd -> return $ KeyboardData kbd (convertModifiers mods))
+          V.EvPaste bs -> Just $ KeyboardData (KeyboardKey_Paste (T.decodeUtf8 bs)) []
+          _ -> Nothing
+
+      return (kb, stuff)
 
 
   -- render various popups
