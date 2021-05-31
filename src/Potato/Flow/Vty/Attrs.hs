@@ -1,9 +1,6 @@
-module Potato.Flow.Vty.Attrs (
-  -- * light color scheme
-  lg_default
-  , lg_layer_selected
-  , lg_manip
-) where
+
+
+module Potato.Flow.Vty.Attrs where
 
 
 import           Relude
@@ -27,9 +24,16 @@ lg_layer_selected = Attr {
   , attrURL = Default
 }
 
-
 lg_manip :: Attr
 lg_manip = Attr {
+  attrStyle = SetTo blink
+  , attrForeColor = SetTo black
+  , attrBackColor = SetTo brightMagenta
+  , attrURL = Default
+}
+
+lg_canvas_cursor :: Attr
+lg_canvas_cursor = Attr {
   attrStyle = SetTo blink
   , attrForeColor = SetTo black
   , attrBackColor = SetTo brightMagenta

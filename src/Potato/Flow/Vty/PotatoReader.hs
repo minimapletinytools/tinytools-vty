@@ -1,12 +1,10 @@
 {-# Language UndecidableInstances #-}
 
-module Potato.Flow.Vty.PotatoReader (
-  PotatoReader
-  , runPotatoReader
-  , PotatoConfig(..)
-) where
+module Potato.Flow.Vty.PotatoReader where
+
 import           Relude
 
+import Data.Default
 import Control.Monad.Fix (MonadFix)
 import Control.Monad.IO.Class (MonadIO)
 --import Control.Monad.Morph
@@ -20,7 +18,25 @@ import Reflex.Host.Class (MonadReflexCreateTrigger)
 import           Reflex
 import           Reflex.Vty
 
-data PotatoConfig t = PotatoConfig
+import Potato.Flow.Vty.Attrs
+
+data PotatoStyle t = PotatoStyle {
+  _potatoStyle_canvasCursor :: Behavior t V.Attr
+}
+
+instance (Reflex t) => Default (PotatoStyle t) where
+  def = PotatoStyle {
+      _potatoStyle_canvasCursor = constant lg_canvas_cursor
+    }
+
+data PotatoConfig t = PotatoConfig {
+  _potatoConfig_style :: PotatoStyle t
+}
+
+instance (Reflex t) =>  Default (PotatoConfig t) where
+  def = PotatoConfig {
+      _potatoConfig_style = def
+    }
 
 -- | A class for things that can dynamically gain and lose focus
 class (Reflex t, Monad m) => HasPotato t m | m -> t where

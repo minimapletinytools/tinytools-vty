@@ -328,7 +328,7 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
 
   -- render main panels
 
-  (keyboardEv, ((layersW, toolsW, paramsW), canvasW)) <- runPotatoReader PotatoConfig $
+  (keyboardEv, ((layersW, toolsW, paramsW), canvasW)) <- runPotatoReader def $
     captureInputEvents (That inputCapturedByPopupBeh) $ do
       inp <- input
       stuff <- splitHDrag 35 (fill (constant '*')) leftPanel rightPanel
