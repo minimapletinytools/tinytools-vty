@@ -110,16 +110,16 @@ packages:
   original:
     hackage: these-1.0.1@sha256:58dba2446b57dde711c5e7f63910d18bc28b9a5831a89772986bb184a3e7851b,3266
 - completed:
-    size: 58273
-    url: https://github.com/pdlla/reflex-vty/archive/41640ec73d6d4fa5f0137127d5ecc79b7b10e82e.tar.gz
+    size: 57924
+    url: https://github.com/pdlla/reflex-vty/archive/047a5f962b4640ddb37307cc1dbc145e9785f77a.tar.gz
     name: reflex-vty
     version: 0.2.0.0
-    sha256: b46ed3c9f99c1e44a331817b8319ec542eb1fb9c885e0340918226b6352f58ee
+    sha256: 9925a60078a883a532a497655c9596071ba9b984d0c3d0e2f91dfa323feda0ad
     pantry-tree:
       size: 2021
-      sha256: 8ba6f5fc7ddc19cf70403c3fb4e0ca3e19a103ebfe2cae060963c3049e52b11b
+      sha256: f17058b96ac381a7edb7df38aa20bcf267d8e52865f92d01642a59822e3dac5f
   original:
-    url: https://github.com/pdlla/reflex-vty/archive/41640ec73d6d4fa5f0137127d5ecc79b7b10e82e.tar.gz
+    url: https://github.com/pdlla/reflex-vty/archive/047a5f962b4640ddb37307cc1dbc145e9785f77a.tar.gz
 snapshots:
 - completed:
     size: 533252
