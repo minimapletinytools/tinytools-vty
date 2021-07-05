@@ -56,9 +56,9 @@ if' True  x _ = x
 if' False _ y = y
 
 
-
 data LayerWidgetConfig t = LayerWidgetConfig {
-  _layerWidgetConfig_layers    :: Dynamic t LayerEntries
+  _layerWidgetConfig_layers    :: Dynamic t LayersState
+  , _layerWidgetConfig_layersView    :: Dynamic t LayersViewHandlerRenderOutput
   , _layerWidgetConfig_selection :: Dynamic t Selection
 }
 
@@ -81,29 +81,34 @@ holdLayerWidget LayerWidgetConfig {..} = do
   -- ::actually draw images::
   let
 
-    makeLayerImage :: Int -> LayerEntry -> V.Image
-    makeLayerImage width lentry@LayerEntry {..} = r where
-      ident = layerEntry_depth lentry
-      sowl = _layerEntry_superOwl
-      rid = _superOwl_id sowl
-      label = isOwl_name sowl
-      -- TODO selected state
-      attr = if False then lg_layer_selected else lg_default
+    makeLayerImage :: Int -> LayersHandlerRenderEntry -> V.Image
+    makeLayerImage width lhrentry = case lhrentry of
+      LayersHandlerRenderEntryDummy ident -> r where
+        r = V.text' lg_layer_selected . T.pack . L.take width
+          $ replicate ident ' '
+          <> replicate 10 '*'
+      LayersHandlerRenderEntryNormal selected lentry@LayerEntry{..} -> r where
+        ident = layerEntry_depth lentry
+        sowl = _layerEntry_superOwl
+        rid = _superOwl_id sowl
+        label = isOwl_name sowl
+        -- TODO selected state
+        attr = if selected then lg_layer_selected else lg_default
 
-      r = V.text' attr . T.pack . L.take width
-        $ replicate ident ' '
-        -- <> [moveChar]
-        <> if' (layerEntry_isFolder lentry) (if' _layerEntry_isCollapsed [expandChar] [closeChar]) []
-        <> if' (lockHiddenStateToBool _layerEntry_hideState) [hiddenChar] [visibleChar]
-        <> if' (lockHiddenStateToBool _layerEntry_lockState) [lockedChar] [unlockedChar]
-        <> " "
-        <> show rid
-        <> " "
-        <> T.unpack label
+        r = V.text' attr . T.pack . L.take width
+          $ replicate ident ' '
+          -- <> [moveChar]
+          <> if' (layerEntry_isFolder lentry) (if' _layerEntry_isCollapsed [expandChar] [closeChar]) []
+          <> if' (lockHiddenStateToBool _layerEntry_hideState) [hiddenChar] [visibleChar]
+          <> if' (lockHiddenStateToBool _layerEntry_lockState) [lockedChar] [unlockedChar]
+          <> " "
+          <> show rid
+          <> " "
+          <> T.unpack label
     layerImages :: Behavior t [V.Image]
     layerImages = current $ fmap ((:[]) . V.vertCat)
-      $ ffor2 regionDyn _layerWidgetConfig_layers $ \(w,h) lentries ->
-        map (makeLayerImage w) . L.take (max 0 (h - padBottom)) $ toList lentries
+      $ ffor2 regionDyn (fmap _layersViewHandlerRenderOutput_entries _layerWidgetConfig_layersView) $ \(w,h) lhrentries ->
+        map (makeLayerImage w) . L.take (max 0 (h - padBottom)) $ toList lhrentries
   tellImages layerImages
   let
     -- TODO scrolling?

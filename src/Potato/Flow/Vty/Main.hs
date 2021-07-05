@@ -125,7 +125,8 @@ tickOnEvent ev = void $ runWithReplace (return ()) (ev $> return ())
 
 pfcfg :: (Reflex t) => MainPFWidgetConfig t
 pfcfg = def {
-    _mainPFWidgetConfig_initialFile = Just "potato.flow"
+    --_mainPFWidgetConfig_initialFile = Just "potato.flow"
+    _mainPFWidgetConfig_initialState = owlpfstate_basic2
   }
 
 
@@ -291,16 +292,17 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
           performEvent_ $ ffor saveEv $ \rc -> do
              let t = renderedCanvasToText rc
              liftIO $ T.writeFile "potato.txt" t
-      (grout . fixed) 5 $ debugStream [
+      (grout . fixed) 3 $ debugStream [
         never
         ]
-      tools' <- (grout . fixed) 10 $ holdToolsWidget $  ToolWidgetConfig {
+      tools' <- (grout . fixed) 6 $ holdToolsWidget $  ToolWidgetConfig {
           _toolWidgetConfig_tool =  _goatWidget_tool everythingW
         }
 
       -- TODO Layout stuff messes up your mouse assumptions. You need to switch Layout to use pane2 D:
       layers' <- (grout . stretch) 1 $ holdLayerWidget $ LayerWidgetConfig {
             _layerWidgetConfig_layers = _goatWidget_layers everythingW
+            , _layerWidgetConfig_layersView = _goatWidget_layersHandlerRenderOutput everythingW
             , _layerWidgetConfig_selection = _goatWidget_selection  everythingW
           }
       _ <- (grout . fixed) 5 $ holdInfoWidget $ InfoWidgetConfig {
