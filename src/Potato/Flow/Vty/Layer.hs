@@ -87,16 +87,28 @@ holdLayerWidget LayerWidgetConfig {..} = do
         r = V.text' lg_layer_selected . T.pack . L.take width
           $ replicate ident ' '
           <> replicate 10 '*'
-      LayersHandlerRenderEntryNormal selected lentry@LayerEntry{..} -> r where
+      LayersHandlerRenderEntryNormal selected mdots lentry@LayerEntry{..} -> r where
         ident = layerEntry_depth lentry
         sowl = _layerEntry_superOwl
         rid = _superOwl_id sowl
         label = isOwl_name sowl
         -- TODO selected state
-        attr = if selected then lg_layer_selected else lg_default
+        attr = case selected of
+          LHRESS_Selected -> lg_layer_selected
+          LHRESS_InheritSelected -> lg_layer_inheritselect
+          _ ->lg_default
 
-        r = V.text' attr . T.pack . L.take width
-          $ replicate ident ' '
+        identn = case mdots of
+          Nothing -> ident
+          Just x -> x
+
+        r = V.text' attr . T.pack . L.take width $
+
+          -- render identation and possible drop depth
+          replicate identn ' '
+          <> replicate (min 1 (ident - identn)) '|'
+          <> replicate (max 0 (ident - identn - 1)) ' '
+
           -- <> [moveChar]
           <> if' (layerEntry_isFolder lentry) (if' _layerEntry_isCollapsed [expandChar] [closeChar]) []
           <> if' (lockHiddenStateToBool _layerEntry_hideState) [hiddenChar] [visibleChar]

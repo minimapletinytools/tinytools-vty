@@ -12,6 +12,14 @@ lg_default :: Attr
 lg_default = Attr {
   attrStyle = SetTo defaultStyleMask
   , attrForeColor = SetTo black
+  , attrBackColor = Default
+  , attrURL = Default
+}
+
+lg_layer_inheritselect :: Attr
+lg_layer_inheritselect = Attr {
+  attrStyle = SetTo defaultStyleMask
+  , attrForeColor = SetTo black
   , attrBackColor = SetTo brightWhite
   , attrURL = Default
 }
