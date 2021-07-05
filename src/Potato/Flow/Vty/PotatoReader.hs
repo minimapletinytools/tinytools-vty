@@ -20,25 +20,29 @@ import           Reflex.Vty
 
 import Potato.Flow.Vty.Attrs
 
-data PotatoStyle t = PotatoStyle {
-  _potatoStyle_canvasCursor :: Behavior t V.Attr
-  , _potatoStyle_normal :: Behavior t V.Attr
-  , _potatoStyle_selected :: Behavior t V.Attr
-  , _potatoStyle_softSelected :: Behavior t V.Attr
+data PotatoStyle = PotatoStyle {
+  _potatoStyle_canvasCursor :: V.Attr
+  , _potatoStyle_normal :: V.Attr
+  , _potatoStyle_selected :: V.Attr
+  , _potatoStyle_softSelected :: V.Attr
 }
 
-instance (Reflex t) => Default (PotatoStyle t) where
+
+instance Default PotatoStyle where
   def = PotatoStyle {
-      _potatoStyle_canvasCursor = constant lg_canvas_cursor
+      _potatoStyle_canvasCursor = lg_canvas_cursor
+      , _potatoStyle_normal = lg_default
+      , _potatoStyle_selected = lg_layer_selected
+      , _potatoStyle_softSelected = lg_layer_inheritselect
     }
 
 data PotatoConfig t = PotatoConfig {
-  _potatoConfig_style :: PotatoStyle t
+  _potatoConfig_style :: Behavior t PotatoStyle
 }
 
 instance (Reflex t) =>  Default (PotatoConfig t) where
   def = PotatoConfig {
-      _potatoConfig_style = def
+      _potatoConfig_style = constant def
     }
 
 -- | A class for things that can dynamically gain and lose focus

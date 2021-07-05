@@ -72,7 +72,8 @@ holdLayerWidget :: forall t m. (MonadWidget t m, HasPotato t m)
   -> m (LayerWidget t)
 holdLayerWidget LayerWidgetConfig {..} = do
 
-  PotatoStyle {..} <- fmap _potatoConfig_style $ askPotato
+  potatostylebeh <- fmap _potatoConfig_style askPotato
+  PotatoStyle {..} <- sample potatostylebeh
   regionWidthDyn <- displayWidth
   regionHeightDyn <- displayHeight
 
@@ -98,9 +99,9 @@ holdLayerWidget LayerWidgetConfig {..} = do
         label = isOwl_name sowl
         -- TODO selected state
         attr = case selected of
-          LHRESS_Selected -> lg_layer_selected
-          LHRESS_InheritSelected -> lg_layer_inheritselect
-          _ ->lg_default
+          LHRESS_Selected -> _potatoStyle_selected
+          LHRESS_InheritSelected -> _potatoStyle_softSelected
+          _ -> _potatoStyle_normal
 
         identn = case mdots of
           Nothing -> ident
