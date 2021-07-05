@@ -16,6 +16,7 @@ import           Potato.Flow.Vty.Attrs
 import           Potato.Flow.Vty.Input
 import           Potato.Reflex.Vty.Helpers
 import           Potato.Reflex.Vty.Widget
+import Potato.Flow.Vty.PotatoReader
 
 
 import           Control.Monad.Fix
@@ -66,13 +67,16 @@ data LayerWidget t = LayerWidget {
   _layerWidget_mouse :: Event t LMouseData
 }
 
-holdLayerWidget :: forall t m. (MonadWidget t m)
+holdLayerWidget :: forall t m. (MonadWidget t m, HasPotato t m)
   => LayerWidgetConfig t
   -> m (LayerWidget t)
 holdLayerWidget LayerWidgetConfig {..} = do
 
+  PotatoStyle {..} <- fmap _potatoConfig_style $ askPotato
   regionWidthDyn <- displayWidth
   regionHeightDyn <- displayHeight
+
+
   let
     padTop = 0
     padBottom = 0

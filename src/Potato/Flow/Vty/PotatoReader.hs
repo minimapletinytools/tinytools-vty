@@ -22,6 +22,9 @@ import Potato.Flow.Vty.Attrs
 
 data PotatoStyle t = PotatoStyle {
   _potatoStyle_canvasCursor :: Behavior t V.Attr
+  , _potatoStyle_normal :: Behavior t V.Attr
+  , _potatoStyle_selected :: Behavior t V.Attr
+  , _potatoStyle_softSelected :: Behavior t V.Attr
 }
 
 instance (Reflex t) => Default (PotatoStyle t) where
@@ -54,6 +57,9 @@ instance HasPotato t m => HasPotato t (Input t m)
 instance HasPotato t m => HasPotato t (ImageWriter t m)
 instance HasPotato t m => HasPotato t (DisplayRegion t m)
 instance HasPotato t m => HasPotato t (FocusReader t m)
+
+instance HasPotato t m => HasPotato t (Layout t m) where
+  askPotato = lift askPotato
 
 -- | A widget that has access to information about whether it is focused
 newtype PotatoReader t m a = PotatoReader

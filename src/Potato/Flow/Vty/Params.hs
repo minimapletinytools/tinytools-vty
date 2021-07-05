@@ -17,6 +17,7 @@ import           Relude
 import           Potato.Flow
 import           Potato.Flow.Vty.Common
 import           Potato.Reflex.Vty.Helpers
+import Potato.Flow.Vty.PotatoReader
 
 import           Control.Monad.Fix
 import           Control.Monad.NodeId
@@ -487,7 +488,7 @@ switchHoldTriple eva evb evc evin = r where
 
 
 
-holdParamsWidget :: forall t m. (MonadWidget t m)
+holdParamsWidget :: forall t m. (MonadWidget t m, HasPotato t m)
   => ParamsWidgetConfig t
   -> m (ParamsWidget t)
 holdParamsWidget ParamsWidgetConfig {..} = do
