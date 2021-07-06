@@ -74,6 +74,7 @@ holdLayerWidget LayerWidgetConfig {..} = do
 
   potatostylebeh <- fmap _potatoConfig_style askPotato
   PotatoStyle {..} <- sample potatostylebeh
+
   regionWidthDyn <- displayWidth
   regionHeightDyn <- displayHeight
 

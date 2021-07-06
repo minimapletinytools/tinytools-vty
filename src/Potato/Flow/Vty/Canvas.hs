@@ -18,6 +18,7 @@ import           Potato.Flow.Vty.Input
 import           Potato.Reflex.Vty.Helpers
 import           Potato.Reflex.Vty.Widget
 import           Reflex.Potato.Helpers
+import Potato.Flow.Vty.PotatoReader
 
 import           Control.Lens
 import qualified Data.IntMap.Strict             as IM
@@ -56,10 +57,14 @@ data CanvasWidget t = CanvasWidget {
   _canvasWidget_mouse :: Event t LMouseData
 }
 
-holdCanvasWidget :: forall t m. (MonadWidget t m)
+holdCanvasWidget :: forall t m. (MonadWidget t m, HasPotato t m)
   => CanvasWidgetConfig t
   -> m (CanvasWidget t)
 holdCanvasWidget CanvasWidgetConfig {..} = mdo
+
+  potatostylebeh <- fmap _potatoConfig_style askPotato
+  potatostyle <- sample potatostylebeh
+
   -- ::draw the canvas::
   let
     renderedCanvas = _canvasWidgetConfig_renderedCanvas
@@ -71,7 +76,7 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
   pane canvasRegion (constDyn True) $ do
     text $ current (fmap renderedCanvasToText renderedCanvas)
   -- TODO proper handle Attr
-  tellImages $ ffor3 (current _canvasWidgetConfig_handles) (constant V.defAttr) (current canvasRegion')
+  tellImages $ ffor3 (current _canvasWidgetConfig_handles) (fmap _potatoStyle_canvasCursor potatostylebeh) (current canvasRegion')
     $ \(HandlerRenderOutput hs) attr (LBox (V2 px py) _)-> fmap (\(LBox (V2 x y) (V2 w h)) -> V.translate (x+px) (y+py) $ V.charFill attr 'X' w h) hs
 
   inp <- makeLMouseDataInputEv 0 False

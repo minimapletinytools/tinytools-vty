@@ -16,6 +16,7 @@ import           Test.HUnit
 
 import           Potato.Flow.Vty.Params
 import Potato.Flow
+import Potato.Flow.Vty.PotatoReader
 
 import           Control.Monad.IO.Class     (liftIO)
 import           Control.Monad.Ref
@@ -43,7 +44,7 @@ $(declareStuff "ParamsNetwork"
       do
         setSelectionDyn <- holdDyn isParliament_empty $(tinput "ParamsNetwork" "setSelection")
         setCanvasDyn <- holdDyn (SCanvas (LBox (V2 0 0) (V2 100 100))) $(tinput "ParamsNetwork" "setCanvas")
-        paramsWidget <- holdParamsWidget $ ParamsWidgetConfig {
+        paramsWidget <- runPotatoReader def $ holdParamsWidget $ ParamsWidgetConfig {
             _paramsWidgetConfig_selectionDyn = setSelectionDyn
             , _paramsWidgetConfig_canvasDyn = setCanvasDyn
           }
