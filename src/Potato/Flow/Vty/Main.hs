@@ -274,6 +274,7 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
 
   -- define main panels
   let
+    hdivider = (grout. fixed) 1 $ fill (constant '-')
     leftPanel = initLayout $ col $ do
       (grout . fixed) 1 $ row $ do
         (grout . stretch) 1 $ do
@@ -292,12 +293,17 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
           performEvent_ $ ffor saveEv $ \rc -> do
              let t = renderedCanvasToText rc
              liftIO $ T.writeFile "potato.txt" t
-      (grout . fixed) 3 $ debugStream [
+      (grout . fixed) 1 $ debugStream [
         never
         ]
-      tools' <- (grout . fixed) 6 $ holdToolsWidget $  ToolWidgetConfig {
+
+      hdivider
+
+      tools' <- (grout . fixed) 3 $ holdToolsWidget $  ToolWidgetConfig {
           _toolWidgetConfig_tool =  _goatWidget_tool everythingW
         }
+
+      hdivider
 
       -- TODO Layout stuff messes up your mouse assumptions. You need to switch Layout to use pane2 D:
       layers' <- (grout . stretch) 1 $ holdLayerWidget $ LayerWidgetConfig {
@@ -305,9 +311,15 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
             , _layerWidgetConfig_layersView = _goatWidget_layersHandlerRenderOutput everythingW
             , _layerWidgetConfig_selection = _goatWidget_selection  everythingW
           }
+
+      hdivider
+
       _ <- (grout . fixed) 5 $ holdInfoWidget $ InfoWidgetConfig {
           _infoWidgetConfig_selection = _goatWidget_selection everythingW
         }
+
+      hdivider
+
       params' <- (grout . fixed) 10 $ holdParamsWidget $ ParamsWidgetConfig {
           _paramsWidgetConfig_selectionDyn = _goatWidget_selection everythingW
           , _paramsWidgetConfig_canvasDyn = _goatWidget_canvas everythingW
