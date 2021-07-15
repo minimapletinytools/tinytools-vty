@@ -260,6 +260,8 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
         , _goatWidgetConfig_mouse = leftmostWarn "mouse" [_layerWidget_mouse layersW, _canvasWidget_mouse canvasW]
         , _goatWidgetConfig_keyboard = keyboardEv
 
+        , _goatWidgetConfig_canvasRegionDim = _canvasWidget_regionDim canvasW
+
         , _goatWidgetConfig_selectTool = _toolWidget_setTool toolsW
         , _goatWidgetConfig_paramsEvent = _paramsWidget_paramsEvent paramsW
         , _goatWidgetConfig_canvasSize = _paramsWidget_canvasSizeEvent paramsW
@@ -358,7 +360,8 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
 
 
   -- render various popups
-  (_, popupStateDyn1) <- popupPaneSimple def (postBuildEv $> welcomeWidget)
+  --(_, popupStateDyn1) <- popupPaneSimple def (postBuildEv $> welcomeWidget)
+  (_, popupStateDyn1) <- popupPaneSimple def (never $> welcomeWidget)
 
   let
     inputCapturedByPopupBeh = current . fmap getAny . mconcat . fmap (fmap Any) $ [popupStateDyn1]

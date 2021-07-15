@@ -32,8 +32,14 @@ import           Reflex.Vty
 defaultCanvasLBox :: LBox
 defaultCanvasLBox = LBox (V2 0 0) (V2 100 50)
 
+lBox_to_region :: LBox -> Region
+lBox_to_region (LBox (V2 x y) (V2 w h)) = Region x y w h
+
+region_to_lBox :: Region -> LBox
+region_to_lBox (Region x y w h) = (LBox (V2 x y) (V2 w h))
+
 dynLBox_to_dynRegion :: (Reflex t) => Dynamic t LBox -> Dynamic t Region
-dynLBox_to_dynRegion dlb = ffor dlb $ \(LBox (V2 x y) (V2 w h)) -> Region x y w h
+dynLBox_to_dynRegion dlb = ffor dlb $ lBox_to_region
 
 translate_dynRegion :: (Reflex t) => Dynamic t XY -> Dynamic t Region -> Dynamic t Region
 translate_dynRegion dpos dr = ffor2 dpos dr $ \(V2 x y) region -> region {
@@ -53,8 +59,10 @@ data CanvasWidgetConfig t = CanvasWidgetConfig {
   , _canvasWidgetConfig_handles        :: Dynamic t HandlerRenderOutput
 }
 
+
 data CanvasWidget t = CanvasWidget {
   _canvasWidget_mouse :: Event t LMouseData
+  , _canvasWidget_regionDim :: Event t XY
 }
 
 holdCanvasWidget :: forall t m. (MonadWidget t m, HasPotato t m)
@@ -65,19 +73,48 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
   potatostylebeh <- fmap _potatoConfig_style askPotato
   potatostyle <- sample potatostylebeh
 
+  dh <- displayHeight
+  dw <- displayWidth
+
   -- ::draw the canvas::
   let
-    renderedCanvas = _canvasWidgetConfig_renderedCanvas
-    canvasRegion' = ffor2 _canvasWidgetConfig_pan renderedCanvas $ \pan rc -> pan_lBox pan (renderedCanvas_box rc)
-    canvasRegion = dynLBox_to_dynRegion canvasRegion'
-    --canvasRegion = translate_dynRegion _canvasWidgetConfig_pan $ dynLBox_to_dynRegion (fmap renderedCanvas_box renderedCanvas)
-  fill (constant '░')
-  -- TODO render out of bounds stuff with gray background or whatveer
-  pane canvasRegion (constDyn True) $ do
-    text $ current (fmap renderedCanvasToText renderedCanvas)
-  -- TODO proper handle Attr
-  tellImages $ ffor3 (current _canvasWidgetConfig_handles) (fmap _potatoStyle_canvasCursor potatostylebeh) (current canvasRegion')
+    -- the screen region
+    screenRegion' = ffor2 dw dh (\w h -> LBox 0 (V2 w h))
+    -- the screen region in canvas space
+    canvasScreenRegion' = traceDyn "screen" $ fmap _renderedCanvas_box _canvasWidgetConfig_renderedCanvas
+
+    -- true region is the canvas region translated and cropped to the panned screen (i.e. the region the canvas exists on the physics screen)
+    maybeCropAndPan pan scanvas screen = maybe (LBox 0 0) (pan_lBox pan) $ intersect_lBox screen (_sCanvas_box scanvas)
+    trueRegion' = ffor3 _canvasWidgetConfig_pan _canvasWidgetConfig_canvas canvasScreenRegion' maybeCropAndPan
+    trueRegion = dynLBox_to_dynRegion trueRegion'
+    oobRegions' = ffor2 screenRegion' trueRegion' $ \sc tr -> substract_lBox sc tr
+    oobRegions = traceDyn "oob" $ fmap (fmap lBox_to_region) oobRegions'
+
+    -- reg is in screen space so we need to translate back to canvas space by undoing the pan
+    renderRegionFn pan reg rc = renderedCanvasRegionToText (pan_lBox (-pan) (region_to_lBox reg)) rc
+
+    renderRegion dreg = pane dreg (constDyn True) $ do
+      text . current . ffor3 _canvasWidgetConfig_pan dreg _canvasWidgetConfig_renderedCanvas $ renderRegionFn
+
+  -- TODO use correct theme
+  localTheme (const (fmap _potatoStyle_softSelected potatostylebeh)) $ do
+    fill (constant ' ')
+    simpleList oobRegions renderRegion
+
+  renderRegion trueRegion
+
+
+
+  tellImages $ ffor3 (current _canvasWidgetConfig_handles) (fmap _potatoStyle_canvasCursor potatostylebeh) (current trueRegion')
     $ \(HandlerRenderOutput hs) attr (LBox (V2 px py) _)-> fmap (\(LBox (V2 x y) (V2 w h)) -> V.translate (x+px) (y+py) $ V.charFill attr 'X' w h) hs
 
   inp <- makeLMouseDataInputEv 0 False
-  return $ CanvasWidget inp
+  postBuildEv <- getPostBuild
+
+  let
+    regionDimDyn = ffor2 dw dh V2
+    regionDimEv = updated regionDimDyn
+    forceDimEv = pushAlways (\_ -> sample . current $ regionDimDyn) postBuildEv
+
+
+  return $ CanvasWidget inp (leftmost [regionDimEv, forceDimEv])

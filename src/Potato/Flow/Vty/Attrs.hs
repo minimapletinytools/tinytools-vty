@@ -47,3 +47,14 @@ lg_canvas_cursor = Attr {
   , attrBackColor = SetTo brightMagenta
   , attrURL = Default
 }
+
+lg_canvas_default :: Attr
+lg_canvas_default = lg_default
+
+lg_canvas_oob :: Attr
+lg_canvas_oob = Attr {
+  attrStyle = SetTo defaultStyleMask
+  , attrForeColor = SetTo black
+  , attrBackColor = SetTo brightWhite
+  , attrURL = Default
+}
