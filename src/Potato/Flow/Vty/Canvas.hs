@@ -92,7 +92,7 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
     -- reg is in screen space so we need to translate back to canvas space by undoing the pan
     renderRegionFn pan reg rc = renderedCanvasRegionToText (pan_lBox (-pan) (region_to_lBox reg)) rc
 
-    renderRegion dreg = pane dreg (constDyn True) $ do
+    renderRegion dreg = pane dreg (constDyn False) $ do
       text . current . ffor3 _canvasWidgetConfig_pan dreg _canvasWidgetConfig_renderedCanvas $ renderRegionFn
 
   -- TODO use correct theme
@@ -103,9 +103,15 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
   renderRegion trueRegion
 
 
+  let
+    makerhimage attr' (LBox (V2 px py) _) rh = r where
+      LBox (V2 x y) (V2 w h) = _renderHandle_box rh
+      rc = fromMaybe ' ' $ _renderHandle_char rh
+      attr = attr' -- TODO eventually RenderHandle may be styled somehow
+      r = V.translate (x+px) (y+py) $ V.charFill attr rc w h
 
   tellImages $ ffor3 (current _canvasWidgetConfig_handles) (fmap _potatoStyle_canvasCursor potatostylebeh) (current trueRegion')
-    $ \(HandlerRenderOutput hs) attr (LBox (V2 px py) _)-> fmap (\(LBox (V2 x y) (V2 w h)) -> V.translate (x+px) (y+py) $ V.charFill attr 'X' w h) hs
+    $ \(HandlerRenderOutput hs) attr reg -> fmap (makerhimage attr reg) hs
 
   inp <- makeLMouseDataInputEv 0 False
   postBuildEv <- getPostBuild

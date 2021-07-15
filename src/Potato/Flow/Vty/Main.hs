@@ -257,7 +257,7 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
         , _goatWidgetConfig_load = fmapMaybe id mLoadFileEv
 
         -- canvas direct input
-        , _goatWidgetConfig_mouse = leftmostWarn "mouse" [_layerWidget_mouse layersW, _canvasWidget_mouse canvasW]
+        , _goatWidgetConfig_mouse = leftmostWarn "mouse" [(_layerWidget_mouse layersW), (_canvasWidget_mouse canvasW)]
         , _goatWidgetConfig_keyboard = keyboardEv
 
         , _goatWidgetConfig_canvasRegionDim = _canvasWidget_regionDim canvasW
