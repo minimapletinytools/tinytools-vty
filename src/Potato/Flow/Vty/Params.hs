@@ -293,23 +293,22 @@ holdSuperStyleWidget inputDyn = constDyn $ mdo
       -- TODO also a toggle for setting corners to common sets
       let
         mssDyn = fmap snd inputDyn
-      -- TODO change this so it's left to right
       -- TODO arrow nav would be super cool
       noRepeatNavigation
       (focusDyn,tl,v,bl,h,f,tr,br) <- col $ do
-        (tile . fixed) 1 emptyWidget -- just to make a space
+        (grout . fixed) 1 emptyWidget -- just to make a space
         --(tile . fixed) 1 $ text (fmap (T.pack . superStyle_toListFormat . Data.Maybe.fromJust) $ current mssDyn)
-        (tl'',h'',tr'') <- (tile . fixed) 1 $ row $ do
+        (tl'',h'',tr'') <- (grout . fixed) 1 $ row $ do
           tl' <- (tile . fixed) 1 $ makeSuperStyleTextEntry SSC_TL mssDyn
           h' <- (tile . fixed) 1 $ makeSuperStyleTextEntry SSC_H mssDyn
           tr' <- (tile . fixed) 1 $ makeSuperStyleTextEntry SSC_TR mssDyn
           return (tl',h',tr')
-        (v'',f'') <- (tile . fixed) 1 $ row $ do
+        (v'',f'') <- (grout . fixed) 1 $ row $ do
           v' <- (tile . fixed) 1 $ makeSuperStyleTextEntry SSC_V mssDyn
           f' <- (tile . fixed) 1 $ makeSuperStyleTextEntry SSC_Fill mssDyn
           _ <- (grout . fixed) 1 $ emptyWidget -- TODO you can modify this too, why not, 2 boxes for the same thing
           return (v',f')
-        (bl'',br'') <- (tile . fixed) 1 $ row $ do
+        (bl'',br'') <- (grout . fixed) 1 $ row $ do
           bl' <- (tile . fixed) 1 $ makeSuperStyleTextEntry SSC_BL mssDyn
           _ <- (grout . fixed) 1 $ emptyWidget -- TODO you can modify this too, why not, 2 boxes for the same thing
           br' <- (tile . fixed) 1 $ makeSuperStyleTextEntry SSC_BR mssDyn
