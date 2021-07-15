@@ -61,6 +61,7 @@ instance HasPotato t m => HasPotato t (Input t m)
 instance HasPotato t m => HasPotato t (ImageWriter t m)
 instance HasPotato t m => HasPotato t (DisplayRegion t m)
 instance HasPotato t m => HasPotato t (FocusReader t m)
+instance HasPotato t m => HasPotato t (Focus t m)
 
 instance HasPotato t m => HasPotato t (Layout t m) where
   askPotato = lift askPotato

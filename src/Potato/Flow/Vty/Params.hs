@@ -18,6 +18,7 @@ import           Potato.Flow
 import           Potato.Flow.Vty.Common
 import           Potato.Reflex.Vty.Helpers
 import Potato.Flow.Vty.PotatoReader
+import Potato.Flow.Vty.Attrs
 
 import           Control.Monad.Fix
 import           Control.Monad.NodeId
@@ -39,7 +40,7 @@ import           Reflex.Network
 import           Reflex.Potato.Helpers
 import           Reflex.Vty
 
--- TODO need to add initManager_ calls
+deriving instance Show FocusId
 
 
 -- | Default vty event handler for text inputs
@@ -182,10 +183,13 @@ singleCellTextInput modifyEv c0 = do
 
 -- remember that input dyn can't update the same time the output updates or you will have infinite loop
 dimensionInput
-  :: (MonadWidget t m)
+  :: (MonadWidget t m, HasPotato t m)
   => Dynamic t Int
   -> m (Dynamic t Int)
 dimensionInput valueDyn = do
+
+
+
   let
     toText = TZ.fromText . show
     modifyEv = fmap (\v -> const (toText v)) (updated valueDyn)
@@ -205,6 +209,10 @@ textInputCustom modifyEv c0 = mdo
   f <- focus
   dh <- displayHeight
   dw <- displayWidth
+
+  --potatostyle <- askPotato >>=  sample . _potatoConfig_style
+
+
   rec v <- foldDyn ($) c0 $ mergeWith (.)
         [ modifyEv
         , let displayInfo = current rows
@@ -213,8 +221,8 @@ textInputCustom modifyEv c0 = mdo
         ]
       click <- mouseDown V.BLeft
       let
-        -- TODO generate cursor attributes from theme
-        cursorAttributes = V.defAttr
+        -- TODO pull from potato style
+        cursorAttributes = lg_layer_selected
         cursorAttrs = ffor f $ \x -> if x then cursorAttributes else V.defAttr
       let rows = (\w s c -> TZ.displayLines w V.defAttr c s)
             <$> dw
@@ -421,7 +429,7 @@ holdSBoxTypeWidget inputDyn = constDyn $ do
   -- TODO
   return (2, never, never)
 
-holdCanvasSizeWidget :: forall t m. (MonadLayoutWidget t m) => Dynamic t SCanvas -> ParamsWidgetFn t m () XY
+holdCanvasSizeWidget :: forall t m. (MonadLayoutWidget t m, HasPotato t m) => Dynamic t SCanvas -> ParamsWidgetFn t m () XY
 holdCanvasSizeWidget canvasDyn nothingDyn = ffor nothingDyn $ \_ -> do
   let
     cSizeDyn = fmap (_lBox_size . _sCanvas_box) canvasDyn
@@ -429,10 +437,10 @@ holdCanvasSizeWidget canvasDyn nothingDyn = ffor nothingDyn $ \_ -> do
     cHeightDyn = fmap (\(V2 _ y) -> y) cSizeDyn
   noRepeatNavigation
   (focusDyn,wDyn,hDyn) <- col $ do
-    wDyn' <- (tile . fixed) 1 $ row $ do
+    wDyn' <- (grout . fixed) 1 $ row $ do
       (grout . fixed) 8 $ text " width:"
       (tile . stretch) 1 $ dimensionInput cWidthDyn
-    hDyn' <- (tile . fixed) 1 $ row $ do
+    hDyn' <- (grout . fixed) 1 $ row $ do
       (grout . fixed) 8 $ text "height:"
       (tile . stretch) 1 $ dimensionInput cHeightDyn
     focusDyn' <- focusedId
@@ -446,8 +454,11 @@ holdCanvasSizeWidget canvasDyn nothingDyn = ffor nothingDyn $ \_ -> do
       return $ if cw /= w || ch /= h
         then Just $ V2 (w-cw) (h-ch) -- it's a delta D:
         else Nothing
-
-    captureEv = leftmost [void outputEv, void (updated wDyn), void (updated hDyn)]
+  captureEv1 <- singleCharacterCapture
+  let
+    -- causes causality loop idk why :(
+    --captureEv = leftmost [void outputEv, void (updated wDyn), void (updated hDyn)]
+    captureEv = leftmost [void outputEv, captureEv1]
   return (2, captureEv, outputEv)
 
 data SEltParams = SEltParams {
@@ -522,12 +533,12 @@ holdParamsWidget ParamsWidgetConfig {..} = do
         Just csw -> mdo
           (cssz, csCaptureEv', cssev') <- (tile . fixed) cssz csw
           return (cssev', csCaptureEv')
-      return $ (leftmostWarn "paramsLayout" (fmap fst outputs), leftmostWarn "paramsCapture" (fmap snd outputs), cssev)
+      return $ (leftmostWarn "paramsLayout" (fmap fst outputs), leftmostWarn "paramsCapture" (captureEv2 : fmap snd outputs), cssev)
 
     return (paramsOutputEv', captureEv', canvasSizeOutputEv')
 
   return ParamsWidget {
     _paramsWidget_paramsEvent = paramsOutputEv
     , _paramsWidget_canvasSizeEvent = canvasSizeOutputEv
-    , _paramsWidget_captureInputEv = captureEv
+    , _paramsWidget_captureInputEv = traceEvent "final capture" captureEv
   }

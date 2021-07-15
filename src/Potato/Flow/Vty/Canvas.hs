@@ -81,14 +81,14 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
     -- the screen region
     screenRegion' = ffor2 dw dh (\w h -> LBox 0 (V2 w h))
     -- the screen region in canvas space
-    canvasScreenRegion' = traceDyn "screen" $ fmap _renderedCanvasRegion_box _canvasWidgetConfig_renderedCanvas
+    canvasScreenRegion' = fmap _renderedCanvasRegion_box _canvasWidgetConfig_renderedCanvas
 
     -- true region is the canvas region translated and cropped to the panned screen (i.e. the region the canvas exists on the physics screen)
     maybeCropAndPan pan scanvas screen = maybe (LBox 0 0) (pan_lBox pan) $ intersect_lBox screen (_sCanvas_box scanvas)
     trueRegion' = ffor3 _canvasWidgetConfig_pan _canvasWidgetConfig_canvas canvasScreenRegion' maybeCropAndPan
     trueRegion = dynLBox_to_dynRegion trueRegion'
     oobRegions' = ffor2 screenRegion' trueRegion' $ \sc tr -> substract_lBox sc tr
-    oobRegions = traceDyn "oob" $ fmap (fmap lBox_to_region) oobRegions'
+    oobRegions = fmap (fmap lBox_to_region) oobRegions'
 
     -- reg is in screen space so we need to translate back to canvas space by undoing the pan
     renderRegionFn pan reg rc = renderedCanvasRegionToText (pan_lBox (-pan) (region_to_lBox reg)) rc
