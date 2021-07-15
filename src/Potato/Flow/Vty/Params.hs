@@ -92,7 +92,7 @@ paramsNavigation = do
   back <- fmap (const (-1)) <$> key V.KBackTab
   return $ leftmost [fwd, back]
 
--- TODO figure out how to do norepeat
+-- TODO figure out how to do norepeat, also why does this norepeat actually not repeat for super style widget?
 noRepeatNavigation :: (MonadWidget t m, HasFocus t m) => m ()
 noRepeatNavigation = do
   navEv <- paramsNavigation
@@ -172,7 +172,7 @@ updateFromSuperStyle ssc = TZ.top . TZ.fromText . T.singleton . gettfn ssc where
       _ -> Nothing) . _superStyle_fill
 
 singleCellTextInput
-  :: (MonadWidget t m)
+  :: (MonadWidget t m, HasPotato t m)
   => Event t (TZ.TextZipper -> TZ.TextZipper)
   -> TZ.TextZipper
   -> m (Dynamic t Text)
@@ -201,7 +201,7 @@ dimensionInput valueDyn = do
 
 -- TODO use theming here
 textInputCustom
-  :: (MonadWidget t m)
+  :: (MonadWidget t m, HasPotato t m)
   => Event t (TZ.TextZipper -> TZ.TextZipper)
   -> TZ.TextZipper
   -> m (Dynamic t Text)
@@ -210,8 +210,13 @@ textInputCustom modifyEv c0 = mdo
   dh <- displayHeight
   dw <- displayWidth
 
-  --potatostyle <- askPotato >>=  sample . _potatoConfig_style
+  -- TODO do this without sampling (I think this will not update if you change style without recreating these widgets)
+  -- (you could do this easily by using localTheme)
+  potatostyle <- askPotato >>=  sample . _potatoConfig_style
 
+  let
+    cursorAttributes = _potatoStyle_selected potatostyle
+    normalAttributes = _potatoStyle_normal potatostyle
 
   rec v <- foldDyn ($) c0 $ mergeWith (.)
         [ modifyEv
@@ -221,10 +226,8 @@ textInputCustom modifyEv c0 = mdo
         ]
       click <- mouseDown V.BLeft
       let
-        -- TODO pull from potato style
-        cursorAttributes = lg_layer_selected
-        cursorAttrs = ffor f $ \x -> if x then cursorAttributes else V.defAttr
-      let rows = (\w s c -> TZ.displayLines w V.defAttr c s)
+        cursorAttrs = ffor f $ \x -> if x then cursorAttributes else normalAttributes
+      let rows = (\w s c -> TZ.displayLines w normalAttributes c s)
             <$> dw
             <*> (TZ.mapZipper <$> (constDyn id) <*> v)
             <*> cursorAttrs
@@ -233,7 +236,7 @@ textInputCustom modifyEv c0 = mdo
   return $ TZ.value <$> v
 
 
-makeSuperStyleTextEntry :: (MonadWidget t m) => SuperStyleCell -> Dynamic t (Maybe SuperStyle) -> m (Behavior t PChar)
+makeSuperStyleTextEntry :: (MonadWidget t m, HasPotato t m) => SuperStyleCell -> Dynamic t (Maybe SuperStyle) -> m (Behavior t PChar)
 makeSuperStyleTextEntry ssc mssDyn = do
   mss0 <- sample . current $ mssDyn
   let modifyEv = (fmap (maybe id (\ss -> const (updateFromSuperStyle ssc ss))) (updated mssDyn))
@@ -273,7 +276,7 @@ makeSuperStyleEvent tl v bl h f tr br trig = pushAlways pushfn trig where
         , _superStyle_fill       = FillStyle_Simple f'
       }
 
-holdSuperStyleWidget :: forall t m. (MonadLayoutWidget t m) => ParamsWidgetFn t m SuperStyle ControllersWithId
+holdSuperStyleWidget :: forall t m. (MonadLayoutWidget t m, HasPotato t m) => ParamsWidgetFn t m SuperStyle ControllersWithId
 holdSuperStyleWidget inputDyn = constDyn $ mdo
 
   typeChoiceDyn <- radioListSimple 0 ["custom", "presets"]
@@ -539,5 +542,5 @@ holdParamsWidget ParamsWidgetConfig {..} = do
   return ParamsWidget {
     _paramsWidget_paramsEvent = paramsOutputEv
     , _paramsWidget_canvasSizeEvent = canvasSizeOutputEv
-    , _paramsWidget_captureInputEv = traceEvent "final capture" captureEv
+    , _paramsWidget_captureInputEv = captureEv
   }

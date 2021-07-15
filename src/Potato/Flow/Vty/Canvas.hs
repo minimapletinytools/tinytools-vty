@@ -71,7 +71,6 @@ holdCanvasWidget :: forall t m. (MonadWidget t m, HasPotato t m)
 holdCanvasWidget CanvasWidgetConfig {..} = mdo
 
   potatostylebeh <- fmap _potatoConfig_style askPotato
-  potatostyle <- sample potatostylebeh
 
   dh <- displayHeight
   dw <- displayWidth

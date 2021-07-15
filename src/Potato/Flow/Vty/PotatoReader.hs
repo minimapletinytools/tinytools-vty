@@ -52,6 +52,10 @@ class (Reflex t, Monad m) => HasPotato t m | m -> t where
 instance (HasInput t m, Monad m) => HasInput t (ReaderT x m)
 instance (HasFocus t m, Monad m) => HasFocus t (ReaderT x m)
 
+-- can you get this to work?
+--instance (HasPotato t m, (Monad (mt m)), MonadTrans mt) => HasPotato t (mt m) where
+--  askPotato = lift askPotato
+
 instance HasPotato t m => HasPotato t (ReaderT x m)
 instance HasPotato t m => HasPotato t (BehaviorWriterT t x m)
 instance HasPotato t m => HasPotato t (DynamicWriterT t x m)
@@ -61,10 +65,11 @@ instance HasPotato t m => HasPotato t (Input t m)
 instance HasPotato t m => HasPotato t (ImageWriter t m)
 instance HasPotato t m => HasPotato t (DisplayRegion t m)
 instance HasPotato t m => HasPotato t (FocusReader t m)
-instance HasPotato t m => HasPotato t (Focus t m)
-
+instance HasPotato t m => HasPotato t (Focus t m) where
+  askPotato = lift askPotato
 instance HasPotato t m => HasPotato t (Layout t m) where
   askPotato = lift askPotato
+
 
 -- | A widget that has access to information about whether it is focused
 newtype PotatoReader t m a = PotatoReader
