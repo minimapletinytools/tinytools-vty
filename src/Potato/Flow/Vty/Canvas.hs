@@ -54,7 +54,7 @@ data CanvasWidgetConfig t = CanvasWidgetConfig {
   _canvasWidgetConfig_pan            :: Dynamic t XY
   -- TODO DELETE
   , _canvasWidgetConfig_broadPhase     :: Dynamic t BroadPhaseState
-  , _canvasWidgetConfig_renderedCanvas :: Dynamic t RenderedCanvas
+  , _canvasWidgetConfig_renderedCanvas :: Dynamic t RenderedCanvasRegion
   , _canvasWidgetConfig_canvas         :: Dynamic t SCanvas
   , _canvasWidgetConfig_handles        :: Dynamic t HandlerRenderOutput
 }
@@ -81,7 +81,7 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
     -- the screen region
     screenRegion' = ffor2 dw dh (\w h -> LBox 0 (V2 w h))
     -- the screen region in canvas space
-    canvasScreenRegion' = traceDyn "screen" $ fmap _renderedCanvas_box _canvasWidgetConfig_renderedCanvas
+    canvasScreenRegion' = traceDyn "screen" $ fmap _renderedCanvasRegion_box _canvasWidgetConfig_renderedCanvas
 
     -- true region is the canvas region translated and cropped to the panned screen (i.e. the region the canvas exists on the physics screen)
     maybeCropAndPan pan scanvas screen = maybe (LBox 0 0) (pan_lBox pan) $ intersect_lBox screen (_sCanvas_box scanvas)
