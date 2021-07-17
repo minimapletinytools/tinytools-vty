@@ -122,7 +122,7 @@ instance HasImageWriter t m => HasImageWriter t (PotatoReader t m) where
 -- default input :: (f m' ~ m, Monad m', MonadTrans f, HasInput t m') => ...
 -- inside of HasLayout class
 instance (Reflex t, HasLayout t m) => HasLayout t (PotatoReader t m) where
-  axis a b c = PotatoReader . ReaderT $ \pcfg -> axis a b (runPotatoReader pcfg c)
+  axis a b c = PotatoReader . ReaderT $ \pcfg -> axis a b (runPotatoReader c pcfg)
   region = lift . region
   askOrientation = lift askOrientation
 
@@ -143,7 +143,7 @@ instance MonadNodeId m => MonadNodeId (PotatoReader t m)
 -- TODO flip arg order to match ReaderT oops...
 runPotatoReader
   :: (Reflex t, Monad m)
-  => PotatoConfig t
-  -> PotatoReader t m a
+  => PotatoReader t m a
+  -> PotatoConfig t
   -> m a
-runPotatoReader b = flip runReaderT b . unPotatoReader
+runPotatoReader a b = flip runReaderT b $ unPotatoReader a
