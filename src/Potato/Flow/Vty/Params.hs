@@ -126,7 +126,7 @@ type MaybeParamsWidgetOutputDyn t m b = Dynamic t (Maybe (m (Dynamic t Int, Even
 type ParamsWidgetOutputDyn t m b = Dynamic t (m (Dynamic t Int, Event t (), Event t b))
 type ParamsWidgetFn t m a b = Dynamic t (Selection, Maybe a) -> ParamsWidgetOutputDyn t m b
 
-networkParamsWidgetOutputDynForTesting :: (MonadWidget t m) => ParamsWidgetOutputDyn t m b -> m (Dynamic t Int, Event t (), Event t b)
+networkParamsWidgetOutputDynForTesting :: (MonadWidget t m, HasPotato t m) => ParamsWidgetOutputDyn t m b -> m (Dynamic t Int, Event t (), Event t b)
 networkParamsWidgetOutputDynForTesting p = do
   out' <- networkView p
   outHeightDyn <- holdDyn (constDyn 0) $ fmap fst3 out'

@@ -49,12 +49,20 @@ instance (Reflex t) =>  Default (PotatoConfig t) where
 class (Reflex t, Monad m) => HasPotato t m | m -> t where
   askPotato :: m (PotatoConfig t)
 
-instance (HasInput t m, Monad m) => HasInput t (ReaderT x m)
-instance (HasFocus t m, Monad m) => HasFocus t (ReaderT x m)
+instance (HasInput t m, Monad m) => HasInput t (ReaderT r m)
 
--- can you get this to work?
---instance (HasPotato t m, (Monad (mt m)), MonadTrans mt) => HasPotato t (mt m) where
---  askPotato = lift askPotato
+
+-- TODO it's better to do this using
+-- default input :: (f m' ~ m, Monad m', MonadTrans f, HasInput t m') => ...
+-- inside of HasFocus class
+instance (Reflex t, HasFocus t m, Monad m) => HasFocus t (ReaderT r m) where
+  makeFocus = lift makeFocus
+  requestFocus = lift . requestFocus
+  isFocused = lift . isFocused
+  --subFoci :: m a -> m (a, Dynamic t FocusSet)
+  subFoci x = ReaderT $ \r -> subFoci (runReaderT x r)
+  focusedId = lift focusedId
+
 
 instance HasPotato t m => HasPotato t (ReaderT x m)
 instance HasPotato t m => HasPotato t (BehaviorWriterT t x m)
@@ -110,6 +118,14 @@ instance HasImageWriter t m => HasImageWriter t (PotatoReader t m) where
     hoistpotato g = PotatoReader . (hoist g) . unPotatoReader
     hoist nat m = ReaderT (\i -> nat (runReaderT m i))
 
+-- TODO it's better to do this using
+-- default input :: (f m' ~ m, Monad m', MonadTrans f, HasInput t m') => ...
+-- inside of HasLayout class
+instance (Reflex t, HasLayout t m) => HasLayout t (PotatoReader t m) where
+  axis a b c = PotatoReader . ReaderT $ \pcfg -> axis a b (runPotatoReader pcfg c)
+  region = lift . region
+  askOrientation = lift askOrientation
+
 instance (Adjustable t m, MonadFix m, MonadHold t m) => Adjustable t (PotatoReader t m) where
   runWithReplace (PotatoReader a) e = PotatoReader $ runWithReplace a $ fmap unPotatoReader e
   traverseIntMapWithKeyWithAdjust f m e = PotatoReader $ traverseIntMapWithKeyWithAdjust (\k v -> unPotatoReader $ f k v) m e
@@ -122,7 +138,9 @@ instance MonadTrans (PotatoReader t) where
 
 instance MonadNodeId m => MonadNodeId (PotatoReader t m)
 
+
 -- | Run a 'FocusReader' action with the given focus value
+-- TODO flip arg order to match ReaderT oops...
 runPotatoReader
   :: (Reflex t, Monad m)
   => PotatoConfig t
