@@ -22,6 +22,7 @@ import           Potato.Flow.Vty.PotatoReader
 import           Potato.Flow.Vty.Tools
 import           Potato.Reflex.Vty.Helpers
 import           Potato.Reflex.Vty.Widget.Popup
+import           Potato.Reflex.Vty.Widget.FileExplorer
 import           Potato.Reflex.Vty.Widget
 import qualified Potato.Reflex.Vty.Host
 
@@ -359,9 +360,16 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
       return (kb, stuff)
 
 
+  let
+    testFileExplorerWiget = boxTitle (constant def) "😱😱😱" $ do
+      holdFileExplorerWidget $ FileExplorerWidgetConfig (const True) "/"
+      return never
+  _ <- popupPaneSimple def (postBuildEv $> testFileExplorerWiget)
+
   -- render various popups
   --(_, popupStateDyn1) <- popupPaneSimple def (postBuildEv $> welcomeWidget)
   (_, popupStateDyn1) <- popupPaneSimple def (never $> welcomeWidget)
+
 
   let
     inputCapturedByPopupBeh = current . fmap getAny . mconcat . fmap (fmap Any) $ [popupStateDyn1]

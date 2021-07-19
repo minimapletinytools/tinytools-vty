@@ -87,5 +87,5 @@ popupPaneSimple :: forall t m a. (MonadWidget t m)
   -> Event t (m (Event t a)) -- ^ when inner event fires, popup is disabled
   -> m (Event t a, Dynamic t Bool) -- ^ (inner widget event, popup state)
 popupPaneSimple size widgetEv = popupPane size fancyWidgetEv where
-  fmapfn w = \escEv clickOutsideEv -> fmap (\outputEv -> (leftmost [escEv, clickOutsideEv, void outputEv], outputEv)) w
+  fmapfn w = \escEv clickOutsideEv -> fmap (\outputEv -> (leftmost [traceEvent "esc" escEv, traceEvent "outside" clickOutsideEv, traceEvent "void" $ void outputEv], outputEv)) w
   fancyWidgetEv = fmap fmapfn widgetEv
