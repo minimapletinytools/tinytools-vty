@@ -42,8 +42,6 @@ import           Reflex.Vty
 
 deriving instance Show FocusId
 
-
--- | Default vty event handler for text inputs
 updateTextZipperForSingleCharacter
   :: V.Event -- ^ The vty event to handle
   -> TZ.TextZipper -- ^ The zipper to modify

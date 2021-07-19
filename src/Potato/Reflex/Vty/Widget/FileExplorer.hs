@@ -99,7 +99,7 @@ holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
       "." -> old
       ".." -> FP.takeDirectory old
       _ -> new
-  dirDyn <- foldDyn foldDirDynFn "" (leftmost [pb $> _fileExplorerWidgetConfig_initialDirectory, clickFolderEvent])
+  dirDyn <- foldDyn foldDirDynFn "" (leftmost [pb $> _fileExplorerWidgetConfig_initialDirectory, clickFolderEvent, setFolderEvent])
   fetchDirComplete <- fetchDirectory (updated dirDyn)
   dirContentsDyn <- holdDyn [] fetchDirComplete
 
@@ -122,11 +122,20 @@ holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
             then return $ (click $> Right path)
             else return never
 
-  clickEvents <- initLayout $ col $ do
-    (grout . fixed) 3 $ box (constant singleBoxStyle) $ do
+  (clickEvents, setFolderRawEvent) <- initLayout $ col $ do
+    setFolderRawEvent' <- (grout . fixed) 3 $ box (constant singleBoxStyle) $ do
+      -- one of TZ inputs should be (updated dirDyn)
       text (constant "TODO INPUT BOX GOES HERE")
+      -- TODO set folder event via text input
+      return (never :: Event t FP.FilePath)
     clickEvents' <- networkView (ffor2 (traceDyn "poop" vScrollDyn) dirContentsDyn dirWidget)
-    return clickEvents'
+    return (clickEvents', setFolderRawEvent')
+
+  mSetFolderEvent <- performEvent $ ffor setFolderRawEvent $ \dir -> liftIO $ do
+    exists <- FP.doesDirectoryExist dir
+    if exists then return $ Just dir else return Nothing
+  let
+    setFolderEvent = fmapMaybe id mSetFolderEvent
 
 
   clickEvent :: Event t (Either FP.FilePath FP.FilePath) <- switchHold never $ (fmap leftmost clickEvents)
