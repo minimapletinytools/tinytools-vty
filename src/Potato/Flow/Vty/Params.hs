@@ -214,7 +214,7 @@ holdSuperStyleWidget inputDyn = constDyn $ mdo
           return (bl',br')
         focusDyn' <- focusedId
         return (focusDyn',tl'',v'',bl'',h'',f'',tr'',br'')
-      captureEv1 <- singleCharacterCapture
+      captureEv1 <- makeCaptureFromUpdateTextZipperMethod updateTextZipperForSingleCharacter
 
 
       let
@@ -352,8 +352,7 @@ holdCanvasSizeWidget canvasDyn nothingDyn = ffor nothingDyn $ \_ -> do
       return $ if cw /= w || ch /= h
         then Just $ V2 (w-cw) (h-ch) -- it's a delta D:
         else Nothing
-  -- TODO prob want capture that matches dimensionInput
-  captureEv1 <- singleCharacterCapture
+  captureEv1 <- makeCaptureFromUpdateTextZipperMethod updateTextZipperForNumberInput
   let
     -- causes causality loop idk why :(
     --captureEv = leftmost [void outputEv, void (updated wDyn), void (updated hDyn)]

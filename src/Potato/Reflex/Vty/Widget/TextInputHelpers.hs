@@ -49,44 +49,28 @@ makeModifyEventFromUpdateTextZipperMethod ::
 makeModifyEventFromUpdateTextZipperMethod f = \ev -> fromMaybe id (f ev)
 
 
-updateTextZipperForSingleCharacter
-  :: V.Event -- ^ The vty event to handle
-  -> TZ.TextZipper -- ^ The zipper to modify
-  -> TZ.TextZipper
+updateTextZipperForSingleCharacter :: UpdateTextZipperMethod
 updateTextZipperForSingleCharacter ev = case ev of
-  V.EvKey (V.KChar '\t') [] -> id
-  V.EvKey (V.KChar k) [] -> const $ TZ.top $ TZ.insertChar k TZ.empty
-  V.EvKey V.KBS [] -> const TZ.empty
-  V.EvKey V.KDel [] -> const TZ.empty
-  V.EvKey (V.KChar 'u') [V.MCtrl] -> const TZ.empty
-  _ -> id
-
--- | capture matches updateTextZipperForSingleCharacter
-singleCharacterCapture :: (Reflex t, MonadFix m, MonadNodeId m, HasInput t m) => m (Event t ())
-singleCharacterCapture = do
-  inp <- input
-  return $ fforMaybe inp $ \case
-    V.EvKey (V.KChar '\t') [] -> Nothing
-    V.EvKey (V.KChar k) [] -> Just ()
-    V.EvKey V.KBS [] -> Just ()
-    V.EvKey V.KDel [] -> Just ()
-    V.EvKey (V.KChar 'u') [V.MCtrl] -> Just ()
-    _ -> Nothing
+  V.EvKey (V.KChar '\t') [] -> Just $ id
+  V.EvKey (V.KChar k) [] -> Just $ const $ TZ.top $ TZ.insertChar k TZ.empty
+  V.EvKey V.KBS [] -> Just $ const TZ.empty
+  V.EvKey V.KDel [] -> Just $ const TZ.empty
+  V.EvKey (V.KChar 'u') [V.MCtrl] -> Just $ const TZ.empty
+  _ -> Nothing
 
 updateTextZipperForNumberInput
-  :: V.Event -- ^ The vty event to handle
-  -> TZ.TextZipper -- ^ The zipper to modify
-  -> TZ.TextZipper
+  :: UpdateTextZipperMethod
 updateTextZipperForNumberInput ev = case ev of
-  V.EvKey (V.KChar k) [] | isNumber k -> TZ.insertChar k
-  V.EvKey V.KBS []                    -> TZ.deleteLeft
-  V.EvKey V.KDel []                   -> TZ.deleteRight
-  V.EvKey V.KLeft []                  -> TZ.left
-  V.EvKey V.KRight []                 -> TZ.right
-  V.EvKey V.KHome []                  -> TZ.home
-  V.EvKey V.KEnd []                   -> TZ.end
-  V.EvKey (V.KChar 'u') [V.MCtrl]     -> const TZ.empty
-  _                                   -> id
+  V.EvKey (V.KChar k) [] | isNumber k -> Just $ TZ.insertChar k
+  V.EvKey V.KBS []                    -> Just $ TZ.deleteLeft
+  V.EvKey V.KDel []                   -> Just $ TZ.deleteRight
+  V.EvKey V.KLeft []                  -> Just $ TZ.left
+  V.EvKey V.KRight []                 -> Just $ TZ.right
+  V.EvKey V.KHome []                  -> Just $ TZ.home
+  V.EvKey V.KEnd []                   -> Just $ TZ.end
+  V.EvKey (V.KChar 'u') [V.MCtrl]     -> Just $ const TZ.empty
+  _                                   -> Nothing
+
 
 singleCellTextInput
   :: (MonadWidget t m, HasPotato t m)
@@ -95,7 +79,7 @@ singleCellTextInput
   -> m (Dynamic t Text)
 singleCellTextInput modifyEv c0 = do
   i <- input
-  textInputCustom (mergeWith (.) [fmap updateTextZipperForSingleCharacter i, modifyEv]) c0
+  textInputCustom (mergeWith (.) [fmap (makeModifyEventFromUpdateTextZipperMethod updateTextZipperForSingleCharacter) i, modifyEv]) c0
 
 
 -- remember that input dyn can't update the same time the output updates or you will have infinite loop
@@ -109,7 +93,7 @@ dimensionInput valueDyn = do
     modifyEv = fmap (\v -> const (toText v)) (updated valueDyn)
   v0 <- sample . current $ valueDyn
   i <- input
-  tDyn <- textInputCustom (mergeWith (.) [fmap updateTextZipperForNumberInput i, modifyEv]) (toText v0)
+  tDyn <- textInputCustom (mergeWith (.) [fmap (makeModifyEventFromUpdateTextZipperMethod updateTextZipperForNumberInput) i, modifyEv]) (toText v0)
   --tDyn <- fmap _textInput_value $ textInput (def { _textInputConfig_initialValue = (toText v0)})
   return $ ffor2 valueDyn tDyn $ \v t -> fromMaybe v (readMaybe (T.unpack t))
 
