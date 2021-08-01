@@ -97,7 +97,31 @@ dimensionInput valueDyn = do
   --tDyn <- fmap _textInput_value $ textInput (def { _textInputConfig_initialValue = (toText v0)})
   return $ ffor2 valueDyn tDyn $ \v t -> fromMaybe v (readMaybe (T.unpack t))
 
+updateTextZipperForFilenameCharacters :: UpdateTextZipperMethod
+updateTextZipperForFilenameCharacters ev = case ev of
+  V.EvKey (V.KChar k) [] -> Just $ TZ.insertChar k
+  V.EvKey V.KBS []                    -> Just $ TZ.deleteLeft
+  V.EvKey V.KDel []                   -> Just $ TZ.deleteRight
+  V.EvKey V.KLeft []                  -> Just $ TZ.left
+  V.EvKey V.KRight []                 -> Just $ TZ.right
+  V.EvKey V.KHome []                  -> Just $ TZ.home
+  V.EvKey V.KEnd []                   -> Just $ TZ.end
+  V.EvKey (V.KChar 'u') [V.MCtrl]     -> Just $ const TZ.empty
+  _                                   -> Nothing
+
+-- UNTESTED
+filenameInput
+  :: (MonadWidget t m, HasPotato t m)
+  => Event t Text -- ^ override input event
+  -> m (Dynamic t Text)
+filenameInput overrideEv' = do
+  i <- input
+  let overrideEv = ffor overrideEv' $ \t -> const (TZ.fromText t)
+  textInputCustom (mergeWith (.) [fmap (makeModifyEventFromUpdateTextZipperMethod updateTextZipperForSingleCharacter) i, overrideEv]) TZ.empty
+
+-- TODO look into a variant that scrolls horizontally with cursor
 -- TODO use theming here
+-- TODO rename to singelLineTextInputCustom or something
 textInputCustom
   :: (MonadWidget t m, HasPotato t m)
   => Event t (TZ.TextZipper -> TZ.TextZipper)
@@ -125,6 +149,9 @@ textInputCustom modifyEv c0 = mdo
       click <- mouseDown V.BLeft
       let
         cursorAttrs = ffor f $ \x -> if x then cursorAttributes else normalAttributes
+
+      -- TODO expect only 1 line here, don't need to handle the rest
+      -- TODO prob better to scroll to the far right (based on displayWidth I guess? remember to offset the cursor click too)
       let rows = (\w s c -> TZ.displayLines w normalAttributes c s)
             <$> dw
             <*> (TZ.mapZipper <$> (constDyn id) <*> v)
