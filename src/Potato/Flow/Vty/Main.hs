@@ -364,7 +364,8 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
     testFileExplorerWiget = boxTitle (constant def) "😱😱😱" $ do
       holdFileExplorerWidget $ FileExplorerWidgetConfig (const True) "/"
       return never
-  _ <- popupPaneSimple def (postBuildEv $> testFileExplorerWiget)
+  --_ <- popupPaneSimple def (postBuildEv $> testFileExplorerWiget)
+  _ <- popupPaneSimple def (never $> testFileExplorerWiget)
 
   -- render various popups
   --(_, popupStateDyn1) <- popupPaneSimple def (postBuildEv $> welcomeWidget)
