@@ -150,15 +150,3 @@ drag2AttachOnStart btn beh = do
       return $ Just (anew, d)
   dragBeh <- foldDynM foldfn Nothing dragEv
   return $ fmapMaybe id $ updated dragBeh
-
-
--- TODO something like this
--- returns an Event t Text which fires with updated text when:
---  return key is pressed
---  focus is lost
--- returns a Dynamic t Text
--- takes a Text as initial value
-
---simpleTextInputWidget
---  :: forall t m a. (Reflex t, MonadFix m, MonadHold t m, HasInput t m)
---  =>

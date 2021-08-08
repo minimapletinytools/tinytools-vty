@@ -1,4 +1,6 @@
 -- extends methods Text.Input
+-- TODO beling in Potato because depends on HasPotato
+-- alternatively, drop the HasPotato requirement by passing in Behavior t V.Attr into these methods
 
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE RecursiveDo     #-}
@@ -119,15 +121,9 @@ filenameInput overrideEv' = do
   let overrideEv = ffor overrideEv' $ \t -> const (TZ.fromText t)
   textInputCustom (mergeWith (.) [fmap (makeModifyEventFromUpdateTextZipperMethod updateTextZipperForSingleCharacter) i, overrideEv]) TZ.empty
 
--- TODO look into a variant that scrolls horizontally with cursor
--- TODO use theming here
--- TODO rename to singelLineTextInputCustom or something
-textInputCustom
-  :: (MonadWidget t m, HasPotato t m)
-  => Event t (TZ.TextZipper -> TZ.TextZipper)
-  -> TZ.TextZipper
-  -> m (Dynamic t Text)
-textInputCustom modifyEv c0 = mdo
+-- TODO add horiz and vert offset parameter
+renderTextZipper :: (MonadWidget t m, HasPotato t m) => Dynamic t TZ.TextZipper -> m (Dynamic t (TZ.DisplayLines V.Attr))
+renderTextZipper tz = do
   f <- focus
   dh <- displayHeight
   dw <- displayWidth
@@ -135,27 +131,36 @@ textInputCustom modifyEv c0 = mdo
   -- TODO do this without sampling (I think this will not update if you change style without recreating these widgets)
   -- (you could do this easily by using localTheme)
   potatostyle <- askPotato >>=  sample . _potatoConfig_style
-
   let
     cursorAttributes = _potatoStyle_selected potatostyle
     normalAttributes = _potatoStyle_normal potatostyle
+    -- TODO do I care about focus or no?
+    cursorAttrs = ffor f $ \x -> if x then cursorAttributes else normalAttributes
 
+  let rows = (\w s c -> TZ.displayLines w normalAttributes c s)
+        <$> dw
+        <*> tz
+        <*> cursorAttrs
+      img = images . TZ._displayLines_spans <$> rows
+  tellImages $ (\imgs -> (:[]) . V.vertCat $ imgs) <$> current img
+  return rows
+
+
+
+-- TODO look into a variant that scrolls horizontally with cursor
+-- TODO rename to singelLineTextInputCustom or something
+textInputCustom
+  :: (MonadWidget t m, HasPotato t m)
+  => Event t (TZ.TextZipper -> TZ.TextZipper)
+  -> TZ.TextZipper
+  -> m (Dynamic t Text)
+textInputCustom modifyEv c0 = mdo
   rec v <- foldDyn ($) c0 $ mergeWith (.)
         [ modifyEv
-        , let displayInfo = current rows
+        , let displayInfo = current dls
           in ffor (attach displayInfo click) $ \(dl, MouseDown _ (mx, my) _) ->
             TZ.goToDisplayLinePosition mx my dl
         ]
       click <- mouseDown V.BLeft
-      let
-        cursorAttrs = ffor f $ \x -> if x then cursorAttributes else normalAttributes
-
-      -- TODO expect only 1 line here, don't need to handle the rest
-      -- TODO prob better to scroll to the far right (based on displayWidth I guess? remember to offset the cursor click too)
-      let rows = (\w s c -> TZ.displayLines w normalAttributes c s)
-            <$> dw
-            <*> (TZ.mapZipper <$> (constDyn id) <*> v)
-            <*> cursorAttrs
-          img = images . TZ._displayLines_spans <$> rows
-      tellImages $ (\imgs -> (:[]) . V.vertCat $ imgs) <$> current img
+      dls <- renderTextZipper v
   return $ TZ.value <$> v
