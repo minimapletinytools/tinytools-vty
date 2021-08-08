@@ -133,18 +133,18 @@ renderTextZipper tz = do
   potatostyle <- askPotato >>=  sample . _potatoConfig_style
   let
     cursorAttributes = _potatoStyle_selected potatostyle
-    normalAttributes = _potatoStyle_normal potatostyle
-    -- TODO do I care about focus or no?
-    cursorAttrs = ffor f $ \x -> if x then cursorAttributes else normalAttributes
+    normalAttributes = _potatoStyle_softSelected potatostyle
+    nofocusAttributes = _potatoStyle_normal potatostyle
+    attrsDyn = ffor f $ \x -> if x then (normalAttributes, cursorAttributes) else (nofocusAttributes, nofocusAttributes)
 
-  let rows = (\w s c -> TZ.displayLines w normalAttributes c s)
+  -- we still render trailing cursor when we aren't focused... you should probably fix this
+  let rows = (\w s (nattr, cattr) -> TZ.displayLines w nattr cattr s)
         <$> dw
         <*> tz
-        <*> cursorAttrs
+        <*> attrsDyn
       img = images . TZ._displayLines_spans <$> rows
   tellImages $ (\imgs -> (:[]) . V.vertCat $ imgs) <$> current img
   return rows
-
 
 
 -- TODO look into a variant that scrolls horizontally with cursor
