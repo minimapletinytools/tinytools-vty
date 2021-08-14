@@ -114,16 +114,17 @@ updateTextZipperForFilenameCharacters ev = case ev of
 -- UNTESTED
 filenameInput
   :: (MonadWidget t m, HasPotato t m)
-  => Event t Text -- ^ override input event
+  => Text -- ^ initial
+  -> Event t Text -- ^ override input event
   -> m (Dynamic t Text)
-filenameInput overrideEv' = do
+filenameInput t0 overrideEv' = do
   i <- input
   let overrideEv = ffor overrideEv' $ \t -> const (TZ.fromText t)
-  textInputCustom (mergeWith (.) [fmap (makeModifyEventFromUpdateTextZipperMethod updateTextZipperForSingleCharacter) i, overrideEv]) TZ.empty
+  textInputCustom (mergeWith (.) [fmap (makeModifyEventFromUpdateTextZipperMethod updateTextZipperForSingleCharacter) i, overrideEv]) (TZ.fromText t0)
 
 -- TODO add horiz and vert offset parameter
-renderTextZipper :: (MonadWidget t m, HasPotato t m) => Dynamic t TZ.TextZipper -> m (Dynamic t (TZ.DisplayLines V.Attr))
-renderTextZipper tz = do
+renderTextZipper :: (MonadWidget t m, HasPotato t m) => Dynamic t Int -> Dynamic t TZ.TextZipper -> m (Dynamic t (TZ.DisplayLines V.Attr))
+renderTextZipper offsetDyn tz = do
   f <- focus
   dh <- displayHeight
   dw <- displayWidth
@@ -142,25 +143,31 @@ renderTextZipper tz = do
         <$> dw
         <*> tz
         <*> attrsDyn
-      img = images . TZ._displayLines_spans <$> rows
+      img = ffor2 rows offsetDyn $ \rows' ox -> images . fmap (drop ox) . TZ._displayLines_spans $ rows'
   tellImages $ (\imgs -> (:[]) . V.vertCat $ imgs) <$> current img
   return rows
 
-
--- TODO look into a variant that scrolls horizontally with cursor
 -- TODO rename to singelLineTextInputCustom or something
+textInputCustom'
+  :: (MonadWidget t m, HasPotato t m)
+  => Dynamic t Int
+  -> Event t (TZ.TextZipper -> TZ.TextZipper)
+  -> TZ.TextZipper
+  -> m (Dynamic t Text)
+textInputCustom' offsetDyn modifyEv c0 = mdo
+  rec v <- foldDyn ($) c0 $ mergeWith (.)
+        [ modifyEv
+        , let displayInfo = current ((,) <$> dls <*> offsetDyn)
+          in ffor (attach displayInfo click) $ \((dl,ox), MouseDown _ (mx, my) _) ->
+            TZ.goToDisplayLinePosition (ox+mx) my dl
+        ]
+      click <- mouseDown V.BLeft
+      dls <- renderTextZipper offsetDyn v
+  return $ TZ.value <$> v
+
 textInputCustom
   :: (MonadWidget t m, HasPotato t m)
   => Event t (TZ.TextZipper -> TZ.TextZipper)
   -> TZ.TextZipper
   -> m (Dynamic t Text)
-textInputCustom modifyEv c0 = mdo
-  rec v <- foldDyn ($) c0 $ mergeWith (.)
-        [ modifyEv
-        , let displayInfo = current dls
-          in ffor (attach displayInfo click) $ \(dl, MouseDown _ (mx, my) _) ->
-            TZ.goToDisplayLinePosition mx my dl
-        ]
-      click <- mouseDown V.BLeft
-      dls <- renderTextZipper v
-  return $ TZ.value <$> v
+textInputCustom = textInputCustom' (constDyn 0)
