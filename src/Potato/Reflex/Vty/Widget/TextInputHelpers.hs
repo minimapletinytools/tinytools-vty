@@ -101,6 +101,7 @@ dimensionInput valueDyn = do
 
 updateTextZipperForFilenameCharacters :: UpdateTextZipperMethod
 updateTextZipperForFilenameCharacters ev = case ev of
+  -- TODO you need to do more filtering here
   V.EvKey (V.KChar k) [] -> Just $ TZ.insertChar k
   V.EvKey V.KBS []                    -> Just $ TZ.deleteLeft
   V.EvKey V.KDel []                   -> Just $ TZ.deleteRight
@@ -111,16 +112,55 @@ updateTextZipperForFilenameCharacters ev = case ev of
   V.EvKey (V.KChar 'u') [V.MCtrl]     -> Just $ const TZ.empty
   _                                   -> Nothing
 
+
+-- UNTESTED
+-- prob don't need this version
+filenameInputFireEventOnLoseFocus
+  :: (MonadWidget t m, HasPotato t m, HasFocus t m)
+  => Text -- ^ initial
+  -> Event t Text -- ^ override input event
+  -> m (Event t Text) -- ^ event that fires when text input loses focus
+filenameInputFireEventOnLoseFocus t0 overrideEv' = mdo
+  dw <- displayWidth
+  i <- input
+  let
+    overrideEv = ffor overrideEv' $ \t -> const (TZ.fromText t)
+    offsetx = ffor2 dw dt $ \w fn -> max 0 (T.length fn - w + 4)
+  dt <- textInputCustom' offsetx (mergeWith (.) [fmap (makeModifyEventFromUpdateTextZipperMethod updateTextZipperForFilenameCharacters) i, overrideEv]) (TZ.fromText t0)
+  focusDyn <- focusedId
+  lastTextDyn <- holdDyn t0 updatedtextev
+  let
+    updatedtextev = flip push (void $ updated focusDyn) $ \_ -> do
+      t <- sample . current $ dt
+      told <- sample . current $ lastTextDyn
+      if t == told
+        then return Nothing
+        else return $ Just t
+  return updatedtextev
+
 -- UNTESTED
 filenameInput
   :: (MonadWidget t m, HasPotato t m)
   => Text -- ^ initial
   -> Event t Text -- ^ override input event
   -> m (Dynamic t Text)
-filenameInput t0 overrideEv' = do
+filenameInput t0 overrideEv' = mdo
+  dw <- displayWidth
   i <- input
-  let overrideEv = ffor overrideEv' $ \t -> const (TZ.fromText t)
-  textInputCustom (mergeWith (.) [fmap (makeModifyEventFromUpdateTextZipperMethod updateTextZipperForSingleCharacter) i, overrideEv]) (TZ.fromText t0)
+  let
+    overrideEv = ffor overrideEv' $ \t -> const (TZ.fromText t)
+    offsetx = ffor2 dw dt $ \w fn -> max 0 (T.length fn - w + 4)
+  dt <- textInputCustom' offsetx (mergeWith (.) [fmap (makeModifyEventFromUpdateTextZipperMethod updateTextZipperForFilenameCharacters) i, overrideEv]) (TZ.fromText t0)
+  return dt
+
+-- | Turn a 'Span' into an 'Graphics.Vty.Image'
+{-
+spanToImage :: Span V.Attr -> V.Image
+spanToImage (Span attrs t) = V.text' attrs t
+
+images :: [[Span V.Attr]] -> [V.Image]
+images = map (V.horizCat . map spanToImage)
+-}
 
 -- TODO add horiz and vert offset parameter
 renderTextZipper :: (MonadWidget t m, HasPotato t m) => Dynamic t Int -> Dynamic t TZ.TextZipper -> m (Dynamic t (TZ.DisplayLines V.Attr))
@@ -143,6 +183,7 @@ renderTextZipper offsetDyn tz = do
         <$> dw
         <*> tz
         <*> attrsDyn
+      -- TODO implement drop properly needs to go through span correctly
       img = ffor2 rows offsetDyn $ \rows' ox -> images . fmap (drop ox) . TZ._displayLines_spans $ rows'
   tellImages $ (\imgs -> (:[]) . V.vertCat $ imgs) <$> current img
   return rows
@@ -158,6 +199,7 @@ textInputCustom' offsetDyn modifyEv c0 = mdo
   rec v <- foldDyn ($) c0 $ mergeWith (.)
         [ modifyEv
         , let displayInfo = current ((,) <$> dls <*> offsetDyn)
+        -- TODO TEST mouse offset
           in ffor (attach displayInfo click) $ \((dl,ox), MouseDown _ (mx, my) _) ->
             TZ.goToDisplayLinePosition (ox+mx) my dl
         ]

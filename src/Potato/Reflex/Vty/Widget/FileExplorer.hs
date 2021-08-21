@@ -16,6 +16,7 @@ import           Potato.Flow.Vty.Input
 import           Potato.Reflex.Vty.Helpers
 import           Potato.Reflex.Vty.Widget
 import Potato.Flow.Vty.PotatoReader
+import Potato.Reflex.Vty.Widget.TextInputHelpers
 
 
 import Control.Exception (catch)
@@ -53,16 +54,16 @@ data FileExplorerWidgetConfig t = FileExplorerWidgetConfig {
 
   -- TODO we don't need full filepath
   _fileExplorerWidgetConfig_fileFilter :: FP.FilePath -> Bool
-  , _fileExplorerWidgetConfig_initialDirectory :: FP.FilePath
+  , _fileExplorerWidgetConfig_initialFile :: FP.FilePath
 }
 
--- WIP TODO FINISH
 data FileExplorerWidget t = FileExplorerWidget {
-  _fileExplorerWidget_doubleClickFile :: Event t FP.FilePath
+  _fileExplorerWidget_fullfilename :: Behavior t FP.FilePath -- pretty sure this is just single click for now -__-
+  , _fileExplorerWidget_doubleClickFile :: Event t FP.FilePath -- pretty sure this is just single click for now -__-
   , _fileExplorerWidget_directory :: Dynamic t FP.FilePath
 }
 
-holdFileExplorerWidget :: forall t m. (MonadWidget t m)
+holdFileExplorerWidget :: forall t m. (MonadLayoutWidget t m, HasPotato t m)
   => FileExplorerWidgetConfig t
   -> m (FileExplorerWidget t)
 holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
@@ -92,18 +93,19 @@ holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
   --selectedDyn :: Dynamic t (Maybe Int)
   --selectedDyn <- holdDyn Nothing $ leftmost [selectEv, ]
 
-  -- set up directory stuff
+  -- set up directory/filename text field stuff
   pb <- getPostBuild
   let
     foldDirDynFn new old = case new of
       "." -> old
       ".." -> FP.takeDirectory old
       _ -> new
-  dirDyn <- foldDyn foldDirDynFn "" (leftmost [pb $> _fileExplorerWidgetConfig_initialDirectory, clickFolderEvent, setFolderEvent])
+  dirDyn <- foldDyn foldDirDynFn "" (leftmost [pb $> FP.takeDirectory _fileExplorerWidgetConfig_initialFile, clickFolderEvent, setFolderEvent])
   fetchDirComplete <- fetchDirectory (updated dirDyn)
   dirContentsDyn <- holdDyn [] fetchDirComplete
 
   let
+    -- set up directory list widget
     dirWidget vscroll xs = forM (drop vscroll xs) $ \(isFolder, path) -> do
       (grout . fixed) 1 $ do
         let
@@ -122,21 +124,32 @@ holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
             then return $ (click $> Right path)
             else return never
 
-  (clickEvents, setFolderRawEvent) <- initLayout $ col $ do
-    setFolderRawEvent' <- (grout . fixed) 3 $ box (constant singleBoxStyle) $ do
-      -- one of TZ inputs should be (updated dirDyn)
-      text (constant "TODO INPUT BOX GOES HERE")
-      -- TODO set folder event via text input
-      return (never :: Event t FP.FilePath)
-    clickEvents' <- networkView (ffor2 (traceDyn "poop" vScrollDyn) dirContentsDyn dirWidget)
-    return (clickEvents', setFolderRawEvent')
+  -- put it all together
+  (clickEvents, setFolderRawEvent, filenameDyn) <- col $ do
+    -- TODO focus is messed up  with folsder and filename, why??
+    -- TODO consider combining filename and directory into one...
 
+    let
+      setFileEv = fmap T.pack $ leftmost [pb $> FP.takeFileName _fileExplorerWidgetConfig_initialFile, clickFileEvent]
+    -- input for filename
+    filenameDyn' <- (tile . fixed) 1 $ filenameInput "" setFileEv
+    -- input for directory
+    setFolderRawEvent' <- (tile . fixed) 1 $ do
+      let indirev = (updated (fmap T.pack dirDyn))
+      dirdyn <- filenameInput "" indirev
+      return $ difference (updated $ fmap T.unpack dirdyn) indirev
+    clickEvents' <- (grout . stretch) 5 $ box (constant singleBoxStyle) $ do
+      networkView (ffor2 vScrollDyn dirContentsDyn dirWidget)
+    return (clickEvents', setFolderRawEvent', filenameDyn')
+
+  -- perform the IO query to get the folder contents
   mSetFolderEvent <- performEvent $ ffor setFolderRawEvent $ \dir -> liftIO $ do
+    -- TODO ~ doesn't seem to work to work for something reason
+    -- TODO need to collapse ..s
     exists <- FP.doesDirectoryExist dir
     if exists then return $ Just dir else return Nothing
   let
     setFolderEvent = fmapMaybe id mSetFolderEvent
-
 
   clickEvent :: Event t (Either FP.FilePath FP.FilePath) <- switchHold never $ (fmap leftmost clickEvents)
 
@@ -145,10 +158,13 @@ holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
     maybeLeft _ = Nothing
     maybeRight (Right a) = Just a
     maybeRight _ = Nothing
-    clickFolderEvent = fmapMaybe maybeLeft (traceEvent "click2" clickEvent)
+    clickFolderEvent = fmapMaybe maybeLeft clickEvent
     clickFileEvent = fmapMaybe maybeRight clickEvent
 
+    fullfilenameDyn = ffor2 dirDyn filenameDyn $ \dir fn -> FP.combine dir (T.unpack fn)
+
   return $ FileExplorerWidget {
-      _fileExplorerWidget_doubleClickFile = clickFileEvent
+      _fileExplorerWidget_fullfilename = current fullfilenameDyn
+      , _fileExplorerWidget_doubleClickFile = clickFileEvent
       , _fileExplorerWidget_directory = dirDyn
     }

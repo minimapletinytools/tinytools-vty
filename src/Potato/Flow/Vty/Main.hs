@@ -25,6 +25,7 @@ import           Potato.Reflex.Vty.Widget.Popup
 import           Potato.Reflex.Vty.Widget.FileExplorer
 import           Potato.Reflex.Vty.Widget
 import qualified Potato.Reflex.Vty.Host
+import Potato.Flow.Vty.SaveAsWindow
 
 import System.IO (stderr, hFlush)
 import           Control.Concurrent
@@ -252,6 +253,10 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
       T.hPutStr stderr $ pHandlerDebugShow handler
       hFlush stderr
 
+  -- PotatoReader
+  let
+    potatoConfig = def
+
   let
     goatWidgetConfig = GoatWidgetConfig {
         _goatWidgetConfig_initialState = _mainPFWidgetConfig_initialState
@@ -345,7 +350,7 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
 
   -- render main panels
 
-  (keyboardEv, ((layersW, toolsW, paramsW), canvasW)) <- flip runPotatoReader def $
+  (keyboardEv, ((layersW, toolsW, paramsW), canvasW)) <- flip runPotatoReader potatoConfig $
     captureInputEvents (That inputCapturedByPopupBeh) $ do
       inp <- input
       stuff <- splitHDrag 35 (fill (constant '*')) leftPanel rightPanel
@@ -360,20 +365,16 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
       return (kb, stuff)
 
 
-  let
-    testFileExplorerWiget = boxTitle (constant def) "😱😱😱" $ do
-      holdFileExplorerWidget $ FileExplorerWidgetConfig (const True) "/"
-      return never
-  --_ <- popupPaneSimple def (postBuildEv $> testFileExplorerWiget)
-  _ <- popupPaneSimple def (never $> testFileExplorerWiget)
 
   -- render various popups
   --(_, popupStateDyn1) <- popupPaneSimple def (postBuildEv $> welcomeWidget)
   (_, popupStateDyn1) <- popupPaneSimple def (never $> welcomeWidget)
 
+  --(_, popupStateDyn2) <- flip runPotatoReader potatoConfig $ popupSaveAsWindow $ SaveAsWindowConfig (never $> "/Users/user/kitchen/faucet/potato-flow
+  (_, popupStateDyn2) <- flip runPotatoReader potatoConfig $ popupSaveAsWindow $ SaveAsWindowConfig (postBuildEv $> "/Users/user/kitchen/faucet/potato-flow-vty")
 
   let
-    inputCapturedByPopupBeh = current . fmap getAny . mconcat . fmap (fmap Any) $ [popupStateDyn1]
+    inputCapturedByPopupBeh = current . fmap getAny . mconcat . fmap (fmap Any) $ [popupStateDyn1, popupStateDyn2]
 
 
 
