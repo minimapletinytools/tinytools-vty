@@ -126,9 +126,7 @@ holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
 
   -- put it all together
   (clickEvents, setFolderRawEvent, filenameDyn) <- col $ do
-    -- TODO focus is messed up  with folsder and filename, why??
     -- TODO consider combining filename and directory into one...
-
     let
       setFileEv = fmap T.pack $ leftmost [pb $> FP.takeFileName _fileExplorerWidgetConfig_initialFile, clickFileEvent]
     -- input for filename
@@ -144,8 +142,6 @@ holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
 
   -- perform the IO query to get the folder contents
   mSetFolderEvent <- performEvent $ ffor setFolderRawEvent $ \dir -> liftIO $ do
-    -- TODO ~ doesn't seem to work to work for something reason
-    -- TODO need to collapse ..s
     exists <- FP.doesDirectoryExist dir
     if exists then return $ Just dir else return Nothing
   let

@@ -162,12 +162,13 @@ images :: [[Span V.Attr]] -> [V.Image]
 images = map (V.horizCat . map spanToImage)
 -}
 
--- TODO add horiz and vert offset parameter
-renderTextZipper :: (MonadWidget t m, HasPotato t m) => Dynamic t Int -> Dynamic t TZ.TextZipper -> m (Dynamic t (TZ.DisplayLines V.Attr))
-renderTextZipper offsetDyn tz = do
+dropSpan :: Int -> [TZ.Span V.Attr] -> [TZ.Span V.Attr]
+dropSpan _ [] = []
+dropSpan n ((TZ.Span tag text):xs) = TZ.Span tag (T.drop n text) : dropSpan (max 0 (n - T.length text)) xs
+
+renderTextZipper :: (MonadWidget t m, HasPotato t m) => Dynamic t Int -> Dynamic t Int -> Dynamic t TZ.TextZipper -> m (Dynamic t (TZ.DisplayLines V.Attr))
+renderTextZipper offsetDyn dw tz = do
   f <- focus
-  dh <- displayHeight
-  dw <- displayWidth
 
   -- TODO do this without sampling (I think this will not update if you change style without recreating these widgets)
   -- (you could do this easily by using localTheme)
@@ -183,8 +184,7 @@ renderTextZipper offsetDyn tz = do
         <$> dw
         <*> tz
         <*> attrsDyn
-      -- TODO implement drop properly needs to go through span correctly
-      img = ffor2 rows offsetDyn $ \rows' ox -> images . fmap (drop ox) . TZ._displayLines_spans $ rows'
+      img = ffor2 rows offsetDyn $ \rows' ox -> images . fmap (dropSpan ox) . TZ._displayLines_spans $ rows'
   tellImages $ (\imgs -> (:[]) . V.vertCat $ imgs) <$> current img
   return rows
 
@@ -199,12 +199,11 @@ textInputCustom' offsetDyn modifyEv c0 = mdo
   rec v <- foldDyn ($) c0 $ mergeWith (.)
         [ modifyEv
         , let displayInfo = current ((,) <$> dls <*> offsetDyn)
-        -- TODO TEST mouse offset
           in ffor (attach displayInfo click) $ \((dl,ox), MouseDown _ (mx, my) _) ->
             TZ.goToDisplayLinePosition (ox+mx) my dl
         ]
       click <- mouseDown V.BLeft
-      dls <- renderTextZipper offsetDyn v
+      dls <- renderTextZipper offsetDyn (constDyn 999999) v
   return $ TZ.value <$> v
 
 textInputCustom
