@@ -55,9 +55,6 @@ popupSaveAsWindow SaveAsWindowConfig {..} = do
   -- TODO style everything
   let
     popupSaveAsEv = ffor _saveAsWindowConfig_saveAs $ \f0 -> mdo
-      let
-        initialFilename = T.pack $ FP.takeFileName (T.unpack f0)
-        filenameOverrideEv = undefined
       boxTitle (constant def) "Save As" $ do
         initManager_ $ col $ mdo
           fewidget <- (tile . stretch) 3 $ holdFileExplorerWidget $ FileExplorerWidgetConfig {

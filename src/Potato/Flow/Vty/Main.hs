@@ -26,11 +26,13 @@ import           Potato.Reflex.Vty.Widget.FileExplorer
 import           Potato.Reflex.Vty.Widget
 import qualified Potato.Reflex.Vty.Host
 import Potato.Flow.Vty.SaveAsWindow
+import Potato.Flow.Vty.Alert
 
 import System.IO (stderr, hFlush)
 import           Control.Concurrent
 import           Control.Monad.Fix
 import           Control.Monad.NodeId
+import Control.Exception (handle)
 import qualified Data.Aeson                        as Aeson
 import qualified Data.Aeson.Encode.Pretty as PrettyAeson
 import           Data.Maybe
@@ -173,7 +175,6 @@ welcomeWidget = do
       (grout . stretch) 1 $ text (current welcomeMessageDyn)
       (grout . fixed) 3 $ textButton def (constant "bye")
 
-
 -- | toggle the focus of a widget
 -- also forces unfocused widget to ignore mouse inputs
 focusWidgetNoMouse :: forall t m a. (MonadWidget t m)
@@ -241,6 +242,15 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
       mspf :: Maybe SPotatoFlow <- liftIO $ Aeson.decodeFileStrict (T.unpack fp)
       return $ mspf >>= return . (,emptyControllerMeta)
 
+  let
+    performSaveEv = attach (current $ _goatWidget_DEBUG_goatState everythingW) $ leftmost [saveAsEv, clickSaveEv]
+  mSaveErrorAlertEv <- performEvent $ ffor performSaveEv $ \(gs,fn) -> liftIO $ do
+    let spf = owlPFState_to_sPotatoFlow . _owlPFWorkspace_pFState . _goatState_workspace $ gs
+    handle (\(SomeException e) -> return . Just $ "ERROR, Could not save to file  <> show fn <> " got exception \"" <> show e <> "\"") $ do
+      --liftIO $ Aeson.encodeFile "potato.flow" spf
+      print $ "wrote to file: " <> show fn
+      LBS.writeFile fn $ PrettyAeson.encodePretty spf
+      return Nothing
 
   -- debug stuff (temp)
   let
@@ -284,23 +294,27 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
   let
     hdivider = (grout. fixed) 1 $ fill (constant '-')
     leftPanel = initLayout $ col $ do
-      (grout . fixed) 1 $ row $ do
-        (grout . stretch) 1 $ do
+      (clickSaveEv_d1, clickSaveAsEv_d1) <- (grout . fixed) 1 $ row $ do
+        clickSaveEv_d2 <- (grout . stretch) 1 $ do
           text "save"
           click <- mouseDown V.BLeft
-          let saveEv = tag (current $ _goatWidget_DEBUG_goatState everythingW) click
-          performEvent_ $ ffor saveEv $ \gs -> do
-             let spf = owlPFState_to_sPotatoFlow . _owlPFWorkspace_pFState . _goatState_workspace $ gs
-             --liftIO $ Aeson.encodeFile "potato.flow" spf
-             liftIO $ LBS.writeFile "potato.flow" $ PrettyAeson.encodePretty spf
-        (grout . stretch) 1 $ text "|"
+          -- TODO pull filename from Settings or whatever
+          let clickSaveEv_d3 = tag (constant "~/potato.flow") click
+          return clickSaveEv_d3
+        (grout . fixed) 1 $ text "|"
+        clickSaveAsEv_d2 <- (grout . stretch) 1 $ do
+          text "save as"
+          click <- mouseDown V.BLeft
+          return (void click)
+        (grout . fixed) 1 $ text "|"
         (grout . stretch) 1 $ do
           text "print"
           click <- mouseDown V.BLeft
-          let saveEv = tag (current $ _goatWidget_renderedCanvas everythingW) click
-          performEvent_ $ ffor saveEv $ \rc -> do
+          let clickSaveEv = tag (current $ _goatWidget_renderedCanvas everythingW) click
+          performEvent_ $ ffor clickSaveEv $ \rc -> do
              let t = renderedCanvasToText rc
              liftIO $ T.writeFile "potato.txt" t
+        return (clickSaveEv_d2, clickSaveAsEv_d2)
       (grout . fixed) 1 $ debugStream [
         never
         ]
@@ -332,7 +346,7 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
           _paramsWidgetConfig_selectionDyn = _goatWidget_selection everythingW
           , _paramsWidgetConfig_canvasDyn = _goatWidget_canvas everythingW
         }
-      return (layers', tools', params')
+      return (layers', tools', params', clickSaveEv_d1, clickSaveAsEv_d1)
 
     rightPanel = do
       dreg' <- askRegion
@@ -350,7 +364,7 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
 
   -- render main panels
 
-  (keyboardEv, ((layersW, toolsW, paramsW), canvasW)) <- flip runPotatoReader potatoConfig $
+  (keyboardEv, ((layersW, toolsW, paramsW, clickSaveEv, clickSaveAsEv), canvasW)) <- flip runPotatoReader potatoConfig $
     captureInputEvents (That inputCapturedByPopupBeh) $ do
       inp <- input
       stuff <- splitHDrag 35 (fill (constant '*')) leftPanel rightPanel
@@ -366,15 +380,21 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
 
 
 
-  -- render various popups
+
+
   --(_, popupStateDyn1) <- popupPaneSimple def (postBuildEv $> welcomeWidget)
   (_, popupStateDyn1) <- popupPaneSimple def (never $> welcomeWidget)
 
-  --(_, popupStateDyn2) <- flip runPotatoReader potatoConfig $ popupSaveAsWindow $ SaveAsWindowConfig (never $> "/Users/user/kitchen/faucet/potato-flow
-  (_, popupStateDyn2) <- flip runPotatoReader potatoConfig $ popupSaveAsWindow $ SaveAsWindowConfig (postBuildEv $> "/Users/user/kitchen/faucet/potato-flow-vty")
+  (saveAsEv, popupStateDyn2) <- flip runPotatoReader potatoConfig $ popupSaveAsWindow $ SaveAsWindowConfig (clickSaveAsEv $> "/Users/user/kitchen/faucet/potato-flow-vty")
 
   let
-    inputCapturedByPopupBeh = current . fmap getAny . mconcat . fmap (fmap Any) $ [popupStateDyn1, popupStateDyn2]
+   alertEv = leftmost [fmapMaybe id mSaveErrorAlertEv]
+  popupStateDyn3 <- flip runPotatoReader potatoConfig $ popupAlert alertEv
+
+
+  let
+    -- TODO assert that we never have more than 1 popup open at once
+    inputCapturedByPopupBeh = current . fmap getAny . mconcat . fmap (fmap Any) $ [popupStateDyn1, popupStateDyn2, popupStateDyn3]
 
 
 
