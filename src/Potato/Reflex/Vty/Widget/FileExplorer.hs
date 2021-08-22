@@ -71,13 +71,13 @@ holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
   -- set up v scrolling stuff
   kup <- key V.KUp
   kdown <- key V.KDown
-  m <- mouseScroll
+  mscroll <- mouseScroll
   let
     requestedScroll :: Event t Int
     requestedScroll = leftmost
       [ 1 <$ kdown
       , (-1) <$ kup
-      , ffor m $ \case
+      , ffor (traceEvent "mscrol" mscroll) $ \case
           ScrollDirection_Up -> (-1)
           ScrollDirection_Down -> 1
       ]
@@ -96,7 +96,7 @@ holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
   -- set up directory/filename text field stuff
   pb <- getPostBuild
   let
-    foldDirDynFn new old = case new of
+    foldDirDynFn new old = case FP.takeFileName new of
       "." -> old
       ".." -> FP.takeDirectory old
       _ -> new

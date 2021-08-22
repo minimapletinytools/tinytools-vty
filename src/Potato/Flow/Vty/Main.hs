@@ -246,7 +246,7 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
     performSaveEv = attach (current $ _goatWidget_DEBUG_goatState everythingW) $ leftmost [saveAsEv, clickSaveEv]
   mSaveErrorAlertEv <- performEvent $ ffor performSaveEv $ \(gs,fn) -> liftIO $ do
     let spf = owlPFState_to_sPotatoFlow . _owlPFWorkspace_pFState . _goatState_workspace $ gs
-    handle (\(SomeException e) -> return . Just $ "ERROR, Could not save to file  <> show fn <> " got exception \"" <> show e <> "\"") $ do
+    handle (\(SomeException e) -> return . Just $ "ERROR, Could not save to file " <> show fn <> " got exception \"" <> show e <> "\"") $ do
       --liftIO $ Aeson.encodeFile "potato.flow" spf
       print $ "wrote to file: " <> show fn
       LBS.writeFile fn $ PrettyAeson.encodePretty spf
