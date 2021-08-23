@@ -41,12 +41,6 @@ data SaveAsWindowConfig t = SaveAsWindowConfig {
   _saveAsWindowConfig_saveAs :: Event t Text -- ^ Event to launch the popup window to save file as Text is previous file name or empty string
 }
 
-{- data SaveAsWindowWidget t = SaveAsWindowWidget {
-  _saveAsWindowWidget_saveTo :: Event t FP.FilePath
-  , _saveAsWindowWidget_popupState :: Dynamic t Bool
-} -}
-
-
 -- UNTESTED
 popupSaveAsWindow :: forall t m. (MonadWidget t m, HasPotato t m)
   => SaveAsWindowConfig t
@@ -61,7 +55,7 @@ popupSaveAsWindow SaveAsWindowConfig {..} = do
               _fileExplorerWidgetConfig_fileFilter = \fp -> FP.takeExtension fp == ".potato"
               , _fileExplorerWidgetConfig_initialFile = T.unpack f0
             }
-          (cancelEv, saveEv) <- (tile . fixed) 3 $ row $ do
+          (cancelEv, saveButtonEv) <- (tile . fixed) 3 $ row $ do
             cancelEv' <- (tile . stretch) 10 $ textButton def "cancel"
             saveEv' <- (tile . stretch) 10 $ textButton def "save"
             return (cancelEv', saveEv')
@@ -72,7 +66,9 @@ popupSaveAsWindow SaveAsWindowConfig {..} = do
             return $ if exists
               then Just ffn else Nothing
           let saveAsFileEv = fmapMaybe id mSaveAsFileEv-}
-          let saveAsFileEv = tag (_fileExplorerWidget_fullfilename fewidget) saveEv
+          let
+            saveEv = leftmost [_fileExplorerWidget_returnOnfilename fewidget, saveButtonEv]
+            saveAsFileEv = tag (_fileExplorerWidget_fullfilename fewidget) saveEv
           return (cancelEv, saveAsFileEv)
     fmapfn w = \escEv clickOutsideEv -> fmap (\(cancelEv, outputEv) -> (leftmost [escEv, cancelEv, void outputEv], outputEv)) w
   popupPane def $ (fmap fmapfn popupSaveAsEv)

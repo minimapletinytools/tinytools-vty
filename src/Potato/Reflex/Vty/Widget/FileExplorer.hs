@@ -61,6 +61,7 @@ data FileExplorerWidget t = FileExplorerWidget {
   _fileExplorerWidget_fullfilename :: Behavior t FP.FilePath -- pretty sure this is just single click for now -__-
   , _fileExplorerWidget_doubleClickFile :: Event t FP.FilePath -- pretty sure this is just single click for now -__-
   , _fileExplorerWidget_directory :: Dynamic t FP.FilePath
+  , _fileExplorerWidget_returnOnfilename :: Event t () -- fires when you hit the "return" key in file name input area
 }
 
 holdFileExplorerWidget :: forall t m. (MonadLayoutWidget t m, HasPotato t m)
@@ -114,7 +115,9 @@ holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
             -- TODO
             then V.defAttr
             else V.defAttr
+        -- TODO down click should highlight briefly
         text (constant $ T.pack (FP.takeFileName path ))
+        -- TODO make it so you need to click on the name
         -- TODO double click
         click' <- singleClick V.BLeft
         let click = ffilter (not . _singleClick_didDragOff) click'
@@ -125,12 +128,15 @@ holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
             else return never
 
   -- put it all together
-  (clickEvents, setFolderRawEvent, filenameDyn) <- col $ do
+  (clickEvents, setFolderRawEvent, filenameDyn, enterEv) <- col $ do
     -- TODO consider combining filename and directory into one...
     let
       setFileEv = fmap T.pack $ leftmost [pb $> FP.takeFileName _fileExplorerWidgetConfig_initialFile, clickFileEvent]
     -- input for filename
-    filenameDyn' <- (tile . fixed) 1 $ filenameInput "" setFileEv
+    (filenameDyn', enterEv') <- (tile . fixed) 1 $ do
+      (,)
+      <$> filenameInput "" setFileEv
+      <*> key V.KEnter
     -- input for directory
     setFolderRawEvent' <- (tile . fixed) 1 $ do
       let indirev = (updated (fmap T.pack dirDyn))
@@ -138,7 +144,7 @@ holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
       return $ difference (updated $ fmap T.unpack dirdyn) indirev
     clickEvents' <- (grout . stretch) 5 $ box (constant singleBoxStyle) $ do
       networkView (ffor2 vScrollDyn dirContentsDyn dirWidget)
-    return (clickEvents', setFolderRawEvent', filenameDyn')
+    return (clickEvents', setFolderRawEvent', filenameDyn', enterEv')
 
   -- perform the IO query to get the folder contents
   mSetFolderEvent <- performEvent $ ffor setFolderRawEvent $ \dir -> liftIO $ do
@@ -163,4 +169,5 @@ holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
       _fileExplorerWidget_fullfilename = current fullfilenameDyn
       , _fileExplorerWidget_doubleClickFile = clickFileEvent
       , _fileExplorerWidget_directory = dirDyn
+      , _fileExplorerWidget_returnOnfilename = void enterEv
     }
