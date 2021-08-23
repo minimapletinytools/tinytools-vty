@@ -126,6 +126,16 @@ potatoMainWidget child = do
 tickOnEvent :: (Reflex t, Adjustable t m) => Event t a -> m ()
 tickOnEvent ev = void $ runWithReplace (return ()) (ev $> return ())
 
+-- | TODO move to ReflexHelpers
+fanMaybe :: (Reflex t) => Event t (Maybe a) -> (Event t a, Event t ())
+fanMaybe ev = (fmapMaybe id ev, fmapMaybe fmapfn ev) where
+  fmapfn ma = case ma of
+    Nothing -> Just ()
+    _ -> Nothing
+
+eitherMaybeLeft :: Either a b -> Maybe a
+eitherMaybeLeft (Left a) = Just a
+eitherMaybeLeft _ = Nothing
 
 pfcfg :: (Reflex t) => MainPFWidgetConfig t
 pfcfg = def {
@@ -244,13 +254,13 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
 
   let
     performSaveEv = attach (current $ _goatWidget_DEBUG_goatState everythingW) $ leftmost [saveAsEv, clickSaveEv]
-  mSaveErrorAlertEv <- performEvent $ ffor performSaveEv $ \(gs,fn) -> liftIO $ do
+  finishSaveEv <- performEvent $ ffor performSaveEv $ \(gs,fn) -> liftIO $ do
     let spf = owlPFState_to_sPotatoFlow . _owlPFWorkspace_pFState . _goatState_workspace $ gs
-    handle (\(SomeException e) -> return . Just $ "ERROR, Could not save to file " <> show fn <> " got exception \"" <> show e <> "\"") $ do
+    handle (\(SomeException e) -> return . Left $ "ERROR, Could not save to file " <> show fn <> " got exception \"" <> show e <> "\"") $ do
       --liftIO $ Aeson.encodeFile "potato.flow" spf
       print $ "wrote to file: " <> show fn
       LBS.writeFile fn $ PrettyAeson.encodePretty spf
-      return Nothing
+      return $ Right fn
 
   -- debug stuff (temp)
   let
@@ -263,9 +273,16 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
       T.hPutStr stderr $ pHandlerDebugShow handler
       hFlush stderr
 
-  -- PotatoReader
+  -- setup PotatoConfig
+  -- TODO pass in mLoadFileEv (except it need sto be filename)
+  currentOpenFileDyn <- holdDyn Nothing $ fmap Just $ leftmost [snd (fanEither finishSaveEv)]
   let
-    potatoConfig = def
+    potatoConfig = PotatoConfig {
+        _potatoConfig_style = constant def
+        , _potatoConfig_appCurrentOpenFile = current currentOpenFileDyn
+        -- TODO
+        , _potatoConfig_appPrintFile = constant Nothing
+      }
 
   let
     goatWidgetConfig = GoatWidgetConfig {
@@ -298,8 +315,7 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
         clickSaveEv_d2 <- (grout . stretch) 1 $ do
           text "save"
           click <- mouseDown V.BLeft
-          -- TODO pull filename from Settings or whatever
-          let clickSaveEv_d3 = tag (constant "~/potato.flow") click
+          let clickSaveEv_d3 = void click
           return clickSaveEv_d3
         (grout . fixed) 1 $ text "|"
         clickSaveAsEv_d2 <- (grout . stretch) 1 $ do
@@ -364,7 +380,7 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
 
   -- render main panels
 
-  (keyboardEv, ((layersW, toolsW, paramsW, clickSaveEv, clickSaveAsEv), canvasW)) <- flip runPotatoReader potatoConfig $
+  (keyboardEv, ((layersW, toolsW, paramsW, clickSaveEvRaw, clickSaveAsEvRaw), canvasW)) <- flip runPotatoReader potatoConfig $
     captureInputEvents (That inputCapturedByPopupBeh) $ do
       inp <- input
       stuff <- splitHDrag 35 (fill (constant '*')) leftPanel rightPanel
@@ -378,6 +394,9 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
 
       return (kb, stuff)
 
+  let
+    (clickSaveEv, nothingClickSaveEv)  = fanMaybe $ tag (_potatoConfig_appCurrentOpenFile potatoConfig) clickSaveEvRaw
+    clickSaveAsEv = leftmost $ [clickSaveAsEvRaw, nothingClickSaveEv]
 
 
 
@@ -388,7 +407,7 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
   (saveAsEv, popupStateDyn2) <- flip runPotatoReader potatoConfig $ popupSaveAsWindow $ SaveAsWindowConfig (clickSaveAsEv $> "/Users/user/kitchen/faucet/potato-flow-vty")
 
   let
-   alertEv = leftmost [fmapMaybe id mSaveErrorAlertEv]
+   alertEv = leftmost [fmapMaybe eitherMaybeLeft finishSaveEv]
   popupStateDyn3 <- flip runPotatoReader potatoConfig $ popupAlert alertEv
 
 

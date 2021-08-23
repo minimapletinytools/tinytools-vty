@@ -13,6 +13,8 @@ import Control.Monad.Reader (ReaderT, ask, local, runReaderT)
 import Control.Monad.Ref
 import Control.Monad.Trans (MonadTrans, lift)
 
+import qualified System.FilePath as FP
+
 import qualified Graphics.Vty as V
 import Reflex.Host.Class (MonadReflexCreateTrigger)
 import           Reflex
@@ -38,11 +40,15 @@ instance Default PotatoStyle where
 
 data PotatoConfig t = PotatoConfig {
   _potatoConfig_style :: Behavior t PotatoStyle
+  , _potatoConfig_appCurrentOpenFile :: Behavior t (Maybe FP.FilePath)
+  , _potatoConfig_appPrintFile :: Behavior t (Maybe FP.FilePath)
 }
 
 instance (Reflex t) =>  Default (PotatoConfig t) where
   def = PotatoConfig {
       _potatoConfig_style = constant def
+      , _potatoConfig_appCurrentOpenFile = constant Nothing
+      , _potatoConfig_appPrintFile = constant Nothing
     }
 
 -- | A class for things that can dynamically gain and lose focus
