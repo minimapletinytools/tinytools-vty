@@ -27,6 +27,7 @@ import           Potato.Reflex.Vty.Widget
 import qualified Potato.Reflex.Vty.Host
 import Potato.Flow.Vty.SaveAsWindow
 import Potato.Flow.Vty.Alert
+import Potato.Flow.Vty.AppKbCmd
 
 import System.IO (stderr, hFlush)
 import           Control.Concurrent
@@ -206,7 +207,7 @@ ignoreMouseUnlessFocused child = do
 
 -- | block all or some input events, always focused if parent is focused
 captureInputEvents :: forall t m a. (MonadWidget t m)
-  => These (Event t ()) (Behavior t Bool) -- ^ Left ev is event indicating input should be capture. Right beh is behavior gating input (true means captured)
+  => These (Event t ()) (Behavior t Bool) -- ^ This ev is event indicating input should be capture. That beh is behavior gating input (true means captured)
   -> m a
   -> m a
 captureInputEvents capture child = do
@@ -272,6 +273,9 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
     liftIO $ do
       T.hPutStr stderr $ pHandlerDebugShow handler
       hFlush stderr
+
+  -- application level hotkeys
+  AppKbCmd {..} <- captureInputEvents (That inputCapturedByPopupBeh) holdAppKbCmd
 
   -- setup PotatoConfig
   -- TODO pass in mLoadFileEv (except it need sto be filename)
@@ -381,7 +385,7 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
   -- render main panels
 
   (keyboardEv, ((layersW, toolsW, paramsW, clickSaveEvRaw, clickSaveAsEvRaw), canvasW)) <- flip runPotatoReader potatoConfig $
-    captureInputEvents (That inputCapturedByPopupBeh) $ do
+    captureInputEvents (These _appKbCmd_capturedInput inputCapturedByPopupBeh) $ do
       inp <- input
       stuff <- splitHDrag 35 (fill (constant '*')) leftPanel rightPanel
 
@@ -395,11 +399,8 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
       return (kb, stuff)
 
   let
-    (clickSaveEv, nothingClickSaveEv)  = fanMaybe $ tag (_potatoConfig_appCurrentOpenFile potatoConfig) clickSaveEvRaw
+    (clickSaveEv, nothingClickSaveEv)  = fanMaybe $ tag (_potatoConfig_appCurrentOpenFile potatoConfig) $ leftmost [clickSaveEvRaw, _appKbCmd_save]
     clickSaveAsEv = leftmost $ [clickSaveAsEvRaw, nothingClickSaveEv]
-
-
-
 
   --(_, popupStateDyn1) <- popupPaneSimple def (postBuildEv $> welcomeWidget)
   (_, popupStateDyn1) <- popupPaneSimple def (never $> welcomeWidget)
@@ -414,11 +415,11 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
 
   let
     -- TODO assert that we never have more than 1 popup open at once
+    -- block input if any popup is currently open
     inputCapturedByPopupBeh = current . fmap getAny . mconcat . fmap (fmap Any) $ [popupStateDyn1, popupStateDyn2, popupStateDyn3]
 
 
 
   -- handle escape event
-  return $ fforMaybe flowInput $ \case
-    V.EvKey (V.KChar 'q') [V.MCtrl] -> Just ()
-    _ -> Nothing
+  -- TODO we want to prompt for save first
+  return _appKbCmd_quit

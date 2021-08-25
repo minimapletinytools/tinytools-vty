@@ -40,8 +40,12 @@ instance Default PotatoStyle where
 
 data PotatoConfig t = PotatoConfig {
   _potatoConfig_style :: Behavior t PotatoStyle
+
+  -- TODO these need to be per document if you ever want MDI
   , _potatoConfig_appCurrentOpenFile :: Behavior t (Maybe FP.FilePath)
   , _potatoConfig_appPrintFile :: Behavior t (Maybe FP.FilePath)
+  -- TODO
+  --, _potatoConfig_unsavedChanges :: Behavior t Bool
 }
 
 instance (Reflex t) =>  Default (PotatoConfig t) where
