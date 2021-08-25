@@ -258,7 +258,7 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
     let spf = owlPFState_to_sPotatoFlow . _owlPFWorkspace_pFState . _goatState_workspace $ gs
     handle (\(SomeException e) -> return . Left $ "ERROR, Could not save to file " <> show fn <> " got exception \"" <> show e <> "\"") $ do
       --liftIO $ Aeson.encodeFile "potato.flow" spf
-      print $ "wrote to file: " <> T.unpack fn
+      print $ "wrote to file: " <> fn
       LBS.writeFile fn $ PrettyAeson.encodePretty spf
       return $ Right fn
 
@@ -408,7 +408,7 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
   (saveAsEv, popupStateDyn2) <- flip runPotatoReader potatoConfig $ popupSaveAsWindow $ SaveAsWindowConfig (clickSaveAsEv $> "/Users/user/kitchen/faucet/potato-flow-vty")
 
   let
-   alertEv = leftmost [fmapMaybe eitherMaybeLeft finishSaveEv]
+    alertEv = leftmost [fmapMaybe eitherMaybeLeft finishSaveEv]
   popupStateDyn3 <- flip runPotatoReader potatoConfig $ popupAlert alertEv
 
 
