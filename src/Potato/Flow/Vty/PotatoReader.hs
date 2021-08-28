@@ -48,6 +48,8 @@ data PotatoConfig t = PotatoConfig {
   --, _potatoConfig_unsavedChanges :: Behavior t Bool
 }
 
+data PotatoOutput t = PotatoOutput
+
 instance (Reflex t) =>  Default (PotatoConfig t) where
   def = PotatoConfig {
       _potatoConfig_style = constant def
@@ -91,7 +93,7 @@ instance HasPotato t m => HasPotato t (Layout t m) where
 
 -- | A widget that has access to information about whether it is focused
 newtype PotatoReader t m a = PotatoReader
-  { unPotatoReader :: ReaderT (PotatoConfig t) m a }
+  { unPotatoReader :: StateT   (PotatoOutput t) (ReaderT (PotatoConfig t) m) a }
   deriving
     ( Functor
     , Applicative
@@ -126,13 +128,15 @@ instance HasImageWriter t m => HasImageWriter t (PotatoReader t m) where
   tellImages = lift . tellImages
   mapImages f = hoistpotato (mapImages f) where
     hoistpotato g = PotatoReader . (hoist g) . unPotatoReader
-    hoist nat m = ReaderT (\i -> nat (runReaderT m i))
+    hoist nat m = StateT $ \s -> ReaderT (\i -> nat (runReaderT (runStateT m s) i))
 
 -- TODO it's better to do this using
 -- default input :: (f m' ~ m, Monad m', MonadTrans f, HasInput t m') => ...
 -- inside of HasLayout class
 instance (Reflex t, HasLayout t m) => HasLayout t (PotatoReader t m) where
-  axis a b c = PotatoReader . ReaderT $ \pcfg -> axis a b (runPotatoReader c pcfg)
+  axis a b c = PotatoReader
+    (StateT $ \s ->
+      ReaderT $ \pcfg -> axis a b (runPotatoReader c s pcfg))
   region = lift . region
   askOrientation = lift askOrientation
 
@@ -143,17 +147,17 @@ instance (Adjustable t m, MonadFix m, MonadHold t m) => Adjustable t (PotatoRead
   traverseDMapWithKeyWithAdjustWithMove f m e = PotatoReader $ traverseDMapWithKeyWithAdjustWithMove (\k v -> unPotatoReader $ f k v) m e
 
 instance MonadTrans (PotatoReader t) where
-  lift = PotatoReader . lift
+  lift = PotatoReader . lift . lift
 
 
 instance MonadNodeId m => MonadNodeId (PotatoReader t m)
 
 
 -- | Run a 'FocusReader' action with the given focus value
--- TODO flip arg order to match ReaderT oops...
 runPotatoReader
   :: (Reflex t, Monad m)
   => PotatoReader t m a
+  -> PotatoOutput t
   -> PotatoConfig t
-  -> m a
-runPotatoReader a b = flip runReaderT b $ unPotatoReader a
+  -> m (a, PotatoOutput t)
+runPotatoReader a out b = flip runReaderT b . flip runStateT out $ unPotatoReader a
