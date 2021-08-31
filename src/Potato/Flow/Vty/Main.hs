@@ -29,7 +29,9 @@ import Potato.Flow.Vty.SaveAsWindow
 import Potato.Flow.Vty.Alert
 import Potato.Flow.Vty.AppKbCmd
 
-import System.IO (stderr, hFlush)
+import System.IO (stderr, stdout, hFlush)
+import System.Console.ANSI (hSetTitle)
+
 import           Control.Concurrent
 import           Control.Monad.Fix
 import           Control.Monad.NodeId
@@ -47,6 +49,7 @@ import qualified Data.Text.IO as T
 import           Data.Time.Clock
 import qualified Data.ByteString.Lazy as LBS
 import Data.These
+
 
 import           Network.HTTP.Simple
 
@@ -252,6 +255,16 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
     $ \fp -> do
       mspf :: Maybe SPotatoFlow <- liftIO $ Aeson.decodeFileStrict (T.unpack fp)
       return $ mspf >>= return . (,emptyControllerMeta)
+
+
+  -- TODO finish hooking up the event
+  -- TODO how to tell if dirty or not (with undos etc)
+  -- set the title
+  let
+    setOpenFileStateEv = never
+  performEvent_ $ ffor setOpenFileStateEv $ \(fn, dirty) -> do
+    liftIO $ hSetTitle stdout $ fn <> (if dirty then "*" else "")
+
 
   let
     performSaveEv = attach (current $ _goatWidget_DEBUG_goatState everythingW) $ leftmost [saveAsEv, clickSaveEv]

@@ -95,7 +95,8 @@ dependencies:
 - reflex-test-host
 - ref-tf
 - bimap
-- filepath 
+- filepath
+- ansi-terminal
 
 library:
   source-dirs: src
