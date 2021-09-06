@@ -101,7 +101,7 @@ holdLayerWidget LayerWidgetConfig {..} = do
         -- TODO selected state
         attr = case selected of
           LHRESS_Selected -> _potatoStyle_selected
-          LHRESS_InheritSelected -> _potatoStyle_softSelected
+          LHRESS_InheritSelected -> _potatoStyle_selected
           _ -> _potatoStyle_normal
 
         identn = case mdots of

@@ -43,6 +43,7 @@ import           Reflex.Vty.Widget.Input.Mouse
 import           Control.Monad.NodeId
 import           Control.Monad.Reader
 
+
 -- currently only works for a SINGLE POINT
 -- TODO integrate with pane2 so it reports clicks that happen on pane.
 data SingleClick = SingleClick
@@ -99,7 +100,7 @@ splitHDrag splitter0 wS wA wB = mdo
     [ True <$ mA
     , False <$ mB
     ]
-    
+
   (mA, rA) <- pane2 regA focA $ withMouseDown wA
   pane regS (pure False) wS
   (mB, rB) <- pane2 regB (not <$> focA) $ withMouseDown wB

@@ -2,7 +2,8 @@
 {-# LANGUAGE RecursiveDo     #-}
 
 module Potato.Reflex.Vty.Widget.Popup (
-  popupPaneSimple
+  popupPane
+  , popupPaneSimple
 ) where
 
 import           Relude

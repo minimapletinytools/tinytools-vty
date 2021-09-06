@@ -90,12 +90,13 @@ dependencies:
 - dependent-map
 - aeson-pretty
 - bytestring
-
+- directory
 - template-haskell
 - reflex-test-host
 - ref-tf
 - bimap
-
+- filepath
+- ansi-terminal
 
 library:
   source-dirs: src

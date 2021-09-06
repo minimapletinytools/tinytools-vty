@@ -13,6 +13,8 @@ import Control.Monad.Reader (ReaderT, ask, local, runReaderT)
 import Control.Monad.Ref
 import Control.Monad.Trans (MonadTrans, lift)
 
+import qualified System.FilePath as FP
+
 import qualified Graphics.Vty as V
 import Reflex.Host.Class (MonadReflexCreateTrigger)
 import           Reflex
@@ -38,19 +40,39 @@ instance Default PotatoStyle where
 
 data PotatoConfig t = PotatoConfig {
   _potatoConfig_style :: Behavior t PotatoStyle
+
+  -- TODO these need to be per document if you ever want MDI
+  , _potatoConfig_appCurrentOpenFile :: Behavior t (Maybe FP.FilePath)
+  , _potatoConfig_appPrintFile :: Behavior t (Maybe FP.FilePath)
+  -- TODO
+  --, _potatoConfig_unsavedChanges :: Behavior t Bool
 }
 
 instance (Reflex t) =>  Default (PotatoConfig t) where
   def = PotatoConfig {
       _potatoConfig_style = constant def
+      , _potatoConfig_appCurrentOpenFile = constant Nothing
+      , _potatoConfig_appPrintFile = constant Nothing
     }
 
 -- | A class for things that can dynamically gain and lose focus
 class (Reflex t, Monad m) => HasPotato t m | m -> t where
   askPotato :: m (PotatoConfig t)
 
-instance (HasInput t m, Monad m) => HasInput t (ReaderT x m)
-instance (HasFocus t m, Monad m) => HasFocus t (ReaderT x m)
+instance (HasInput t m, Monad m) => HasInput t (ReaderT r m)
+
+
+-- TODO it's better to do this using
+-- default input :: (f m' ~ m, Monad m', MonadTrans f, HasInput t m') => ...
+-- inside of HasFocus class
+instance (Reflex t, HasFocus t m, Monad m) => HasFocus t (ReaderT r m) where
+  makeFocus = lift makeFocus
+  requestFocus = lift . requestFocus
+  isFocused = lift . isFocused
+  --subFoci :: m a -> m (a, Dynamic t FocusSet)
+  subFoci x = ReaderT $ \r -> subFoci (runReaderT x r)
+  focusedId = lift focusedId
+
 
 instance HasPotato t m => HasPotato t (ReaderT x m)
 instance HasPotato t m => HasPotato t (BehaviorWriterT t x m)
@@ -61,9 +83,11 @@ instance HasPotato t m => HasPotato t (Input t m)
 instance HasPotato t m => HasPotato t (ImageWriter t m)
 instance HasPotato t m => HasPotato t (DisplayRegion t m)
 instance HasPotato t m => HasPotato t (FocusReader t m)
-
+instance HasPotato t m => HasPotato t (Focus t m) where
+  askPotato = lift askPotato
 instance HasPotato t m => HasPotato t (Layout t m) where
   askPotato = lift askPotato
+
 
 -- | A widget that has access to information about whether it is focused
 newtype PotatoReader t m a = PotatoReader
@@ -104,6 +128,14 @@ instance HasImageWriter t m => HasImageWriter t (PotatoReader t m) where
     hoistpotato g = PotatoReader . (hoist g) . unPotatoReader
     hoist nat m = ReaderT (\i -> nat (runReaderT m i))
 
+-- TODO it's better to do this using
+-- default input :: (f m' ~ m, Monad m', MonadTrans f, HasInput t m') => ...
+-- inside of HasLayout class
+instance (Reflex t, HasLayout t m) => HasLayout t (PotatoReader t m) where
+  axis a b c = PotatoReader . ReaderT $ \pcfg -> axis a b (runPotatoReader c pcfg)
+  region = lift . region
+  askOrientation = lift askOrientation
+
 instance (Adjustable t m, MonadFix m, MonadHold t m) => Adjustable t (PotatoReader t m) where
   runWithReplace (PotatoReader a) e = PotatoReader $ runWithReplace a $ fmap unPotatoReader e
   traverseIntMapWithKeyWithAdjust f m e = PotatoReader $ traverseIntMapWithKeyWithAdjust (\k v -> unPotatoReader $ f k v) m e
@@ -116,10 +148,12 @@ instance MonadTrans (PotatoReader t) where
 
 instance MonadNodeId m => MonadNodeId (PotatoReader t m)
 
+
 -- | Run a 'FocusReader' action with the given focus value
+-- TODO flip arg order to match ReaderT oops...
 runPotatoReader
   :: (Reflex t, Monad m)
-  => PotatoConfig t
-  -> PotatoReader t m a
+  => PotatoReader t m a
+  -> PotatoConfig t
   -> m a
-runPotatoReader b = flip runReaderT b . unPotatoReader
+runPotatoReader a b = flip runReaderT b $ unPotatoReader a
