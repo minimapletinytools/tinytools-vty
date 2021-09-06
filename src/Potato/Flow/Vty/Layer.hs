@@ -98,10 +98,11 @@ holdLayerWidget LayerWidgetConfig {..} = do
         sowl = _layerEntry_superOwl
         rid = _superOwl_id sowl
         label = isOwl_name sowl
-        -- TODO selected state
+        
         attr = case selected of
           LHRESS_Selected -> _potatoStyle_selected
           LHRESS_InheritSelected -> _potatoStyle_selected
+          LHRESS_ChildSelected -> _potatoStyle_softSelected
           _ -> _potatoStyle_normal
 
         identn = case mdots of
