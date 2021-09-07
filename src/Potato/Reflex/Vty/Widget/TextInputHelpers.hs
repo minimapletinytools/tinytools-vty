@@ -179,7 +179,7 @@ renderTextZipper offsetDyn dw tz = do
     nofocusAttributes = _potatoStyle_normal potatostyle
     attrsDyn = ffor f $ \x -> if x then (normalAttributes, cursorAttributes) else (nofocusAttributes, nofocusAttributes)
 
-  -- we still render trailing cursor when we aren't focused... you should probably fix this
+  -- TODO this will still render trailing cursor when we aren't focused... please fix
   let rows = (\w s (nattr, cattr) -> TZ.displayLines w nattr cattr s)
         <$> dw
         <*> tz

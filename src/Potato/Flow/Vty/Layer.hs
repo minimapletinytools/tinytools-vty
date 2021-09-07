@@ -17,6 +17,7 @@ import           Potato.Flow.Vty.Input
 import           Potato.Reflex.Vty.Helpers
 import           Potato.Reflex.Vty.Widget
 import Potato.Flow.Vty.PotatoReader
+import qualified Potato.Data.Text.Zipper
 
 
 import           Control.Monad.Fix
@@ -35,6 +36,13 @@ import           Reflex
 import           Reflex.Network
 import           Reflex.Potato.Helpers
 import           Reflex.Vty
+
+
+
+-- | simple conversion function 
+-- potato-flow does not want to depend on reflex an has a coppy of TextZipper library but they are pretty much the same
+coerceZipper :: Potato.Data.Text.Zipper.TextZipper -> TZ.TextZipper
+coerceZipper (Potato.Data.Text.Zipper.TextZipper a b c d) = TZ.TextZipper a b c d
 
 --moveChar :: Char
 --moveChar = '≡'
@@ -93,7 +101,7 @@ holdLayerWidget LayerWidgetConfig {..} = do
         r = V.text' lg_layer_selected . T.pack . L.take width
           $ replicate ident ' '
           <> replicate 10 '*'
-      LayersHandlerRenderEntryNormal selected mdots lentry@LayerEntry{..} -> r where
+      LayersHandlerRenderEntryNormal selected mdots mrenaming lentry@LayerEntry{..} -> r where
         ident = layerEntry_depth lentry
         sowl = _layerEntry_superOwl
         rid = _superOwl_id sowl
@@ -105,17 +113,22 @@ holdLayerWidget LayerWidgetConfig {..} = do
           LHRESS_ChildSelected -> _potatoStyle_softSelected
           _ -> _potatoStyle_normal
 
+        -- TODO correct styles so they aren't confused with selected styles (you should add colors)
+        attrrenamingbg = _potatoStyle_softSelected
+        attrrenamingcur = _potatoStyle_selected
+
         identn = case mdots of
           Nothing -> ident
           Just x -> x
 
-        r = V.text' attr . T.pack . L.take width $
+        t1 = V.text' attr . T.pack $
 
           -- render identation and possible drop depth
           replicate identn ' '
           <> replicate (min 1 (ident - identn)) '|'
           <> replicate (max 0 (ident - identn - 1)) ' '
 
+          -- render folder hide lock icons
           -- <> [moveChar]
           <> if' (layerEntry_isFolder lentry) (if' _layerEntry_isCollapsed [expandChar] [closeChar]) []
           <> if' (lockHiddenStateToBool _layerEntry_hideState) [hiddenChar] [visibleChar]
@@ -123,7 +136,15 @@ holdLayerWidget LayerWidgetConfig {..} = do
           <> " "
           <> show rid
           <> " "
-          <> T.unpack label
+
+        t2 = case mrenaming of 
+          Nothing -> V.text' attr label
+          Just renaming -> img where
+            dls = TZ.displayLines 999999 attrrenamingbg attrrenamingcur (coerceZipper renaming)
+            img = V.vertCat . images $ TZ._displayLines_spans dls
+
+        r = t1 V.<|> t2
+          
     layerImages :: Behavior t [V.Image]
     layerImages = current $ fmap ((:[]) . V.vertCat)
       $ ffor2 regionDyn (fmap _layersViewHandlerRenderOutput_entries _layerWidgetConfig_layersView) $ \(w,h) lhrentries ->
