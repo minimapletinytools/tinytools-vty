@@ -55,7 +55,7 @@ popupPaneInternal PopupPaneSize {..} widgetFnEv = do
       }
   escapeEv <- key V.KEsc
   outsideMouseEv <- mouseDown V.BLeft
-  (outputEv, closeEv) <- pane2 regionDyn (constDyn True) $ do
+  (outputEv, closeEv) <- pane regionDyn (constDyn True) $ do
     insideMouseEv <- mouseDown V.BLeft
     (closeEv', outputEv') <- widgetFnEv (void escapeEv) (void $ difference outsideMouseEv insideMouseEv)
     return (outputEv', closeEv')

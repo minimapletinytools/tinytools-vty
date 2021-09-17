@@ -75,13 +75,6 @@ packages:
   original:
     hackage: dependent-sum-template-0.1.0.3@sha256:0bbbacdfbd3abf2a15aaf0cf2c27e5bdd159b519441fec39e1e6f2f54424adde,1682
 - completed:
-    hackage: reflex-vty-0.2.0.0@sha256:2a136962687d7066ba8b826147adb22eb4936c57c3bacec15cec0d93cf5265e2,3586
-    pantry-tree:
-      size: 1449
-      sha256: bb2f458a993117d3dd5fd8e3793ae1e97a30f650553f39e166514501188bf00e
-  original:
-    hackage: reflex-vty-0.2.0.0
-- completed:
     hackage: bimap-0.3.3@sha256:232518c0410990665b9c8677eb9318ee355c001d58945ddcbedec3baa30b4160,1475
     pantry-tree:
       size: 414
@@ -116,6 +109,17 @@ packages:
       sha256: dd785882a522b6c76ee97fdd5e0e8cbca15b2fc951985bbecc76d0dd6e456aae
   original:
     hackage: these-1.0.1@sha256:58dba2446b57dde711c5e7f63910d18bc28b9a5831a89772986bb184a3e7851b,3266
+- completed:
+    size: 57679
+    url: https://github.com/pdlla/reflex-vty/archive/6079383b31b1668e5d998bb84724969162bb5044.tar.gz
+    name: reflex-vty
+    version: 0.2.0.0
+    sha256: 0c3b69b79a04678064a3ec45d61690bc17b0de67e897820c87e74255a6c93109
+    pantry-tree:
+      size: 1969
+      sha256: 6d4b8faac2390f4c3077a51c7fd3e7e347c7f9f582c9dd10f67b760533ede07e
+  original:
+    url: https://github.com/pdlla/reflex-vty/archive/6079383b31b1668e5d998bb84724969162bb5044.tar.gz
 snapshots:
 - completed:
     size: 533252

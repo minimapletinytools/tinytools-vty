@@ -387,7 +387,7 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
       f <- focus
       -- temp ignoreMouseUnlessFocused as when we click from one panel to the other, it will tigger events in both panels
       -- TODO remove this once we do proper Endo style folding in Goat...
-      ignoreMouseUnlessFocused $ pane2 dreg f $ holdCanvasWidget $ CanvasWidgetConfig {
+      ignoreMouseUnlessFocused $ pane dreg f $ holdCanvasWidget $ CanvasWidgetConfig {
           _canvasWidgetConfig_pan = _goatWidget_pan everythingW
           , _canvasWidgetConfig_broadPhase = _goatWidget_broadPhase everythingW
           , _canvasWidgetConfig_renderedCanvas = _goatWidget_renderedCanvas everythingW
