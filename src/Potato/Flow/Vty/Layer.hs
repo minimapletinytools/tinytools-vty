@@ -93,7 +93,7 @@ holdLayerWidget LayerWidgetConfig {..} = do
         r = V.text' lg_layer_selected . T.pack . L.take width
           $ replicate ident ' '
           <> replicate 10 '*'
-      LayersHandlerRenderEntryNormal selected mdots lentry@LayerEntry{..} -> r where
+      LayersHandlerRenderEntryNormal selected mdots mrenaming lentry@LayerEntry{..} -> r where
         ident = layerEntry_depth lentry
         sowl = _layerEntry_superOwl
         rid = _superOwl_id sowl
