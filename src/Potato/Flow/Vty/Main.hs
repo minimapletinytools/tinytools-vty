@@ -385,9 +385,7 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
       dreg' <- askRegion
       let dreg = fmap (\region -> region { _region_left = 0, _region_top = 0}) dreg'
       f <- focus
-      -- temp ignoreMouseUnlessFocused as when we click from one panel to the other, it will tigger events in both panels
-      -- TODO remove this once we do proper Endo style folding in Goat...
-      ignoreMouseUnlessFocused $ pane dreg f $ holdCanvasWidget $ CanvasWidgetConfig {
+      pane dreg f $ holdCanvasWidget $ CanvasWidgetConfig {
           _canvasWidgetConfig_pan = _goatWidget_pan everythingW
           , _canvasWidgetConfig_broadPhase = _goatWidget_broadPhase everythingW
           , _canvasWidgetConfig_renderedCanvas = _goatWidget_renderedCanvas everythingW
@@ -399,9 +397,7 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
 
   (keyboardEv, ((layersW, toolsW, paramsW, clickSaveEvRaw, clickSaveAsEvRaw), canvasW)) <- flip runPotatoReader potatoConfig $
     captureInputEvents (These _appKbCmd_capturedInput inputCapturedByPopupBeh) $ do
-      inp <- input
       stuff <- splitHDrag 35 (fill (constant '*')) leftPanel rightPanel
-
       kb <- captureInputEvents (This (_paramsWidget_captureInputEv paramsW)) $ do
         inp <- input
         return $ fforMaybe inp $ \case
