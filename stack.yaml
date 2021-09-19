@@ -52,7 +52,7 @@ extra-deps:
 - ref-tf-0.4.0.2@sha256:69de3550250e0cd69f45d080359cb314a9487c915024349c75b78732bbee9332,1134
 - witherable-0.3.1@sha256:ed3d5bc9eb1c08fa9704d9e143cdf622e1bd80b847cd5ede8c07da7bc7981ab9,1313
 - dependent-sum-template-0.1.0.3@sha256:0bbbacdfbd3abf2a15aaf0cf2c27e5bdd159b519441fec39e1e6f2f54424adde,1682
-# - reflex-vty-0.1.4.0@sha256:46dcb043c39532e85c08e7098ac2e1237d5f7d018183b3f758f5ef87e06f51d4,2377
+# - reflex-vty-0.2.0.0
 - bimap-0.3.3@sha256:232518c0410990665b9c8677eb9318ee355c001d58945ddcbedec3baa30b4160,1475
 - vty-5.28.2@sha256:8cffce1f4f92eec70b5c3763bb6437852fd3fa7546869496f7667a5abc3f07d7,20859
 - constraints-0.11.2@sha256:d028005d93f891b48b61ff0c82c6f868859eb728010dea3e355b0c55d0f57cf9,2219
@@ -65,7 +65,7 @@ extra-deps:
 - github: pdlla/reflex-potatoes
   commit: 9fc5f55748cf1f6d662c33bf1799bcab3d168403
 - github: pdlla/reflex-vty
-  commit: 047a5f962b4640ddb37307cc1dbc145e9785f77a
+  commit: 6079383b31b1668e5d998bb84724969162bb5044
 
 # use git submodule to speed up development flow
 - potato_flow

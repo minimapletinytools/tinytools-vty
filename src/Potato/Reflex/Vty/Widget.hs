@@ -22,7 +22,6 @@ module Potato.Reflex.Vty.Widget
   , DragState(..)
   , Drag2(..)
   , drag2
-  , pane2
   ) where
 
 import           Prelude
@@ -101,9 +100,9 @@ splitHDrag splitter0 wS wA wB = mdo
     , False <$ mB
     ]
 
-  (mA, rA) <- pane2 regA focA $ withMouseDown wA
+  (mA, rA) <- pane regA focA $ withMouseDown wA
   pane regS (pure False) wS
-  (mB, rB) <- pane2 regB (not <$> focA) $ withMouseDown wB
+  (mB, rB) <- pane regB (not <$> focA) $ withMouseDown wB
 
   return (rA, rB)
   where
@@ -157,58 +156,3 @@ drag2 btn = mdo
     newDrag = attachWithMaybe f (current dragD) inp
   dragD <- holdDyn Nothing $ Just <$> newDrag
   return (fmapMaybe id $ updated dragD)
-
--- |
--- * 'Tracking' state means actively tracking the current stream of mouse events
--- * 'NotTracking' state means not tracking the current stream of mouse events
--- * 'WaitingForInput' means state will be set on next 'EvMouseDown' event
-data MouseTrackingState = Tracking V.Button | NotTracking | WaitingForInput deriving (Show, Eq)
-
--- | same as pane except mouse drags that start off pane aren't reported and mouse drags that end off pane are reported
-pane2
-  :: forall t m a. (Reflex t, MonadHold t m, MonadNodeId m, MonadFix m, HasDisplayRegion t m, HasInput t m, HasImageWriter t m, HasFocusReader t m)
-  => Dynamic t Region
-  -> Dynamic t Bool -- ^ Whether the widget should be focused when the parent is.
-  -> m a
-  -> m a
-pane2 dr foc child = do
-  inp <- input
-  let
-    reg = current dr
-    isWithin :: Region -> Int -> Int -> Bool
-    isWithin (Region l t w h) x y = not . or $ [ x < l
-                                               , y < t
-                                               , x >= l + w
-                                               , y >= t + h ]
-    trackMouse ::
-      VtyEvent
-      -> (MouseTrackingState, Maybe VtyEvent)
-      -> PushM t (Maybe (MouseTrackingState, Maybe VtyEvent))
-    trackMouse e (tracking, _) = do
-      reg'@(Region l t _ _) <- sample reg
-      -- consider using attachPromptlyDyn instead to get most up to date focus, which allows us to ignore mouse inputs when there is no focus (for stuff like ignoring mouse input when there is a popup)
-      focused <- sample . current $ foc
-      return $ case e of
-        V.EvKey _ _ | not focused -> Nothing
-        V.EvMouseDown x y btn m ->
-          if tracking == Tracking btn || (tracking == WaitingForInput && isWithin reg' x y)
-            then Just (Tracking btn, Just $ V.EvMouseDown (x - l) (y - t) btn m)
-            else Just (NotTracking, Nothing)
-        -- vty has mouse buttons override others (seems to be based on ordering of Button) when multiple are pressed.
-        -- So it's possible for child widget to miss out on a 'EvMouseUp' event
-        -- Perhaps a better option is to have both 'pane' and 'drag' report ALL mouse up events?
-        V.EvMouseUp x y mbtn -> case mbtn of
-          Nothing -> case tracking of
-            Tracking _ -> Just (WaitingForInput, Just $ V.EvMouseUp (x - l) (y - t) mbtn)
-            _ -> Just (WaitingForInput, Nothing)
-          Just btn -> if tracking == Tracking btn
-            -- only report EvMouseUp for the button we are tracking
-            then Just (WaitingForInput, Just $ V.EvMouseUp (x - l) (y - t) mbtn)
-            else Just (WaitingForInput, Nothing)
-        _ -> Just (tracking, Just e)
-  dynInputEvTracking <- foldDynMaybeM trackMouse (WaitingForInput, Nothing) $ inp
-
-  localRegion (const dr) $
-    mapImages (imagesInRegion $ current dr) $
-      localFocus (const foc) $
-        localInput (const (fmapMaybe snd $ updated dynInputEvTracking)) child

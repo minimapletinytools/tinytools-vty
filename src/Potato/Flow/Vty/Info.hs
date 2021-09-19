@@ -38,12 +38,12 @@ holdInfoWidget :: forall t m. (MonadWidget t m)
 holdInfoWidget InfoWidgetConfig {..} = do
   let
     -- TODO read canvasSelection and figure out what the preset is
-    infoDyn = ffor _infoWidgetConfig_selection $ \selection -> case () of
+    infoDyn = ffor _infoWidgetConfig_selection $ \selection@(SuperOwlParliament sowls) -> case () of
       _ | isParliament_length selection == 0 -> return ()
       _ | isParliament_length selection > 1 -> text "many"
       _ -> do
         let
-          sowl = selectionToSuperOwl selection
+          sowl = selectionToSuperOwl (CanvasSelection sowls)
           rid = _superOwl_id sowl
           label = isOwl_name sowl
           selt = superOwl_toSElt_hack sowl

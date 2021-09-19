@@ -77,6 +77,17 @@ test_basic = TestLabel "open and quit" $ TestCase $ runSpiderHost $
     -- fire an empty event and ensure there is no quit event
     fireQueuedEventsAndRead readExitEv >>= \a -> liftIO (checkNothing a)
 
+    -- close the annoying welcome popup
+    queueVtyEvent (V.EvKey V.KEnter []) >> fireQueuedEvents
+
+    -- drag mouse between layer and canvas panes to ensure GoatWidget mouse assumptions hold (otherwise it would crash)
+    queueVtyEvent (V.EvMouseDown 0 10 V.BLeft []) >> fireQueuedEvents
+    queueVtyEvent (V.EvMouseDown 1000 10 V.BLeft []) >> fireQueuedEvents
+    queueVtyEvent (V.EvMouseUp 1000 10 (Just V.BLeft)) >> fireQueuedEvents
+    queueVtyEvent (V.EvMouseDown 1000 10 V.BLeft []) >> fireQueuedEvents
+    queueVtyEvent (V.EvMouseDown 0 10 V.BLeft []) >> fireQueuedEvents
+    queueVtyEvent (V.EvMouseUp 0 10 (Just V.BLeft)) >> fireQueuedEvents
+
     -- enter quit sequence and ensure there is a quit event
     queueVtyEvent $ V.EvKey (V.KChar 'q') [V.MCtrl]
     fireQueuedEventsAndRead readExitEv >>= \a -> liftIO (checkSingleMaybe a ())
