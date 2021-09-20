@@ -330,6 +330,12 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
     hdivider = (grout. fixed) 1 $ fill (constant '-')
     leftPanel = initLayout $ col $ do
       (clickSaveEv_d1, clickSaveAsEv_d1) <- (grout . fixed) 1 $ row $ do
+        
+        let 
+          clickSaveEv_d2 = never
+          clickSaveAsEv_d2 = never
+
+        {- TODO fix me, currently broken now that we've switched to pane2 because popup captures the release event causing pane2 to think it still owns the mouse drag after release
         clickSaveEv_d2 <- (grout . stretch) 1 $ do
           text "save"
           click <- mouseDown V.BLeft
@@ -341,11 +347,13 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
           click <- mouseDown V.BLeft
           return (void click)
         (grout . fixed) 1 $ text "|"
+        -}
+
         (grout . stretch) 1 $ do
-          text "print"
+          text "export to \"potato.txt\""
           click <- mouseDown V.BLeft
-          let clickSaveEv = tag (current $ _goatWidget_renderedCanvas everythingW) click
-          performEvent_ $ ffor clickSaveEv $ \rc -> do
+          let clickPrintEv = tag (current $ _goatWidget_renderedCanvas everythingW) click
+          performEvent_ $ ffor clickPrintEv $ \rc -> do
              let t = renderedCanvasToText rc
              liftIO $ T.writeFile "potato.txt" t
         return (clickSaveEv_d2, clickSaveAsEv_d2)
