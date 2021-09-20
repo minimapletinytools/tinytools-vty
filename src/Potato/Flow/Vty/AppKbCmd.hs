@@ -23,7 +23,7 @@ holdAppKbCmd = do
 
   let
     captureKeyWithCtrl c = fforMaybe inp $ \i -> case i of
-      V.EvKey (V.KChar c) [V.MCtrl] -> Just ()
+      V.EvKey (V.KChar c') [V.MCtrl] | c' == c -> Just ()
       _ -> Nothing
     saveEv = captureKeyWithCtrl 's'
     openEv = captureKeyWithCtrl 'o'

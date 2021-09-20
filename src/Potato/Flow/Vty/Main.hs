@@ -243,6 +243,7 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
   --tickEv <- tickLossy 1 currentTime
   --ticks <- foldDyn (+) (0 :: Int) (fmap (const 1) tickEv)
 
+  --flowInput <- input >>= return . traceEvent "input: "
   flowInput <- input
   postBuildEv <- getPostBuild
 
