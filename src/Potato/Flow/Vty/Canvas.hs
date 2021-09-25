@@ -82,7 +82,7 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
     -- the screen region in canvas space
     canvasScreenRegion' = fmap _renderedCanvasRegion_box _canvasWidgetConfig_renderedCanvas
 
-    -- true region is the canvas region translated and cropped to the panned screen (i.e. the region the canvas exists on the physics screen)
+    -- true region is the canvas region cropped to the panned screen (i.e. the intersection of screen and canvas in canvas space)
     maybeCropAndPan pan scanvas screen = maybe (LBox 0 0) (pan_lBox pan) $ intersect_lBox screen (_sCanvas_box scanvas)
     trueRegion' = ffor3 _canvasWidgetConfig_pan _canvasWidgetConfig_canvas canvasScreenRegion' maybeCropAndPan
     trueRegion = dynLBox_to_dynRegion trueRegion'
