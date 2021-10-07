@@ -330,8 +330,8 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
     hdivider = (grout. fixed) 1 $ fill (constant '-')
     leftPanel = initLayout $ col $ do
       (clickSaveEv_d1, clickSaveAsEv_d1) <- (grout . fixed) 1 $ row $ do
-        
-        let 
+
+        let
           clickSaveEv_d2 = never
           clickSaveAsEv_d2 = never
 
@@ -398,6 +398,7 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
           _canvasWidgetConfig_pan = _goatWidget_pan everythingW
           , _canvasWidgetConfig_broadPhase = _goatWidget_broadPhase everythingW
           , _canvasWidgetConfig_renderedCanvas = _goatWidget_renderedCanvas everythingW
+          , _canvasWidgetConfig_renderedSelection = _goatWidget_renderedSelection everythingW
           , _canvasWidgetConfig_canvas = _goatWidget_canvas everythingW
           , _canvasWidgetConfig_handles = _goatWidget_handlerRenderOutput everythingW
         }

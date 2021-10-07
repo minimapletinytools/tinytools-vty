@@ -23,10 +23,46 @@ import Potato.Flow.Vty.PotatoReader
 import           Control.Lens
 import qualified Data.IntMap.Strict             as IM
 import           Data.These
+import qualified Data.Text as T
+import qualified Data.List.Index as L
+import Data.Tuple.Extra (thd3)
 
 import qualified Graphics.Vty                   as V
 import           Reflex
 import           Reflex.Vty
+
+
+-- alternative text rendering methods that don't show spaces
+textNoRenderSpaces
+  :: (Reflex t, Monad m, HasDisplayRegion t m, HasImageWriter t m, HasTheme t m)
+  => Behavior t Text
+  -> m ()
+textNoRenderSpaces t = do
+  bt <- theme
+  let img = (\a s -> [makeimages a s])
+        <$> bt
+        <*> t
+  tellImages (fmap join img)
+  where
+    -- TODO you can delete spaces from this, it's not needed
+    -- revout is of type [(Text, Int)] where the int is offset from BoL
+    foldlinefn (offset, spaces, revout) c = (offset+1, newspaces, newout) where
+      (newspaces, newout) = if c == ' '
+        then (spaces+1, revout)
+        else if spaces /= 0
+          then (0, (T.singleton c, offset):revout)
+          else case revout of
+            (x,n):xs -> (0, (T.cons c x,n):xs)
+            -- first character case
+            [] -> (0, [(T.singleton c, 0)])
+    makeimages theme =
+      -- (\x -> traceShow (length x) x) .
+      join
+      . L.imap (\i -> fmap (V.translateY i)) -- for each line, offset the image vertically
+      . fmap (fmap (\(t,offset) -> V.translateX offset $  V.string theme (T.unpack t))) -- for each chunk and offset, convert to image
+      . fmap (reverse . thd3 . foldl' foldlinefn (0,0,[]) . T.unpack) -- for each line, split into chunks with offset
+      . T.split (=='\n') -- split into lines
+
 
 -- TODO this needs to come from Potato.Flow
 defaultCanvasLBox :: LBox
@@ -55,6 +91,7 @@ data CanvasWidgetConfig t = CanvasWidgetConfig {
   -- TODO DELETE
   , _canvasWidgetConfig_broadPhase     :: Dynamic t BroadPhaseState
   , _canvasWidgetConfig_renderedCanvas :: Dynamic t RenderedCanvasRegion
+  , _canvasWidgetConfig_renderedSelection :: Dynamic t RenderedCanvasRegion
   , _canvasWidgetConfig_canvas         :: Dynamic t SCanvas
   , _canvasWidgetConfig_handles        :: Dynamic t HandlerRenderOutput
 }
@@ -79,6 +116,7 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
   let
     -- the screen region
     screenRegion' = ffor2 dw dh (\w h -> LBox 0 (V2 w h))
+    screenRegion = dynLBox_to_dynRegion screenRegion'
     -- the screen region in canvas space
     canvasScreenRegion' = fmap _renderedCanvasRegion_box _canvasWidgetConfig_renderedCanvas
 
@@ -95,12 +133,21 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
     renderRegion dreg = pane dreg (constDyn False) $ do
       text . current . ffor3 _canvasWidgetConfig_pan dreg _canvasWidgetConfig_renderedCanvas $ renderRegionFn
 
+
+  -- 1. render out of bounds region
   -- TODO use correct theme
   localTheme (const (fmap _potatoStyle_softSelected potatostylebeh)) $ do
     fill (constant ' ')
     simpleList oobRegions renderRegion
 
+  -- 2. render the canvas region
   renderRegion trueRegion
+
+  -- 3. render the selection
+  -- TODO use correct theme
+  localTheme (const (fmap _potatoStyle_selected potatostylebeh)) $ do
+    textNoRenderSpaces . current . ffor3 _canvasWidgetConfig_pan screenRegion _canvasWidgetConfig_renderedSelection $ renderRegionFn
+
 
 
   let
