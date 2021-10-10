@@ -44,23 +44,22 @@ textNoRenderSpaces t = do
         <*> t
   tellImages (fmap join img)
   where
-    -- TODO you can delete spaces from this, it's not needed
     -- revout is of type [(Text, Int)] where the int is offset from BoL
-    foldlinefn (offset, spaces, revout) c = (offset+1, newspaces, newout) where
-      (newspaces, newout) = if c == ' '
+    foldlinefn (offset, spaces, revout) c = (offset+1, newspaces, newrevout) where
+      (newspaces, newrevout) = if c == ' '
         then (spaces+1, revout)
         else if spaces /= 0
-          then (0, (T.singleton c, offset):revout)
+          then (0, ([c], offset):revout)
           else case revout of
-            (x,n):xs -> (0, (T.cons c x,n):xs)
+            (x,n):xs -> (0, (c:x,n):xs)
             -- first character case
-            [] -> (0, [(T.singleton c, 0)])
+            [] -> (0, [([c], 0)])
     makeimages theme =
       -- (\x -> traceShow (length x) x) .
       join
       . L.imap (\i -> fmap (V.translateY i)) -- for each line, offset the image vertically
-      . fmap (fmap (\(t,offset) -> V.translateX offset $  V.string theme (T.unpack t))) -- for each chunk and offset, convert to image
-      . fmap (reverse . thd3 . foldl' foldlinefn (0,0,[]) . T.unpack) -- for each line, split into chunks with offset
+      . fmap (fmap (\(t,offset) -> V.translateX offset $  V.string theme (reverse t))) -- for each chunk and offset, convert to image
+      . fmap (thd3 . foldl' foldlinefn (0,0,[]) . T.unpack) -- for each line, split into chunks with offset
       . T.split (=='\n') -- split into lines
 
 
@@ -134,6 +133,12 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
       text . current . ffor3 _canvasWidgetConfig_pan dreg _canvasWidgetConfig_renderedCanvas $ renderRegionFn
 
 
+    -- same as renderRegionFn
+    debugRenderRegionFn pan reg rc = r where
+      txt = renderedCanvasRegionToText (pan_lBox (-pan) (region_to_lBox reg)) rc
+      --r = trace (T.unpack txt) txt
+      r = txt
+
   -- 1. render out of bounds region
   -- TODO use correct theme
   localTheme (const (fmap _potatoStyle_softSelected potatostylebeh)) $ do
@@ -146,7 +151,9 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
   -- 3. render the selection
   -- TODO use correct theme
   localTheme (const (fmap _potatoStyle_selected potatostylebeh)) $ do
-    textNoRenderSpaces . current . ffor3 _canvasWidgetConfig_pan screenRegion _canvasWidgetConfig_renderedSelection $ renderRegionFn
+    textNoRenderSpaces . current . ffor3 _canvasWidgetConfig_pan screenRegion _canvasWidgetConfig_renderedSelection $ debugRenderRegionFn
+
+    
 
 
 
