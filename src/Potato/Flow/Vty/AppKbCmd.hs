@@ -12,6 +12,7 @@ import qualified Graphics.Vty.Input.Events         as V
 data AppKbCmd t = AppKbCmd {
   _appKbCmd_save :: Event t ()
   , _appKbCmd_open :: Event t ()
+  , _appKbCmd_print :: Event t ()
   , _appKbCmd_quit :: Event t ()
   , _appKbCmd_new :: Event t ()
   , _appKbCmd_capturedInput :: Event t ()
@@ -27,6 +28,7 @@ holdAppKbCmd = do
       _ -> Nothing
     saveEv = captureKeyWithCtrl 's'
     openEv = captureKeyWithCtrl 'o'
+    printEv = captureKeyWithCtrl 'p'
     quitEv = captureKeyWithCtrl 'q'
     newEv = captureKeyWithCtrl 'n'
     captureEv = leftmost [saveEv, openEv, quitEv, newEv]
@@ -34,6 +36,7 @@ holdAppKbCmd = do
   return $ AppKbCmd {
       _appKbCmd_save = saveEv
       , _appKbCmd_open = openEv
+      , _appKbCmd_print = printEv
       , _appKbCmd_quit = quitEv
       , _appKbCmd_new = newEv
       , _appKbCmd_capturedInput = captureEv

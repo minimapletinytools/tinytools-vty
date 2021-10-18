@@ -352,7 +352,7 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
         (grout . stretch) 1 $ do
           text "export to \"potato.txt\""
           click <- mouseDown V.BLeft
-          let clickPrintEv = tag (current $ _goatWidget_renderedCanvas everythingW) click
+          let clickPrintEv = tag (current $ _goatWidget_renderedCanvas everythingW) (leftmost [void click, _appKbCmd_print])
           performEvent_ $ ffor clickPrintEv $ \rc -> do
              let t = renderedCanvasToText rc
              liftIO $ T.writeFile "potato.txt" t
@@ -421,8 +421,8 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
     (clickSaveEv, nothingClickSaveEv)  = fanMaybe $ tag (_potatoConfig_appCurrentOpenFile potatoConfig) $ leftmost [clickSaveEvRaw, _appKbCmd_save]
     clickSaveAsEv = leftmost $ [clickSaveAsEvRaw, nothingClickSaveEv]
 
-  --(_, popupStateDyn1) <- popupPaneSimple def (postBuildEv $> welcomeWidget)
-  (_, popupStateDyn1) <- popupPaneSimple def (never $> welcomeWidget)
+  (_, popupStateDyn1) <- popupPaneSimple def (postBuildEv $> welcomeWidget)
+  --(_, popupStateDyn1) <- popupPaneSimple def (never $> welcomeWidget)
 
   -- TODO correct initial state (tag potatoConfig)
   (saveAsEv, popupStateDyn2) <- flip runPotatoReader potatoConfig $ popupSaveAsWindow $ SaveAsWindowConfig (clickSaveAsEv $> "/Users/user/kitchen/faucet/potato-flow-vty")

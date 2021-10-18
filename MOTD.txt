@@ -1,4 +1,13 @@
-potato
-tomato
-sheep
-beep
+(ctrl-s) save
+(ctrl-p) print
+(ctrl-q) quit
+
+(ctrl-c) copy
+(ctrl-v) paste
+(ctrl-z) undo
+(ctrl-y) redo
+
+
+# these ones don't work yet sorry :(
+(ctrl-o) open
+(ctrl-n) new
