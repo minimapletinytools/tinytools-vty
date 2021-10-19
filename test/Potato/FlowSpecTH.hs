@@ -33,6 +33,38 @@ import Reflex.Vty.Test.Common
 
 import Language.Haskell.TH
 
+-- for reference, non-TH equivalent network
+{-
+data PotatoNetwork t (m :: Type -> Type)
+
+instance (MonadVtyApp t (TestGuestT t m), TestGuestConstraints t m) => ReflexVtyTestApp (PotatoNetwork t m) t m where
+  data instance VtyAppInputTriggerRefs (PotatoNetwork t m) = PotatoNetwork_InputTriggerRefs {
+      -- force an event bypassing the normal interface
+      _potatoNetwork_InputTriggerRefs_bypassEvent :: Ref m (Maybe (EventTrigger t WSEvent))
+    }
+  data instance VtyAppInputEvents (PotatoNetwork t m) = PotatoNetwork_InputEvents {
+      _potatoNetwork_InputEvents_InputEvents_bypassEvent :: Event t WSEvent
+    }
+
+  data instance VtyAppOutput (PotatoNetwork t m) =
+    PotatoNetwork_Output {
+        _potatoNetwork_Output_exitEv :: Event t ()
+      }
+  getApp PotatoNetwork_InputEvents {..} = do
+    exitEv <- mainPFWidget $ MainPFWidgetConfig {
+        _mainPFWidgetConfig_initialFile = Nothing
+        , _mainPFWidgetConfig_initialState = emptyOwlPFState
+        , _mainPFWidgetConfig_bypassEvent = _potatoNetwork_InputEvents_InputEvents_bypassEvent
+      }
+    return PotatoNetwork_Output {
+        _potatoNetwork_Output_exitEv = exitEv
+      }
+
+  makeInputs = do
+    (ev, ref) <- newEventWithTriggerRef
+    return (PotatoNetwork_InputEvents ev, PotatoNetwork_InputTriggerRefs ref)
+-}
+
 $(declareStuff "PotatoNetwork"
   [("bypassEvent", [t|WSEvent|])
     , ("moop", [t|Int|])]
