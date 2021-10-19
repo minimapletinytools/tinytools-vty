@@ -7,7 +7,6 @@
 (ctrl-z) undo
 (ctrl-y) redo
 
-
 # these ones don't work yet sorry :(
 (ctrl-o) open
 (ctrl-n) new

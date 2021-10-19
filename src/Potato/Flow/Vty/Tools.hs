@@ -43,13 +43,14 @@ holdToolsWidget :: forall t m. (PostBuild t m, MonadHold t m, MonadFix m, MonadN
   -> m (ToolWidget t)
 holdToolsWidget ToolWidgetConfig {..} = mdo
 
-  radioEvs <- radioList (constDyn ["s","╬","□","/","T"]) (fmap ((:[]) . fromEnum) _toolWidgetConfig_tool)
+  radioEvs <- radioList (constDyn ["(v)select","(p)an","(b)ox","(l)ine","(t)extbox","pai(n)t"]) (fmap ((:[]) . fromEnum) _toolWidgetConfig_tool)
   let
     selectB = void $ ffilter (==0) radioEvs
     panB = void $ ffilter (==1) radioEvs
     boxB = void $ ffilter (==2) radioEvs
     lineB = void $ ffilter (==3) radioEvs
     textB = void $ ffilter (==4) radioEvs
+    textareaB = void $ ffilter (==5) radioEvs
 
   let
     -- TODO DELETE, we don't do key press anymore
@@ -63,17 +64,19 @@ holdToolsWidget ToolWidgetConfig {..} = mdo
     keyPressEv k = never
 
     setTool = leftmost
-      [Tool_Select <$ leftmost [ selectB, keyPressEv 'v']
-      , Tool_Pan <$ leftmost [panB, keyPressEv ' ']
-      , Tool_Box <$ leftmost [boxB, keyPressEv 'b']
-      , Tool_Line <$ leftmost [lineB, keyPressEv 'l']
-      , Tool_Text <$ leftmost [textB, keyPressEv 't']]
-
+      [Tool_Select <$ leftmost [selectB]
+      , Tool_Pan <$ leftmost [panB]
+      , Tool_Box <$ leftmost [boxB]
+      , Tool_Line <$ leftmost [lineB]
+      , Tool_Text <$ leftmost [textB]
+      , Tool_TextArea <$ leftmost [textareaB]]
+{-
   vLayoutPad 4 $ debugStream [
     never
     , fmapLabelShow "radio" $ radioEvs
     , fmapLabelShow "selected" $ fmap ((:[]) . fromEnum) (updated _toolWidgetConfig_tool)
     ]
+-}
 
 
   return ToolWidget {
