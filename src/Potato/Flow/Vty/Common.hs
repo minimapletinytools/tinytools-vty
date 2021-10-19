@@ -18,10 +18,14 @@ import           Control.Monad.Fix
 import           Control.Monad.NodeId
 import qualified Data.List.Index             as L
 import qualified Data.Text                   as T
+import Data.Tuple.Extra
 
 import qualified Graphics.Vty                as V
 import           Reflex
 import           Reflex.Vty
+
+maximumlist :: [Int] -> Int
+maximumlist = foldr (\x y ->if x >= y then x else y) (-1)
 
 radioList :: forall t m. (Reflex t, MonadNodeId m, HasDisplayRegion t m, HasImageWriter t m, HasInput t m, HasTheme t m)
   => Dynamic t [Text] -- ^ list of button contents
@@ -51,13 +55,15 @@ radioList buttonsDyn activeDyn = do
         (r,_) = L.ifoldr ifoldrfn ([],actives) bs
     makeImage :: ((Int,Int,Int), Text, Bool) -> V.Image
     makeImage ((x,y,_), t, selected) = V.translate x y $ V.text' attr c where
-      attr = lg_default --if selected then lg_layer_selected else lg_default
-      c = if selected then "{" <> t <> "}" else "[" <> t <> "]"
+      attr = if selected then lg_layer_selected else lg_default
+      --c = if selected then "[" <> t <> "]" else " " <> t <> " "
+      c = t
+    heightDyn = fmap (maximumlist . fmap (snd3 . fst3)) buttons
+    selectEv = flip push mouseDownEv $ \(MouseDown _ (px,py) _) -> do
+      bs <- sample . current $ buttons
+      return $ L.ifindIndex (\_ ((x,y,l),_,_) -> py == y && px >= x && px < x+l) bs
   tellImages $ fmap (fmap makeImage) $ current buttons
-  return $ flip push mouseDownEv $ \(MouseDown _ (px,py) _) -> do
-    bs <- sample . current $ buttons
-    return $ L.ifindIndex (\_ ((x,y,l),_,_) -> py == y && px >= x && px < x+l) bs
-
+  return $ selectEv
 
 radioListSimple :: forall t m. (Reflex t, MonadFix m, MonadHold t m, MonadNodeId m, HasDisplayRegion t m, HasImageWriter t m, HasInput t m, HasTheme t m)
   => Int -- ^ initial choice
