@@ -30,7 +30,7 @@ maximumlist = foldr (\x y ->if x >= y then x else y) (-1)
 radioList :: forall t m. (Reflex t, MonadNodeId m, HasDisplayRegion t m, HasImageWriter t m, HasInput t m, HasTheme t m)
   => Dynamic t [Text] -- ^ list of button contents
   -> Dynamic t [Int] -- ^ which buttons are "active"
-  -> m (Event t Int) -- ^ event when button is clickd
+  -> m (Event t Int, Dynamic t Int) -- ^ (event when button is clicked, height)
 radioList buttonsDyn activeDyn = do
   dw <- displayWidth
   mouseDownEv <- mouseDown V.BLeft
@@ -63,13 +63,13 @@ radioList buttonsDyn activeDyn = do
       bs <- sample . current $ buttons
       return $ L.ifindIndex (\_ ((x,y,l),_,_) -> py == y && px >= x && px < x+l) bs
   tellImages $ fmap (fmap makeImage) $ current buttons
-  return $ selectEv
+  return $ (selectEv, heightDyn)
 
 radioListSimple :: forall t m. (Reflex t, MonadFix m, MonadHold t m, MonadNodeId m, HasDisplayRegion t m, HasImageWriter t m, HasInput t m, HasTheme t m)
   => Int -- ^ initial choice
   -> [Text] -- ^ list of button contents (must be at least one)
   -> m (Dynamic t Int) -- ^ which radio is selected
 radioListSimple initial buttons = mdo
-  radioEvs <- radioList (constDyn buttons) radioDyn
+  (radioEvs,_) <- radioList (constDyn buttons) radioDyn
   radioDyn <- holdDyn [0] $ fmap (\x->[x]) radioEvs
   return $ fmap (Unsafe.head) radioDyn

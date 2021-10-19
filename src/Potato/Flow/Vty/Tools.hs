@@ -43,7 +43,7 @@ holdToolsWidget :: forall t m. (PostBuild t m, MonadHold t m, MonadFix m, MonadN
   -> m (ToolWidget t)
 holdToolsWidget ToolWidgetConfig {..} = mdo
 
-  radioEvs <- radioList (constDyn ["(v)select","(p)an","(b)ox","(l)ine","(t)extbox","pai(n)t"]) (fmap ((:[]) . fromEnum) _toolWidgetConfig_tool)
+  (radioEvs, heightDyn) <- radioList (constDyn ["(v)select","(p)an","(b)ox","(l)ine","(t)extbox","pai(n)t"]) (fmap ((:[]) . fromEnum) _toolWidgetConfig_tool)
   let
     selectB = void $ ffilter (==0) radioEvs
     panB = void $ ffilter (==1) radioEvs

@@ -277,7 +277,7 @@ holdTextAlignmentWidget inputDyn = constDyn $ do
       Just TextAlign_Center -> [1]
       Just TextAlign_Right  -> [2]
 
-  setAlignmentEv' <- radioList (constDyn ["left","center","right"]) (constDyn startAlign)
+  (setAlignmentEv', _) <- radioList (constDyn ["left","center","right"]) (constDyn startAlign)
 
   let
     setAlignmentEv = fmap (\case
