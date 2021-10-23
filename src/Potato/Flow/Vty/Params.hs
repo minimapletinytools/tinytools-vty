@@ -424,7 +424,7 @@ holdParamsWidget ParamsWidgetConfig {..} = do
     -- show canvas params when nothing is selected
     mCanvasSizeInputDyn = fmap (\s -> if isParliament_null s then Just (isParliament_empty, Nothing) else Nothing) selectionDyn
 
-  (paramsOutputEv, captureEv, canvasSizeOutputEv) <- initManager_ $ do
+  (paramsOutputEv, captureEv, canvasSizeOutputEv, heightDyn) <- initManager_ $ do
     textAlignmentWidget <- holdMaybeParamsWidget mTextAlignInputDyn holdTextAlignmentWidget
     superStyleWidget2 <- holdMaybeParamsWidget mSuperStyleInputDyn holdSuperStyleWidget
     --sBoxTypeWidget <- holdMaybeParamsWidget mSBoxTypeInputDyn holdSBoxTypeWidget
@@ -446,18 +446,16 @@ holdParamsWidget ParamsWidgetConfig {..} = do
           return (cssz', cssev', csCaptureEv')
       let
         heightDyn'' = liftA2 (+) cssz $ foldr (liftA2 (+)) 0 $ fmap fst3 outputs
-      -- TODO figure out how to pass out heightDyn'' (convert Event Dynamic -> Dynamic)
-      return $ (leftmostWarn "paramsLayout" (fmap snd3 outputs), leftmostWarn "paramsCapture" (captureEv2 : fmap thd3 outputs), cssev)
+      return $ (leftmostWarn "paramsLayout" (fmap snd3 outputs), leftmostWarn "paramsCapture" (captureEv2 : fmap thd3 outputs), cssev, heightDyn'')
 
+    heightDyn' <- joinHold (fmap fth4 paramsNetwork) 0
+    (paramsOutputEv', captureEv', canvasSizeOutputEv') <- switchHoldTriple never never never $ fmap fstsndthd4 paramsNetwork
 
-
-    (paramsOutputEv', captureEv', canvasSizeOutputEv') <- switchHoldTriple never never never paramsNetwork
-
-    return (paramsOutputEv', captureEv', canvasSizeOutputEv')
+    return (paramsOutputEv', captureEv', canvasSizeOutputEv', heightDyn')
 
   return ParamsWidget {
     _paramsWidget_paramsEvent = paramsOutputEv
     , _paramsWidget_canvasSizeEvent = canvasSizeOutputEv
     , _paramsWidget_captureInputEv = captureEv
-    , _paramsWidget_widgetHeight = 15 -- TODO set correctly
+    , _paramsWidget_widgetHeight = heightDyn -- UNTESTED but should be ok
   }
