@@ -373,6 +373,9 @@ data ParamsWidget t = ParamsWidget {
   _paramsWidget_paramsEvent       :: Event t ControllersWithId
   , _paramsWidget_canvasSizeEvent :: Event t XY
   , _paramsWidget_captureInputEv  :: Event t ()
+
+  , _paramsWidget_widgetHeight :: Dynamic t Int
+
 }
 
 presetStyles :: [[Char]]
@@ -424,14 +427,17 @@ holdParamsWidget ParamsWidgetConfig {..} = do
     (paramsOutputEv', captureEv', canvasSizeOutputEv') <- (switchHoldTriple never never never =<<) . networkView . ffor2 controllersWithIdParamsWidgets canvasSizeWidget $ \widgets mcsw -> col $ do
       outputs <- forM widgets $ \w -> mdo
         (sz, captureEv', ev) <- (tile . fixed) sz w
-        return (ev, captureEv')
+        return (sz, ev, captureEv')
       -- canvas size widget is special becaues it's output type is different
-      (cssev, captureEv2) <- case mcsw of
-        Nothing -> return (never, never)
+      (cssz, cssev, captureEv2) <- case mcsw of
+        Nothing -> return (0, never, never)
         Just csw -> mdo
-          (cssz, csCaptureEv', cssev') <- (tile . fixed) cssz csw
-          return (cssev', csCaptureEv')
-      return $ (leftmostWarn "paramsLayout" (fmap fst outputs), leftmostWarn "paramsCapture" (captureEv2 : fmap snd outputs), cssev)
+          (cssz', csCaptureEv', cssev') <- (tile . fixed) cssz' csw
+          return (cssz', cssev', csCaptureEv')
+      let
+        heightDyn'' = liftA2 (+) cssz $ foldr (liftA2 (+)) 0 $ fmap fst3 outputs
+      -- TODO figure out how to pass out heightDyn'' (convert Event Dynamic -> Dynamic)
+      return $ (leftmostWarn "paramsLayout" (fmap snd3 outputs), leftmostWarn "paramsCapture" (captureEv2 : fmap thd3 outputs), cssev)
 
     return (paramsOutputEv', captureEv', canvasSizeOutputEv')
 
@@ -439,4 +445,5 @@ holdParamsWidget ParamsWidgetConfig {..} = do
     _paramsWidget_paramsEvent = paramsOutputEv
     , _paramsWidget_canvasSizeEvent = canvasSizeOutputEv
     , _paramsWidget_captureInputEv = captureEv
+    , _paramsWidget_widgetHeight = 15 -- TODO set correctly
   }
