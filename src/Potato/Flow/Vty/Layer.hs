@@ -39,7 +39,7 @@ import           Reflex.Vty
 
 
 
--- | simple conversion function 
+-- | simple conversion function
 -- potato-flow does not want to depend on reflex an has a coppy of TextZipper library but they are pretty much the same
 coerceZipper :: Potato.Data.Text.Zipper.TextZipper -> TZ.TextZipper
 coerceZipper (Potato.Data.Text.Zipper.TextZipper a b c d) = TZ.TextZipper a b c d
@@ -90,7 +90,10 @@ holdLayerWidget LayerWidgetConfig {..} = do
   let
     padTop = 0
     padBottom = 0
-    regionDyn = ffor2 regionWidthDyn regionHeightDyn (,)
+    listRegionHeight = fmap (max 0 . ((-) 1)) regionHeightDyn
+    listRegionDyn = ffor2 regionWidthDyn listRegionHeight (,)
+
+  -- TODO create layout for layers, and new folder button at the buttom
 
   -- ::actually draw images::
   let
@@ -106,7 +109,7 @@ holdLayerWidget LayerWidgetConfig {..} = do
         sowl = _layerEntry_superOwl
         rid = _superOwl_id sowl
         label = isOwl_name sowl
-        
+
         attr = case selected of
           LHRESS_Selected -> _potatoStyle_selected
           LHRESS_InheritSelected -> _potatoStyle_selected
@@ -137,17 +140,17 @@ holdLayerWidget LayerWidgetConfig {..} = do
           <> show rid
           <> " "
 
-        t2 = case mrenaming of 
+        t2 = case mrenaming of
           Nothing -> V.text' attr label
           Just renaming -> img where
             dls = TZ.displayLines 999999 attrrenamingbg attrrenamingcur (coerceZipper renaming)
             img = V.vertCat . images $ TZ._displayLines_spans dls
 
         r = t1 V.<|> t2
-          
+
     layerImages :: Behavior t [V.Image]
     layerImages = current $ fmap ((:[]) . V.vertCat)
-      $ ffor2 regionDyn (fmap _layersViewHandlerRenderOutput_entries _layerWidgetConfig_layersView) $ \(w,h) lhrentries ->
+      $ ffor2 listRegionDyn (fmap _layersViewHandlerRenderOutput_entries _layerWidgetConfig_layersView) $ \(w,h) lhrentries ->
         map (makeLayerImage w) . L.take (max 0 (h - padBottom)) $ toList lhrentries
   tellImages layerImages
   let

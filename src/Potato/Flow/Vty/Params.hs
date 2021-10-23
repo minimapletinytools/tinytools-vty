@@ -398,7 +398,16 @@ switchHoldTriple eva evb evc evin = r where
   fanned2 = fmap (\(a,bc) -> (a, fanThese bc)) fanned1
   r = fmap (\(a, (b,c)) -> (a,b,c)) fanned2
 
+joinHold :: (Reflex t, MonadHold t m) => Event t (Dynamic t a) -> Dynamic t a -> m (Dynamic t a)
+joinHold ev d0 = do
+  dyndyn <- holdDyn d0 ev
+  return $ join dyndyn
 
+fth4 :: (a,b,c,d) -> d
+fth4 (_,_,_,d) = d
+
+fstsndthd4 :: (a,b,c,d) -> (a,b,c)
+fstsndthd4 (a,b,c,_) = (a,b,c)
 
 holdParamsWidget :: forall t m. (MonadWidget t m, HasPotato t m)
   => ParamsWidgetConfig t
@@ -422,9 +431,10 @@ holdParamsWidget ParamsWidgetConfig {..} = do
     canvasSizeWidget <- holdMaybeParamsWidget mCanvasSizeInputDyn (holdCanvasSizeWidget canvasDyn)
 
     -- apparently textAlignmentWidget gets updated after any change which causes the whole network to rerender and we lose our focus state...
-    let controllersWithIdParamsWidgets = fmap catMaybes . mconcat . (fmap (fmap (:[]))) $ [textAlignmentWidget, superStyleWidget2]
+    let
+      controllersWithIdParamsWidgets = fmap catMaybes . mconcat . (fmap (fmap (:[]))) $ [textAlignmentWidget, superStyleWidget2]
 
-    (paramsOutputEv', captureEv', canvasSizeOutputEv') <- (switchHoldTriple never never never =<<) . networkView . ffor2 controllersWithIdParamsWidgets canvasSizeWidget $ \widgets mcsw -> col $ do
+    paramsNetwork <- networkView . ffor2 controllersWithIdParamsWidgets canvasSizeWidget $ \widgets mcsw -> col $ do
       outputs <- forM widgets $ \w -> mdo
         (sz, captureEv', ev) <- (tile . fixed) sz w
         return (sz, ev, captureEv')
@@ -438,6 +448,10 @@ holdParamsWidget ParamsWidgetConfig {..} = do
         heightDyn'' = liftA2 (+) cssz $ foldr (liftA2 (+)) 0 $ fmap fst3 outputs
       -- TODO figure out how to pass out heightDyn'' (convert Event Dynamic -> Dynamic)
       return $ (leftmostWarn "paramsLayout" (fmap snd3 outputs), leftmostWarn "paramsCapture" (captureEv2 : fmap thd3 outputs), cssev)
+
+
+
+    (paramsOutputEv', captureEv', canvasSizeOutputEv') <- switchHoldTriple never never never paramsNetwork
 
     return (paramsOutputEv', captureEv', canvasSizeOutputEv')
 
