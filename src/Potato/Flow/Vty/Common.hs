@@ -43,13 +43,16 @@ simpleDrag btn = do
       then Just $ ((fromX, fromY), (toX, toY))
       else Nothing
 
--- TODO needs to take a separate width parameter to resolve circular dependency issues
 -- TODO the better version of this highlights button on mouse down and "clicks" so long as you don't drag off the button
+-- | option to pass in height is a hack to work around circular dependency issues as when using Layout, displayWidth may be dependent on returned dynamic height
 buttonList :: forall t m. (Reflex t, MonadFix m, MonadHold t m, MonadNodeId m, HasDisplayRegion t m, HasImageWriter t m, HasInput t m, HasTheme t m)
   => Dynamic t [Text] -- ^ list of button contents
+  -> Maybe (Dynamic t Int) -- ^ optional width (displayWidth is used if Nothing)
   -> m (Event t Int, Dynamic t Int) -- ^ (event when button is clicked, height)
-buttonList buttonsDyn = do
-  dw <- displayWidth
+buttonList buttonsDyn mWidthDyn = do
+  dw <- case mWidthDyn of
+    Nothing -> displayWidth
+    Just widthDyn -> return widthDyn
   clickEv <- simpleDrag V.BLeft
   let
     -- ((x,y,length), contents)
@@ -64,7 +67,7 @@ buttonList buttonsDyn = do
     makeImage :: ((Int,Int,Int), Text, Bool) -> V.Image
     makeImage ((x,y,_), t, downclickTODO) = V.translate x y $ V.text' attr ("["<>t<>"]") where
       attr = if downclickTODO then lg_layer_selected else lg_default
-    heightDyn = fmap (maximumlist . fmap (snd3 . fst3)) buttons
+    heightDyn = fmap ((+1) . maximumlist . fmap (snd3 . fst3)) buttons
     selectEv = flip push clickEv $ \((px,py),(ex,ey)) -> do
       bs <- sample . current $ buttons
       return $ L.ifindIndex (\_ ((x,y,l),_,_) -> py == y && ey == y && px >= x && ex >= x && px < x+l && ex < x+l) bs

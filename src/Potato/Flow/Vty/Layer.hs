@@ -17,7 +17,9 @@ import           Potato.Flow.Vty.Input
 import           Potato.Reflex.Vty.Helpers
 import           Potato.Reflex.Vty.Widget
 import Potato.Flow.Vty.PotatoReader
+import Potato.Flow.Vty.Common
 import qualified Potato.Data.Text.Zipper
+
 
 
 import           Control.Monad.Fix
@@ -73,6 +75,7 @@ data LayerWidgetConfig t = LayerWidgetConfig {
 
 data LayerWidget t = LayerWidget {
   _layerWidget_mouse :: Event t LMouseData
+  , _layerWidget_newFolderEv :: Event t ()
 }
 
 holdLayerWidget :: forall t m. (MonadWidget t m, HasPotato t m)
@@ -89,7 +92,7 @@ holdLayerWidget LayerWidgetConfig {..} = do
 
   let
 
-  (layerInpEv) <- initLayout $ col $ mdo
+  (layerInpEv, newFolderEv) <- initLayout $ col $ mdo
     -- the layer list itself
     (layerInpEv_d1) <- (grout . stretch) 5 $ row $ do
       let
@@ -159,12 +162,16 @@ holdLayerWidget LayerWidgetConfig {..} = do
 
 
     -- buttons at the bottom
-    (grout . fixed) 1 $ row $ do
+    (newFolderEv_d1, heightDyn) <- (grout . fixed) (traceDyn "boop" heightDyn) $ row $ do
+      (buttonsEv, heightDyn') <- buttonList (constDyn ["new folder"]) (Just regionWidthDyn)
       -- TODO new layer/delete buttons how here
       -- TODO other folder options too maybe?
-      return ()
+      return (ffilterButtonIndex 0 buttonsEv, heightDyn')
 
-    return (layerInpEv_d1)
+    return (layerInpEv_d1, newFolderEv_d1)
 
 
-  return $ LayerWidget layerInpEv
+  return $ LayerWidget {
+      _layerWidget_mouse = layerInpEv
+      , _layerWidget_newFolderEv = newFolderEv
+    }
