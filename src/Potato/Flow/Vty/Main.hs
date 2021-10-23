@@ -20,6 +20,7 @@ import           Potato.Flow.Vty.Layer
 import           Potato.Flow.Vty.Params
 import           Potato.Flow.Vty.PotatoReader
 import           Potato.Flow.Vty.Tools
+import Potato.Flow.Vty.Common
 import           Potato.Reflex.Vty.Helpers
 import           Potato.Reflex.Vty.Widget.Popup
 import           Potato.Reflex.Vty.Widget.FileExplorer
@@ -328,8 +329,26 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
   -- define main panels
   let
     hdivider = (grout. fixed) 1 $ fill (constant '-')
-    leftPanel = initLayout $ col $ do
-      (clickSaveEv_d1, clickSaveAsEv_d1) <- (grout . fixed) 1 $ row $ do
+    leftPanel = initLayout $ col $ mdo
+
+
+      -- TODO just pull out left panel into its own widget...
+      -- TODO height should be dynamic but not sure if there's away to do this dynamically because width (from which buttonsHeightDyn) is derived depends on `grout . fixed`. You need to pull width from outside of the `grout . fixed` call to make this work right...
+      (clickSaveEv_d1, clickSaveAsEv_d1, buttonsHeightDyn) <- (grout . fixed) 2 $ row $ do
+
+        (buttonsEv, heightDyn) <- buttonList (constDyn ["save", "save as", "export to \"potato.txt\""])
+        let
+          clickSaveEv_d2 = ffilterButtonIndex 0 buttonsEv
+          clickSaveAsEv_d2 = ffilterButtonIndex 1 buttonsEv
+          exportEv = ffilterButtonIndex 2 buttonsEv
+          clickPrintEv = tag (current $ _goatWidget_renderedCanvas everythingW) (leftmost [void exportEv, _appKbCmd_print])
+        performEvent_ $ ffor clickPrintEv $ \rc -> do
+           let t = renderedCanvasToText rc
+           liftIO $ T.writeFile "potato.txt" t
+        return (clickSaveEv_d2, clickSaveAsEv_d2, heightDyn)
+
+
+{- DELEE REPLACED BY THE ABOVE
 
         clickSaveEv_d2 <- (grout . stretch) 1 $ do
           text "save"
@@ -342,7 +361,6 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
           click <- singleClickNoDragOffSimple V.BLeft
           return (void click)
         (grout . fixed) 1 $ text "|"
-
         (grout . stretch) 1 $ do
           text "export to \"potato.txt\""
           click <- mouseDown V.BLeft
@@ -350,7 +368,13 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
           performEvent_ $ ffor clickPrintEv $ \rc -> do
              let t = renderedCanvasToText rc
              liftIO $ T.writeFile "potato.txt" t
-        return (clickSaveEv_d2, clickSaveAsEv_d2)
+
+        return (clickSaveEv_d2, clickSaveAsEv_d2, 1)
+-}
+
+
+
+
 {-
       (grout . fixed) 1 $ debugStream [
         never

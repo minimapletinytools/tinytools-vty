@@ -54,6 +54,7 @@ data SingleClick = SingleClick
   }
   deriving (Eq, Ord, Show)
 
+
 singleClick :: (Reflex t, MonadHold t m, MonadFix m, HasInput t m) => V.Button -> m (Event t SingleClick)
 singleClick btn = do
   let
