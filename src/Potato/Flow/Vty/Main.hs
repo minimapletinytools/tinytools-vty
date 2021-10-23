@@ -331,23 +331,17 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
     leftPanel = initLayout $ col $ do
       (clickSaveEv_d1, clickSaveAsEv_d1) <- (grout . fixed) 1 $ row $ do
 
-        let
-          clickSaveEv_d2 = never
-          clickSaveAsEv_d2 = never
-
-        {- TODO fix me, currently broken now that we've switched to pane2 because popup captures the release event causing pane2 to think it still owns the mouse drag after release
         clickSaveEv_d2 <- (grout . stretch) 1 $ do
           text "save"
-          click <- mouseDown V.BLeft
+          click <- singleClickNoDragOffSimple V.BLeft
           let clickSaveEv_d3 = void click
           return clickSaveEv_d3
         (grout . fixed) 1 $ text "|"
         clickSaveAsEv_d2 <- (grout . stretch) 1 $ do
           text "save as"
-          click <- mouseDown V.BLeft
+          click <- singleClickNoDragOffSimple V.BLeft
           return (void click)
         (grout . fixed) 1 $ text "|"
-        -}
 
         (grout . stretch) 1 $ do
           text "export to \"potato.txt\""
@@ -357,10 +351,11 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
              let t = renderedCanvasToText rc
              liftIO $ T.writeFile "potato.txt" t
         return (clickSaveEv_d2, clickSaveAsEv_d2)
+{-
       (grout . fixed) 1 $ debugStream [
         never
         ]
-
+-}
       hdivider
 
       tools' <- (grout . fixed) 3 $ holdToolsWidget $  ToolWidgetConfig {
@@ -421,8 +416,8 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
     (clickSaveEv, nothingClickSaveEv)  = fanMaybe $ tag (_potatoConfig_appCurrentOpenFile potatoConfig) $ leftmost [clickSaveEvRaw, _appKbCmd_save]
     clickSaveAsEv = leftmost $ [clickSaveAsEvRaw, nothingClickSaveEv]
 
-  (_, popupStateDyn1) <- popupPaneSimple def (postBuildEv $> welcomeWidget)
-  --(_, popupStateDyn1) <- popupPaneSimple def (never $> welcomeWidget)
+  --(_, popupStateDyn1) <- popupPaneSimple def (postBuildEv $> welcomeWidget)
+  (_, popupStateDyn1) <- popupPaneSimple def (never $> welcomeWidget)
 
   -- TODO correct initial state (tag potatoConfig)
   (saveAsEv, popupStateDyn2) <- flip runPotatoReader potatoConfig $ popupSaveAsWindow $ SaveAsWindowConfig (clickSaveAsEv $> "/Users/user/kitchen/faucet/potato-flow-vty")

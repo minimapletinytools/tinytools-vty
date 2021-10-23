@@ -17,6 +17,7 @@ module Potato.Reflex.Vty.Widget
   (
   SingleClick(..)
   , singleClick
+  , singleClickNoDragOffSimple
 
   , splitHDrag
   , DragState(..)
@@ -65,6 +66,12 @@ singleClick btn = do
     return $ if ds == DragEnd && withinBounds d
       then Just $ SingleClick btn (fromX, fromY) mods (not didStayOn)
       else Nothing
+
+singleClickNoDragOffSimple :: (Reflex t, MonadHold t m, MonadFix m, HasInput t m) => V.Button -> m (Event t ())
+singleClickNoDragOffSimple btn = do
+  ev <- singleClick btn
+  return $ fmapMaybe (\sc -> if _singleClick_didDragOff sc then Nothing else Just ()) ev
+
 
 integralFractionalDivide :: (Integral a, Fractional b) => a -> a -> b
 integralFractionalDivide n d = fromIntegral n / fromIntegral d
