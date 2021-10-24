@@ -79,13 +79,16 @@ buttonList buttonsDyn mWidthDyn = do
   tellImages $ fmap (fmap makeImage) $ current buttons
   return $ (selectEv, heightDyn)
 
--- TODO needs to take a separate width parameter to resolve circular dependency issues
+-- | option to pass in height is a hack to work around circular dependency issues as when using Layout, displayWidth may be dependent on returned dynamic height
 radioList :: forall t m. (Reflex t, MonadNodeId m, HasDisplayRegion t m, HasImageWriter t m, HasInput t m, HasTheme t m)
   => Dynamic t [Text] -- ^ list of button contents
   -> Dynamic t [Int] -- ^ which buttons are "active"
+  -> Maybe (Dynamic t Int) -- ^ optional width (displayWidth is used if Nothing)
   -> m (Event t Int, Dynamic t Int) -- ^ (event when button is clicked, height)
-radioList buttonsDyn activeDyn = do
-  dw <- displayWidth
+radioList buttonsDyn activeDyn mWidthDyn = do
+  dw <- case mWidthDyn of
+    Nothing -> displayWidth
+    Just widthDyn -> return widthDyn
   mouseDownEv <- mouseDown V.BLeft
   let
     -- ((x,y,length), contents)
@@ -123,6 +126,6 @@ radioListSimple :: forall t m. (Reflex t, MonadFix m, MonadHold t m, MonadNodeId
   -> [Text] -- ^ list of button contents (must be at least one)
   -> m (Dynamic t Int) -- ^ which radio is selected
 radioListSimple initial buttons = mdo
-  (radioEvs,_) <- radioList (constDyn buttons) radioDyn
+  (radioEvs,_) <- radioList (constDyn buttons) radioDyn Nothing
   radioDyn <- holdDyn [0] $ fmap (\x->[x]) radioEvs
   return $ fmap (Unsafe.head) radioDyn

@@ -27,10 +27,12 @@ import           Reflex.Vty
 
 data ToolWidgetConfig t = ToolWidgetConfig {
   _toolWidgetConfig_tool :: Dynamic t Tool
+  , _toolWidgetConfig_widthDyn :: Dynamic t Int
 }
 
 data ToolWidget t = ToolWidget {
   _toolWidget_setTool :: Event t Tool
+  , _toolWidget_heightDyn :: Dynamic t Int
 }
 
 
@@ -43,7 +45,7 @@ holdToolsWidget :: forall t m. (PostBuild t m, MonadHold t m, MonadFix m, MonadN
   -> m (ToolWidget t)
 holdToolsWidget ToolWidgetConfig {..} = mdo
 
-  (radioEvs, heightDyn) <- radioList (constDyn ["(v)select","(p)an","(b)ox","(l)ine","(t)extbox","pai(n)t"]) (fmap ((:[]) . fromEnum) _toolWidgetConfig_tool)
+  (radioEvs, heightDyn) <- radioList (constDyn ["(v)select","(p)an","(b)ox","(l)ine","(t)extbox","pai(n)t"]) (fmap ((:[]) . fromEnum) _toolWidgetConfig_tool) (Just _toolWidgetConfig_widthDyn)
   let
     selectB = void $ ffilter (==0) radioEvs
     panB = void $ ffilter (==1) radioEvs
@@ -81,6 +83,7 @@ holdToolsWidget ToolWidgetConfig {..} = mdo
 
   return ToolWidget {
     _toolWidget_setTool = setTool
+    , _toolWidget_heightDyn = heightDyn
   }
 
   {-

@@ -59,9 +59,9 @@ holdLeftWidget LeftWidgetConfig {..} = do
 
     -- TODO consider
     -- TODO height should be dynamic but not sure if there's away to do this dynamically because width (from which buttonsHeightDyn) is derived depends on `grout . fixed`. You need to pull width from outside of the `grout . fixed` call to make this work right...
-    (clickSaveEv_d1, clickSaveAsEv_d1, buttonsHeightDyn) <- (grout . fixed) 2 $ row $ do
+    (clickSaveEv_d1, clickSaveAsEv_d1, buttonsHeightDyn) <- (grout . fixed) buttonsHeightDyn $ row $ do
 
-      (buttonsEv, heightDyn) <- buttonList (constDyn ["save", "save as", "export to \"potato.txt\""]) Nothing
+      (buttonsEv, heightDyn) <- buttonList (constDyn ["save", "save as", "export to \"potato.txt\""]) (Just widthDyn)
       let
         clickSaveEv_d2 = ffilterButtonIndex 0 buttonsEv
         clickSaveAsEv_d2 = ffilterButtonIndex 1 buttonsEv
@@ -81,8 +81,9 @@ holdLeftWidget LeftWidgetConfig {..} = do
 
     hdivider
 
-    tools <- (grout . fixed) 3 $ holdToolsWidget $  ToolWidgetConfig {
+    tools <- (grout . fixed) (_toolWidget_heightDyn tools) $ holdToolsWidget $  ToolWidgetConfig {
         _toolWidgetConfig_tool =  _goatWidget_tool _layersWidgetConfig_goatW
+        , _toolWidgetConfig_widthDyn = widthDyn
       }
 
     hdivider
