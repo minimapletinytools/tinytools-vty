@@ -20,6 +20,7 @@ import           Potato.Flow.Vty.Layer
 import           Potato.Flow.Vty.Params
 import           Potato.Flow.Vty.PotatoReader
 import           Potato.Flow.Vty.Tools
+import           Potato.Flow.Vty.Left
 import Potato.Flow.Vty.Common
 import           Potato.Reflex.Vty.Helpers
 import           Potato.Reflex.Vty.Widget.Popup
@@ -309,15 +310,15 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
         , _goatWidgetConfig_load = fmapMaybe id mLoadFileEv
 
         -- canvas direct input
-        , _goatWidgetConfig_mouse = leftmostWarn "mouse" [(_layerWidget_mouse layersW), (_canvasWidget_mouse canvasW)]
+        , _goatWidgetConfig_mouse = leftmostWarn "mouse" [(_layerWidget_mouse (_leftWidget_layersW leftW)), (_canvasWidget_mouse canvasW)]
         , _goatWidgetConfig_keyboard = keyboardEv
 
         , _goatWidgetConfig_canvasRegionDim = _canvasWidget_regionDim canvasW
 
-        , _goatWidgetConfig_selectTool = _toolWidget_setTool toolsW
-        , _goatWidgetConfig_paramsEvent = _paramsWidget_paramsEvent paramsW
-        , _goatWidgetConfig_canvasSize = _paramsWidget_canvasSizeEvent paramsW
-        , _goatWidgetConfig_newFolder = _layerWidget_newFolderEv layersW
+        , _goatWidgetConfig_selectTool = _toolWidget_setTool (_leftWidget_toolsW leftW)
+        , _goatWidgetConfig_paramsEvent = _paramsWidget_paramsEvent (_leftWidget_paramsW leftW)
+        , _goatWidgetConfig_canvasSize = _paramsWidget_canvasSizeEvent (_leftWidget_paramsW leftW)
+        , _goatWidgetConfig_newFolder = _layerWidget_newFolderEv (_leftWidget_layersW leftW)
 
         -- debugging stuff
         , _goatWidgetConfig_setDebugLabel = never
@@ -327,88 +328,12 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
   everythingW <- holdGoatWidget goatWidgetConfig
 
 
+
   -- define main panels
   let
-    hdivider = (grout. fixed) 1 $ fill (constant '-')
-    leftPanel = initLayout $ col $ mdo
-
-
-      -- TODO just pull out left panel into its own widget...
-      -- TODO height should be dynamic but not sure if there's away to do this dynamically because width (from which buttonsHeightDyn) is derived depends on `grout . fixed`. You need to pull width from outside of the `grout . fixed` call to make this work right...
-      (clickSaveEv_d1, clickSaveAsEv_d1, buttonsHeightDyn) <- (grout . fixed) 2 $ row $ do
-
-        (buttonsEv, heightDyn) <- buttonList (constDyn ["save", "save as", "export to \"potato.txt\""]) Nothing
-        let
-          clickSaveEv_d2 = ffilterButtonIndex 0 buttonsEv
-          clickSaveAsEv_d2 = ffilterButtonIndex 1 buttonsEv
-          exportEv = ffilterButtonIndex 2 buttonsEv
-          clickPrintEv = tag (current $ _goatWidget_renderedCanvas everythingW) (leftmost [void exportEv, _appKbCmd_print])
-        performEvent_ $ ffor clickPrintEv $ \rc -> do
-           let t = renderedCanvasToText rc
-           liftIO $ T.writeFile "potato.txt" t
-        return (clickSaveEv_d2, clickSaveAsEv_d2, heightDyn)
-
-
-{- DELEE REPLACED BY THE ABOVE
-
-        clickSaveEv_d2 <- (grout . stretch) 1 $ do
-          text "save"
-          click <- singleClickNoDragOffSimple V.BLeft
-          let clickSaveEv_d3 = void click
-          return clickSaveEv_d3
-        (grout . fixed) 1 $ text "|"
-        clickSaveAsEv_d2 <- (grout . stretch) 1 $ do
-          text "save as"
-          click <- singleClickNoDragOffSimple V.BLeft
-          return (void click)
-        (grout . fixed) 1 $ text "|"
-        (grout . stretch) 1 $ do
-          text "export to \"potato.txt\""
-          click <- mouseDown V.BLeft
-          let clickPrintEv = tag (current $ _goatWidget_renderedCanvas everythingW) (leftmost [void click, _appKbCmd_print])
-          performEvent_ $ ffor clickPrintEv $ \rc -> do
-             let t = renderedCanvasToText rc
-             liftIO $ T.writeFile "potato.txt" t
-
-        return (clickSaveEv_d2, clickSaveAsEv_d2, 1)
--}
-
-
-
-
-{-
-      (grout . fixed) 1 $ debugStream [
-        never
-        ]
--}
-      hdivider
-
-      tools' <- (grout . fixed) 3 $ holdToolsWidget $  ToolWidgetConfig {
-          _toolWidgetConfig_tool =  _goatWidget_tool everythingW
-        }
-
-      hdivider
-
-      -- TODO Layout stuff messes up your mouse assumptions. You need to switch Layout to use pane2 D:
-      layers' <- (grout . stretch) 1 $ holdLayerWidget $ LayerWidgetConfig {
-            _layerWidgetConfig_layers = _goatWidget_layers everythingW
-            , _layerWidgetConfig_layersView = _goatWidget_layersHandlerRenderOutput everythingW
-            , _layerWidgetConfig_selection = _goatWidget_selection  everythingW
-          }
-
-      hdivider
-
-      _ <- (grout . fixed) 5 $ holdInfoWidget $ InfoWidgetConfig {
-          _infoWidgetConfig_selection = _goatWidget_selection everythingW
-        }
-
-      hdivider
-
-      params' <- (grout . fixed) 10 $ holdParamsWidget $ ParamsWidgetConfig {
-          _paramsWidgetConfig_selectionDyn = _goatWidget_selection everythingW
-          , _paramsWidgetConfig_canvasDyn = _goatWidget_canvas everythingW
-        }
-      return (layers', tools', params', clickSaveEv_d1, clickSaveAsEv_d1)
+    leftPanel = holdLeftWidget LeftWidgetConfig {
+        _layersWidgetConfig_goatW = everythingW
+      }
 
     rightPanel = do
       dreg' <- askRegion
@@ -424,11 +349,10 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
         }
 
   -- render main panels
-
-  (keyboardEv, ((layersW, toolsW, paramsW, clickSaveEvRaw, clickSaveAsEvRaw), canvasW)) <- flip runPotatoReader potatoConfig $
+  (keyboardEv, (leftW, canvasW)) <- flip runPotatoReader potatoConfig $
     captureInputEvents (These _appKbCmd_capturedInput inputCapturedByPopupBeh) $ do
       stuff <- splitHDrag 35 (fill (constant '*')) leftPanel rightPanel
-      kb <- captureInputEvents (This (_paramsWidget_captureInputEv paramsW)) $ do
+      kb <- captureInputEvents (This (_paramsWidget_captureInputEv (_leftWidget_paramsW leftW))) $ do
         inp <- input
         return $ fforMaybe inp $ \case
           V.EvKey k mods -> convertKey k >>= (\kbd -> return $ KeyboardData kbd (convertModifiers mods))
@@ -438,8 +362,8 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
       return (kb, stuff)
 
   let
-    (clickSaveEv, nothingClickSaveEv)  = fanMaybe $ tag (_potatoConfig_appCurrentOpenFile potatoConfig) $ leftmost [clickSaveEvRaw, _appKbCmd_save]
-    clickSaveAsEv = leftmost $ [clickSaveAsEvRaw, nothingClickSaveEv]
+    (clickSaveEv, nothingClickSaveEv)  = fanMaybe $ tag (_potatoConfig_appCurrentOpenFile potatoConfig) $ leftmost [_menuButtonsWidget_saveEv . _leftWidget_menuButtonsW $ leftW, _appKbCmd_save]
+    clickSaveAsEv = leftmost $ [_menuButtonsWidget_saveAsEv . _leftWidget_menuButtonsW $ leftW, nothingClickSaveEv]
 
   --(_, popupStateDyn1) <- popupPaneSimple def (postBuildEv $> welcomeWidget)
   (_, popupStateDyn1) <- popupPaneSimple def (never $> welcomeWidget)

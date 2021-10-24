@@ -7,6 +7,7 @@ module Potato.Flow.Vty.Left (
   LeftWidgetConfig(..)
   , holdLeftWidget
   , LeftWidget(..)
+  , MenuButtonsWidget(..)
 ) where
 import           Relude
 
