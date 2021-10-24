@@ -43,7 +43,7 @@ simpleDrag btn = do
       then Just $ ((fromX, fromY), (toX, toY))
       else Nothing
 
--- TODO the better version of this highlights button on mouse down and "clicks" so long as you don't drag off the button
+
 -- | option to pass in height is a hack to work around circular dependency issues as when using Layout, displayWidth may be dependent on returned dynamic height
 buttonList :: forall t m. (Reflex t, MonadFix m, MonadHold t m, MonadNodeId m, HasDisplayRegion t m, HasImageWriter t m, HasInput t m, HasTheme t m)
   => Dynamic t [Text] -- ^ list of button contents
@@ -54,6 +54,11 @@ buttonList buttonsDyn mWidthDyn = do
     Nothing -> displayWidth
     Just widthDyn -> return widthDyn
   clickEv <- simpleDrag V.BLeft
+
+  -- TODO the better version of this highlights button on mouse down and "clicks" so long as you don't drag off the button
+  --dragPosDyn
+  --isDraggingDyn
+
   let
     -- ((x,y,length), contents)
     buttons :: Dynamic t [((Int,Int,Int), Text, Bool)]

@@ -317,6 +317,7 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
         , _goatWidgetConfig_selectTool = _toolWidget_setTool toolsW
         , _goatWidgetConfig_paramsEvent = _paramsWidget_paramsEvent paramsW
         , _goatWidgetConfig_canvasSize = _paramsWidget_canvasSizeEvent paramsW
+        , _goatWidgetConfig_newFolder = _layerWidget_newFolderEv layersW
 
         -- debugging stuff
         , _goatWidgetConfig_setDebugLabel = never
