@@ -24,6 +24,13 @@ import qualified Data.Text.IO as T
 import           Reflex
 import           Reflex.Vty
 
+-- could put into a different file but whatever
+data MenuButtonsWidget t = MenuButtonsWidget {
+  _menuButtonsWidget_saveEv :: Event t ()
+  , _menuButtonsWidget_saveAsEv :: Event t ()
+  --, _menuButtonsWidget_exportEv ::
+}
+
 data LeftWidgetConfig t = LeftWidgetConfig {
   _layersWidgetConfig_goatW :: GoatWidget t
   -- TODO other stuff
@@ -33,6 +40,7 @@ data LeftWidget t = LeftWidget {
   _leftWidget_layersW :: LayerWidget t
   , _leftWidget_toolsW :: ToolWidget t
   , _leftWidget_paramsW :: ParamsWidget t
+  , _leftWidget_menuButtonsW :: MenuButtonsWidget t
   -- TODO other stuff
 }
 
@@ -62,6 +70,12 @@ holdLeftWidget LeftWidgetConfig {..} = do
          let t = renderedCanvasToText rc
          liftIO $ T.writeFile "potato.txt" t
       return (clickSaveEv_d2, clickSaveAsEv_d2, heightDyn)
+    let
+      menuButtons = MenuButtonsWidget {
+          _menuButtonsWidget_saveEv = clickSaveEv_d1
+          , _menuButtonsWidget_saveAsEv = clickSaveAsEv_d1
+          --, _menuButtonsWidget_exportEv ::
+        }
 
 
     hdivider
@@ -95,4 +109,5 @@ holdLeftWidget LeftWidgetConfig {..} = do
         _leftWidget_layersW = layers
         , _leftWidget_toolsW = tools
         , _leftWidget_paramsW = params
+        , _leftWidget_menuButtonsW = menuButtons
       }
