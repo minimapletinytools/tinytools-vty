@@ -145,8 +145,8 @@ eitherMaybeLeft _ = Nothing
 
 pfcfg :: (Reflex t) => MainPFWidgetConfig t
 pfcfg = def {
-    --_mainPFWidgetConfig_initialFile = Just "potato.flow"
-    _mainPFWidgetConfig_initialState = owlpfstate_basic2
+    _mainPFWidgetConfig_initialFile = Just "potato.flow"
+    --_mainPFWidgetConfig_initialState = owlpfstate_basic2
   }
 
 
@@ -256,8 +256,8 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
   mLoadFileEv <- performEvent $ ffor
     (fforMaybe postBuildEv (const _mainPFWidgetConfig_initialFile))
     $ \fp -> do
-      mspf :: Maybe SPotatoFlow <- liftIO $ Aeson.decodeFileStrict (T.unpack fp)
-      return $ mspf >>= return . (,emptyControllerMeta)
+      mspf :: Maybe (SPotatoFlow, ControllerMeta) <- liftIO $ Aeson.decodeFileStrict (T.unpack fp)
+      return mspf
 
 
   -- TODO finish hooking up the event
@@ -272,11 +272,16 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
   let
     performSaveEv = attach (current $ _goatWidget_DEBUG_goatState everythingW) $ leftmost [saveAsEv, clickSaveEv]
   finishSaveEv <- performEvent $ ffor performSaveEv $ \(gs,fn) -> liftIO $ do
-    let spf = owlPFState_to_sPotatoFlow . _owlPFWorkspace_pFState . _goatState_workspace $ gs
+    let
+      spf = owlPFState_to_sPotatoFlow . _owlPFWorkspace_pFState . _goatState_workspace $ gs
+      cm = ControllerMeta {
+          _controllerMeta_pan      = _goatState_pan gs
+          , _controllerMeta_layers = _layersState_meta . _goatState_layersState $ gs
+        }
     handle (\(SomeException e) -> return . Left $ "ERROR, Could not save to file " <> show fn <> " got exception \"" <> show e <> "\"") $ do
       --liftIO $ Aeson.encodeFile "potato.flow" spf
       print $ "wrote to file: " <> fn
-      LBS.writeFile fn $ PrettyAeson.encodePretty spf
+      LBS.writeFile fn $ PrettyAeson.encodePretty (spf, cm)
       return $ Right fn
 
   -- debug stuff (temp)

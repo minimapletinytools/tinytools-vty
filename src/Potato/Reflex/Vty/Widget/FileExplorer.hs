@@ -72,15 +72,18 @@ holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
   -- set up v scrolling stuff
   kup <- key V.KUp
   kdown <- key V.KDown
+  --inp <- input
   mscroll <- mouseScroll
   let
     requestedScroll :: Event t Int
+    --requestedScroll = traceEvent "boop" $ leftmost
     requestedScroll = leftmost
       [ 1 <$ kdown
       , (-1) <$ kup
       , ffor (traceEvent "mscrol" mscroll) $ \case
           ScrollDirection_Up -> (-1)
           ScrollDirection_Down -> 1
+      --, 0 <$ traceEvent "inp" inp
       ]
     updateLine maxN delta ix = min (max 0 (ix + delta)) maxN
     scrollEv = leftmost [
