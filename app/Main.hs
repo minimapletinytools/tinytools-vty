@@ -18,7 +18,6 @@ import System.Console.ANSI
 
 main :: IO ()
 main = mainWithDebug
---main = exampleMain
 --main = potatoMain
 --main = layoutTestMain
 --main = easyExample

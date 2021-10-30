@@ -78,10 +78,12 @@ data LayerWidget t = LayerWidget {
   , _layerWidget_newFolderEv :: Event t ()
 }
 
-holdLayerWidget :: forall t m. (MonadWidget t m, HasPotato t m)
+layerContents :: forall t m. (MonadWidget t m, HasPotato t m)
   => LayerWidgetConfig t
-  -> m (LayerWidget t)
-holdLayerWidget LayerWidgetConfig {..} = do
+  -> Dynamic t (Int, Int) -- ^ the scroll offset position
+  -> m (Event t LMouseData)
+layerContents LayerWidgetConfig {..} scrollDyn = do
+
 
   potatostylebeh <- fmap _potatoConfig_style askPotato
   PotatoStyle {..} <- sample potatostylebeh
@@ -91,82 +93,105 @@ holdLayerWidget LayerWidgetConfig {..} = do
 
 
   let
+    padBottom = 0
+    listRegionDyn = ffor2 regionWidthDyn regionHeightDyn (,)
+
+
+    makeLayerImage :: Int -> LayersHandlerRenderEntry -> V.Image
+    makeLayerImage width lhrentry = case lhrentry of
+      LayersHandlerRenderEntryDummy ident -> r where
+        r = V.text' lg_layer_selected . T.pack . L.take width
+          $ replicate ident ' '
+          <> replicate 10 '*'
+      LayersHandlerRenderEntryNormal selected mdots mrenaming lentry@LayerEntry{..} -> r where
+        ident = layerEntry_depth lentry
+        sowl = _layerEntry_superOwl
+        rid = _superOwl_id sowl
+        label = isOwl_name sowl
+
+        attr = case selected of
+          LHRESS_Selected -> _potatoStyle_selected
+          LHRESS_InheritSelected -> _potatoStyle_selected
+          LHRESS_ChildSelected -> _potatoStyle_softSelected
+          _ -> _potatoStyle_normal
+
+        -- TODO correct styles so they aren't confused with selected styles (you should add colors)
+        attrrenamingbg = _potatoStyle_softSelected
+        attrrenamingcur = _potatoStyle_selected
+
+        identn = case mdots of
+          Nothing -> ident
+          Just x -> x - 1
+
+        t1 = V.text' attr . T.pack $
+
+          -- render identation and possible drop depth
+          replicate identn ' '
+          <> replicate (min 1 (ident - identn)) '|'
+          <> replicate (max 0 (ident - identn - 1)) ' '
+
+          -- render folder hide lock icons
+          -- <> [moveChar]
+          <> if' (layerEntry_isFolder lentry) (if' _layerEntry_isCollapsed [expandChar] [closeChar]) []
+          <> if' (lockHiddenStateToBool _layerEntry_hideState) [hiddenChar] [visibleChar]
+          <> if' (lockHiddenStateToBool _layerEntry_lockState) [lockedChar] [unlockedChar]
+          <> " "
+          <> show rid
+          <> " "
+
+        t2 = case mrenaming of
+          Nothing -> V.text' attr label
+          Just renaming -> img where
+            dls = TZ.displayLines 999999 attrrenamingbg attrrenamingcur (coerceZipper renaming)
+            img = V.vertCat . images $ TZ._displayLines_spans dls
+
+        r = t1 V.<|> t2
+
+    layerImages :: Behavior t [V.Image]
+    layerImages = current $ fmap ((:[]) . V.vertCat)
+      $ ffor2 listRegionDyn (fmap _layersViewHandlerRenderOutput_entries _layerWidgetConfig_layersView) $ \(w,h) lhrentries ->
+        map (makeLayerImage w) . L.take (max 0 (h - padBottom)) $ toList lhrentries
+  tellImages layerImages
+  let
+    -- TODO scrolling?
+    offset = V2 0 0
+  layerInpEv_d3 <- makeLMouseDataInputEv offset True
+  return layerInpEv_d3
+
+holdLayerWidget :: forall t m. (MonadWidget t m, HasPotato t m)
+  => LayerWidgetConfig t
+  -> m (LayerWidget t)
+holdLayerWidget lwc@LayerWidgetConfig {..} = do
+
+
+
+
+  potatostylebeh <- fmap _potatoConfig_style askPotato
+  PotatoStyle {..} <- sample potatostylebeh
+
+  regionWidthDyn <- displayWidth
+  regionHeightDyn <- displayHeight
 
   (layerInpEv, newFolderEv) <- initLayout $ col $ mdo
-    -- the layer list itself
-    (layerInpEv_d1) <- (grout . stretch) 5 $ row $ do
-      let
-        padBottom = 0
-        listRegionDyn = ffor2 regionWidthDyn regionHeightDyn (,)
+    -- layer contents and scroll bar
+    layerInpEv_d1 <- (grout . stretch) 1 $ row $ do
 
-        makeLayerImage :: Int -> LayersHandlerRenderEntry -> V.Image
-        makeLayerImage width lhrentry = case lhrentry of
-          LayersHandlerRenderEntryDummy ident -> r where
-            r = V.text' lg_layer_selected . T.pack . L.take width
-              $ replicate ident ' '
-              <> replicate 10 '*'
-          LayersHandlerRenderEntryNormal selected mdots mrenaming lentry@LayerEntry{..} -> r where
-            ident = layerEntry_depth lentry
-            sowl = _layerEntry_superOwl
-            rid = _superOwl_id sowl
-            label = isOwl_name sowl
+      -- the layer list itself
+      layerInpEv_d2 <- layerContents lwc (constDyn (0,0))
 
-            attr = case selected of
-              LHRESS_Selected -> _potatoStyle_selected
-              LHRESS_InheritSelected -> _potatoStyle_selected
-              LHRESS_ChildSelected -> _potatoStyle_softSelected
-              _ -> _potatoStyle_normal
+      -- the vertical scroll bar
+      (grout . fixed) 1 $ col $ do
+        -- TODO vertical scroll bar
+        return ()
 
-            -- TODO correct styles so they aren't confused with selected styles (you should add colors)
-            attrrenamingbg = _potatoStyle_softSelected
-            attrrenamingcur = _potatoStyle_selected
-
-            identn = case mdots of
-              Nothing -> ident
-              Just x -> x
-
-            t1 = V.text' attr . T.pack $
-
-              -- render identation and possible drop depth
-              replicate identn ' '
-              <> replicate (min 1 (ident - identn)) '|'
-              <> replicate (max 0 (ident - identn - 1)) ' '
-
-              -- render folder hide lock icons
-              -- <> [moveChar]
-              <> if' (layerEntry_isFolder lentry) (if' _layerEntry_isCollapsed [expandChar] [closeChar]) []
-              <> if' (lockHiddenStateToBool _layerEntry_hideState) [hiddenChar] [visibleChar]
-              <> if' (lockHiddenStateToBool _layerEntry_lockState) [lockedChar] [unlockedChar]
-              <> " "
-              <> show rid
-              <> " "
-
-            t2 = case mrenaming of
-              Nothing -> V.text' attr label
-              Just renaming -> img where
-                dls = TZ.displayLines 999999 attrrenamingbg attrrenamingcur (coerceZipper renaming)
-                img = V.vertCat . images $ TZ._displayLines_spans dls
-
-            r = t1 V.<|> t2
-
-        layerImages :: Behavior t [V.Image]
-        layerImages = current $ fmap ((:[]) . V.vertCat)
-          $ ffor2 listRegionDyn (fmap _layersViewHandlerRenderOutput_entries _layerWidgetConfig_layersView) $ \(w,h) lhrentries ->
-            map (makeLayerImage w) . L.take (max 0 (h - padBottom)) $ toList lhrentries
-      tellImages layerImages
-      let
-        -- TODO scrolling?
-        offset = V2 0 0
-      layerInpEv_d2 <- makeLMouseDataInputEv offset True
       return layerInpEv_d2
 
-
     -- buttons at the bottom
-    (newFolderEv_d1, heightDyn) <- (grout . fixed) (traceDyn "boop" heightDyn) $ row $ do
-      (buttonsEv, heightDyn') <- buttonList (constDyn ["new folder"]) (Just regionWidthDyn)
+    (newFolderEv_d1, heightDyn) <- (grout . fixed) heightDyn $ row $ do
+      (buttonsEv, heightDyn_d1) <- buttonList (constDyn ["new folder"]) (Just regionWidthDyn)
       -- TODO new layer/delete buttons how here
       -- TODO other folder options too maybe?
-      return (ffilterButtonIndex 0 buttonsEv, heightDyn')
+      return (ffilterButtonIndex 0 buttonsEv, heightDyn_d1)
 
     return (layerInpEv_d1, newFolderEv_d1)
 
