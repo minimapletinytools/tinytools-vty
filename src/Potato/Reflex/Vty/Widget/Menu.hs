@@ -1,3 +1,4 @@
+-- TODO FINISH INCOMPLETE
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE RecursiveDo     #-}
 
@@ -14,7 +15,7 @@ import qualified Graphics.Vty.Input.Events as V
 import           Reflex
 import           Reflex.Network
 import           Reflex.Potato.Helpers
-import           Reflex.Vty             
+import           Reflex.Vty
 
 
 import           Data.Default

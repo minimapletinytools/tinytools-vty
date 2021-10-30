@@ -1,5 +1,5 @@
 -- extends methods Text.Input
--- TODO beling in Potato because depends on HasPotato
+-- TODO belongs in Potato because depends on HasPotato
 -- alternatively, drop the HasPotato requirement by passing in Behavior t V.Attr into these methods
 
 {-# LANGUAGE RecordWildCards #-}

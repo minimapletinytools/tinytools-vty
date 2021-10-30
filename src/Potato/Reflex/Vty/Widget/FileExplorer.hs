@@ -64,6 +64,7 @@ data FileExplorerWidget t = FileExplorerWidget {
   , _fileExplorerWidget_returnOnfilename :: Event t () -- fires when you hit the "return" key in file name input area
 }
 
+-- TODO reduce constraints
 holdFileExplorerWidget :: forall t m. (MonadLayoutWidget t m, HasPotato t m)
   => FileExplorerWidgetConfig t
   -> m (FileExplorerWidget t)

@@ -37,6 +37,7 @@ type PopupInputWidget t m a =
   -> Event t () -- ^ click outside box
   -> m (Event t (), Event t a) -- ^ (close event, output event)
 
+-- TODO reduce constraints
 popupPaneInternal :: forall t m a. (MonadWidget t m)
   => PopupPaneSize
   -> PopupInputWidget t m a -- ^ widget to be displayed in the popup
@@ -61,6 +62,7 @@ popupPaneInternal PopupPaneSize {..} widgetFnEv = do
     return (outputEv', closeEv')
   return (outputEv, closeEv)
 
+-- TODO reduce constraints
 -- | popupPane can only emit a single event before closing itself
 -- clicking outside the popup closes the popup and emits no events (conisder disabling this as default behavior?)
 popupPane :: forall t m a. (MonadWidget t m)
