@@ -66,7 +66,7 @@ vScrollBar handleStyleBeh contentSizeDyn = mdo
 
   let
     content_over_screen_dyn = fmap (\x -> 1 / x) screen_over_content_dyn
-    dragDeltaAdjustedEv = fmap (\(x,y) -> traceShow y $  x * fromIntegral y) (attach (current content_over_screen_dyn) deltaDragEv)
+    dragDeltaAdjustedEv = fmap (\(x,y) -> x * fromIntegral y) (attach (current content_over_screen_dyn) deltaDragEv)
 
   -- TODO movement when you click on areas off the bar
   -- TODO maybe do ^ v arrows at top and bottom to click scroll through 1 at a time
@@ -88,14 +88,14 @@ vScrollBar handleStyleBeh contentSizeDyn = mdo
 
   -- then put it all together
   let
-    foldOffsetFn (maxdiff, delta) c = trace (show c <> " " <> show delta <> " " <> show maxdiff) $ max 0 (min maxdiff (c+delta))
-    --foldOffsetFn (maxdiff, delta) c = max 0 (min maxdiff (c+delta))
+    --foldOffsetFn (maxdiff, delta) c = trace (show c <> " " <> show delta <> " " <> show maxdiff) $ max 0 (min maxdiff (c+delta))
+    foldOffsetFn (maxdiff, delta) c = max 0 (min maxdiff (c+delta))
   offsetFloatDyn <- foldDyn foldOffsetFn 0 (attach (current maxContentSizeDiffDyn) (leftmost [dragDeltaAdjustedEv, requestedScroll]))
 
   let
     offsetScreenUnitDyn = fmap round . liftA2 (*) screen_over_content_dyn $ offsetFloatDyn
 
-  return $ fmap floor offsetFloatDyn
+  return $ traceDyn "offset" $ fmap floor offsetFloatDyn
 
 
 {-

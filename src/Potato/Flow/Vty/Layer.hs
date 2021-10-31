@@ -18,10 +18,10 @@ import           Potato.Reflex.Vty.Helpers
 import           Potato.Reflex.Vty.Widget
 import Potato.Flow.Vty.PotatoReader
 import Potato.Flow.Vty.Common
+import Potato.Reflex.Vty.Widget.ScrollBar
+
+
 import qualified Potato.Data.Text.Zipper
-
-
-
 import           Control.Monad.Fix
 import           Data.Align
 import           Data.Dependent.Sum          (DSum ((:=>)))
@@ -80,7 +80,7 @@ data LayerWidget t = LayerWidget {
 
 layerContents :: forall t m. (MonadWidget t m, HasPotato t m)
   => LayerWidgetConfig t
-  -> Dynamic t (Int, Int) -- ^ the scroll offset position
+  -> Dynamic t XY -- ^ the scroll offset position TODO change back to (Int, Int)
   -> m (Event t LMouseData)
 layerContents LayerWidgetConfig {..} scrollDyn = do
 
@@ -147,15 +147,16 @@ layerContents LayerWidgetConfig {..} scrollDyn = do
 
         r = t1 V.<|> t2
 
+    -- TODO adjust images using scrollDyn
     layerImages :: Behavior t [V.Image]
     layerImages = current $ fmap ((:[]) . V.vertCat)
       $ ffor2 listRegionDyn (fmap _layersViewHandlerRenderOutput_entries _layerWidgetConfig_layersView) $ \(w,h) lhrentries ->
         map (makeLayerImage w) . L.take (max 0 (h - padBottom)) $ toList lhrentries
   tellImages layerImages
-  let
-    -- TODO scrolling?
-    offset = V2 0 0
-  layerInpEv_d3 <- makeLMouseDataInputEv offset True
+
+  -- TODO fix me
+  --layerInpEv_d3 <- makeLMouseDataInputEv scrollDyn True
+  layerInpEv_d3 <- makeLMouseDataInputEv 0 True
   return layerInpEv_d3
 
 holdLayerWidget :: forall t m. (MonadWidget t m, HasPotato t m)
@@ -170,19 +171,24 @@ holdLayerWidget lwc@LayerWidgetConfig {..} = do
   PotatoStyle {..} <- sample potatostylebeh
 
   regionWidthDyn <- displayWidth
-  regionHeightDyn <- displayHeight
+  --regionHeightDyn <- displayHeight
 
   (layerInpEv, newFolderEv) <- initLayout $ col $ mdo
     -- layer contents and scroll bar
-    layerInpEv_d1 <- (grout . stretch) 1 $ row $ do
+    layerInpEv_d1 <- (grout . stretch) 1 $ row $ mdo
 
       -- the layer list itself
-      layerInpEv_d2 <- layerContents lwc (constDyn (0,0))
+      (layerInpEv_d2, listRegionHeightDyn) <- (grout . stretch) 0 $ col $ do
+        listRegionHeightDyn_d1 <- displayHeight
+        layerInpEv_d3 <- layerContents lwc (fmap (\y -> V2 0 y) vScrollDyn)
+        return (layerInpEv_d3, listRegionHeightDyn_d1)
 
       -- the vertical scroll bar
-      (grout . fixed) 1 $ col $ do
-        -- TODO vertical scroll bar
-        return ()
+      vScrollDyn <- (grout . fixed) 1 $ col $ do
+        let
+          contentSizeDyn = fmap ((+1) . Seq.length . _layersViewHandlerRenderOutput_entries) _layerWidgetConfig_layersView
+          handleStyleBeh = undefined
+        vScrollBar handleStyleBeh 40 --contentSizeDyn
 
       return layerInpEv_d2
 

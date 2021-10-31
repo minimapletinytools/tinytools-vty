@@ -67,7 +67,7 @@ convertButton = \case
 
 makeLMouseDataInputEv
   :: (Reflex t, MonadFix m, MonadHold t m, HasInput t m)
-  => XY
+  => XY -- TODO change to dynamic
   -> Bool
   -> m (Event t LMouseData)
 makeLMouseDataInputEv offset isLayerMouse = do
