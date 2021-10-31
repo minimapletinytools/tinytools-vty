@@ -81,7 +81,7 @@ holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
     requestedScroll = leftmost
       [ 1 <$ kdown
       , (-1) <$ kup
-      , ffor (traceEvent "mscrol" mscroll) $ \case
+      , ffor mscroll $ \case
           ScrollDirection_Up -> (-1)
           ScrollDirection_Down -> 1
       --, 0 <$ traceEvent "inp" inp
