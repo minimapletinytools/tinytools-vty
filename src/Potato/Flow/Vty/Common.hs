@@ -114,7 +114,7 @@ radioList buttonsDyn activeDyn mWidthDyn = do
       attr = if selected then lg_layer_selected else lg_default
       --c = if selected then "[" <> t <> "]" else " " <> t <> " "
       c = "["<>t<>"]"
-    heightDyn = fmap (maximumlist . fmap (snd3 . fst3)) buttons
+    heightDyn = fmap ((+1) . maximumlist . fmap (snd3 . fst3)) buttons
     selectEv = flip push mouseDownEv $ \(MouseDown _ (px,py) _) -> do
       bs <- sample . current $ buttons
       return $ L.ifindIndex (\_ ((x,y,l),_,_) -> py == y && px >= x && px < x+l) bs
