@@ -65,12 +65,16 @@ convertButton = \case
   V.BScrollUp -> Nothing
   V.BScrollDown -> Nothing
 
+tupleToXY :: (Int, Int) -> XY
+tupleToXY (x,y) = V2 x y
+
+
 makeLMouseDataInputEv
   :: (Reflex t, MonadFix m, MonadHold t m, HasInput t m)
-  => XY -- TODO change to dynamic
+  => Dynamic t (Int, Int)
   -> Bool
   -> m (Event t LMouseData)
-makeLMouseDataInputEv offset isLayerMouse = do
+makeLMouseDataInputEv offsetDyn isLayerMouse = do
   -- NOTE, must report both mouse down and up for any given drag or things will break
   -- button/mods is always the same button as mouse down, even if it changes during a drag
   inp <- input
@@ -89,22 +93,22 @@ makeLMouseDataInputEv offset isLayerMouse = do
   mouseUpDyn <- holdDyn True mouseUpEv
   mouseDownDyn <- foldDyn mouseDownFoldFn (V.BLeft,[]) (attach (current mouseUpDyn) mouseDownEv)
 
-  return $ fforMaybe (attach (current mouseDownDyn) inp) $ \case
+  return $ fforMaybe (attach (current ((,) <$> mouseDownDyn <*> offsetDyn)) inp) $ \case
     (_, V.EvMouseDown _ _ V.BScrollUp _) -> Nothing
     (_, V.EvMouseDown _ _ V.BScrollDown _) -> Nothing
-    (_, V.EvMouseDown x y b mods) -> case convertButton b of
+    ((_,offset), V.EvMouseDown x y b mods) -> case convertButton b of
       Nothing -> Nothing
       Just b' -> Just $ LMouseData {
-        _lMouseData_position       = (V2 x y) + offset
+        _lMouseData_position       = (V2 x y) + tupleToXY offset
         , _lMouseData_isRelease    = False
         , _lMouseData_button       = b'
         , _lMouseData_modifiers    = convertModifiers mods
         , _lMouseData_isLayerMouse = isLayerMouse
       }
-    ((b,mods), V.EvMouseUp x y _) -> case convertButton b of
+    (((b,mods),offset), V.EvMouseUp x y _) -> case convertButton b of
       Nothing -> Nothing
       Just b' -> Just $ LMouseData {
-        _lMouseData_position       = (V2 x y) + offset
+        _lMouseData_position       = (V2 x y) + tupleToXY offset
         , _lMouseData_isRelease    = True
         , _lMouseData_button       = b'
         , _lMouseData_modifiers    = convertModifiers mods

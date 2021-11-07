@@ -80,7 +80,7 @@ data LayerWidget t = LayerWidget {
 
 layerContents :: forall t m. (MonadWidget t m, HasPotato t m)
   => LayerWidgetConfig t
-  -> Dynamic t XY -- ^ the scroll offset position TODO change back to (Int, Int)
+  -> Dynamic t (Int, Int)
   -> m (Event t LMouseData)
 layerContents LayerWidgetConfig {..} scrollDyn = do
 
@@ -147,16 +147,13 @@ layerContents LayerWidgetConfig {..} scrollDyn = do
 
         r = t1 V.<|> t2
 
-    -- TODO adjust images using scrollDyn
     layerImages :: Behavior t [V.Image]
     layerImages = current $ fmap ((:[]) . V.vertCat)
-      $ ffor2 listRegionDyn (fmap _layersViewHandlerRenderOutput_entries _layerWidgetConfig_layersView) $ \(w,h) lhrentries ->
-        map (makeLayerImage w) . L.take (max 0 (h - padBottom)) $ toList lhrentries
+      $ ffor3 listRegionDyn (fmap _layersViewHandlerRenderOutput_entries _layerWidgetConfig_layersView) scrollDyn $ \(w,h) lhrentries scroll ->
+        map (makeLayerImage w) . L.take (max 0 (h - padBottom)) . L.drop (snd scroll) $ toList lhrentries
   tellImages layerImages
 
-  -- TODO fix me
-  --layerInpEv_d3 <- makeLMouseDataInputEv scrollDyn True
-  layerInpEv_d3 <- makeLMouseDataInputEv 0 True
+  layerInpEv_d3 <- makeLMouseDataInputEv scrollDyn True
   return layerInpEv_d3
 
 holdLayerWidget :: forall t m. (MonadWidget t m, HasPotato t m)
@@ -180,7 +177,7 @@ holdLayerWidget lwc@LayerWidgetConfig {..} = do
       -- the layer list itself
       (layerInpEv_d2, listRegionHeightDyn) <- (grout . stretch) 0 $ col $ do
         listRegionHeightDyn_d1 <- displayHeight
-        layerInpEv_d3 <- layerContents lwc (fmap (\y -> V2 0 y) vScrollDyn)
+        layerInpEv_d3 <- layerContents lwc (fmap (\y -> (0,y)) vScrollDyn)
         return (layerInpEv_d3, listRegionHeightDyn_d1)
 
       -- the vertical scroll bar
@@ -188,9 +185,12 @@ holdLayerWidget lwc@LayerWidgetConfig {..} = do
         let
           contentSizeDyn = fmap ((+1) . Seq.length . _layersViewHandlerRenderOutput_entries) _layerWidgetConfig_layersView
           handleStyleBeh = undefined
-        vScrollBar handleStyleBeh 40 --contentSizeDyn
+        vScrollBar handleStyleBeh 40 
+        --vScrollBar handleStyleBeh contentSizeDyn
 
       return layerInpEv_d2
+
+    -- TODO horizontal scroll bar somedays
 
     -- buttons at the bottom
     (newFolderEv_d1, heightDyn) <- (grout . fixed) heightDyn $ row $ do

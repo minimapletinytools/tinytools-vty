@@ -145,8 +145,8 @@ eitherMaybeLeft _ = Nothing
 
 pfcfg :: (Reflex t) => MainPFWidgetConfig t
 pfcfg = def {
-    _mainPFWidgetConfig_initialFile = Just "potato.flow"
-    --_mainPFWidgetConfig_initialState = owlpfstate_basic2
+    --_mainPFWidgetConfig_initialFile = Just "potato.flow"
+    _mainPFWidgetConfig_initialState = owlpfstate_basic2
   }
 
 

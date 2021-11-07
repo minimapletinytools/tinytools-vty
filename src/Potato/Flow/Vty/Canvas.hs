@@ -167,7 +167,7 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
   tellImages $ ffor3 (current _canvasWidgetConfig_handles) (fmap _potatoStyle_canvasCursor potatostylebeh) (current trueRegion')
     $ \(HandlerRenderOutput hs) attr reg -> fmap (makerhimage attr reg) hs
 
-  inp <- makeLMouseDataInputEv 0 False
+  inp <- makeLMouseDataInputEv (constDyn (0,0)) False
   postBuildEv <- getPostBuild
 
   let
