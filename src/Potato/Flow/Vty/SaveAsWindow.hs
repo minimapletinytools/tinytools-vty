@@ -38,7 +38,7 @@ import qualified System.FilePath as FP
 import qualified System.Directory as FP
 
 data SaveAsWindowConfig t = SaveAsWindowConfig {
-  _saveAsWindowConfig_saveAs :: Event t Text -- ^ Event to launch the popup window to save file as Text is previous file name or empty string
+  _saveAsWindowConfig_saveAs :: Event t FP.FilePath -- ^ Event to launch the popup window to save file as Text is previous file name or empty string
 }
 
 -- UNTESTED
@@ -53,7 +53,7 @@ popupSaveAsWindow SaveAsWindowConfig {..} = do
         initManager_ $ col $ mdo
           fewidget <- (tile . stretch) 3 $ holdFileExplorerWidget $ FileExplorerWidgetConfig {
               _fileExplorerWidgetConfig_fileFilter = \fp -> FP.takeExtension fp == ".potato"
-              , _fileExplorerWidgetConfig_initialFile = T.unpack f0
+              , _fileExplorerWidgetConfig_initialFile = f0
             }
           (cancelEv, saveButtonEv) <- (tile . fixed) 3 $ row $ do
             cancelEv' <- (tile . stretch) 10 $ textButton def "cancel"

@@ -227,7 +227,7 @@ data MainPFWidgetConfig t = MainPFWidgetConfig {
   _mainPFWidgetConfig_initialFile :: Maybe FP.FilePath
   , _mainPFWidgetConfig_homeDirectory :: FP.FilePath
   , _mainPFWidgetConfig_initialState :: OwlPFState -- ^ will be overriden by initialFile if set
-  , _mainPFWidgetConfig_bypassEvent :: Event t WSEvent
+  , _mainPFWidgetConfig_bypassEvent :: Event t WSEvent -- ^ used for testing
 }
 
 instance (Reflex t) => Default (MainPFWidgetConfig t) where
@@ -378,7 +378,7 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
   (_, popupStateDyn1) <- popupPaneSimple def (never $> welcomeWidget)
 
   -- TODO correct initial state (tag potatoConfig)
-  (saveAsEv, popupStateDyn2) <- flip runPotatoReader potatoConfig $ popupSaveAsWindow $ SaveAsWindowConfig (clickSaveAsEv $> "/Users/user/kitchen/faucet/potato-flow-vty")
+  (saveAsEv, popupStateDyn2) <- flip runPotatoReader potatoConfig $ popupSaveAsWindow $ SaveAsWindowConfig (clickSaveAsEv $> _mainPFWidgetConfig_homeDirectory)
 
   let
     alertEv = leftmost [fmapMaybe eitherMaybeLeft finishSaveEv]
