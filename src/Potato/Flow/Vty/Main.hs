@@ -33,6 +33,8 @@ import Potato.Flow.Vty.AppKbCmd
 
 import System.IO (stderr, stdout, hFlush)
 import System.Console.ANSI (hSetTitle)
+import qualified System.FilePath as FP
+import qualified System.Directory as FP
 
 import           Control.Concurrent
 import           Control.Monad.Fix
@@ -222,7 +224,8 @@ captureInputEvents capture child = do
     child
 
 data MainPFWidgetConfig t = MainPFWidgetConfig {
-  _mainPFWidgetConfig_initialFile :: Maybe Text
+  _mainPFWidgetConfig_initialFile :: Maybe FP.FilePath
+  , _mainPFWidgetConfig_homeDirectory :: FP.FilePath
   , _mainPFWidgetConfig_initialState :: OwlPFState -- ^ will be overriden by initialFile if set
   , _mainPFWidgetConfig_bypassEvent :: Event t WSEvent
 }
@@ -230,6 +233,7 @@ data MainPFWidgetConfig t = MainPFWidgetConfig {
 instance (Reflex t) => Default (MainPFWidgetConfig t) where
   def = MainPFWidgetConfig {
       _mainPFWidgetConfig_initialFile = Nothing
+      , _mainPFWidgetConfig_homeDirectory = ""
       , _mainPFWidgetConfig_initialState = emptyOwlPFState
       , _mainPFWidgetConfig_bypassEvent = never
     }
@@ -256,7 +260,7 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
   mLoadFileEv <- performEvent $ ffor
     (fforMaybe postBuildEv (const _mainPFWidgetConfig_initialFile))
     $ \fp -> do
-      mspf :: Maybe (SPotatoFlow, ControllerMeta) <- liftIO $ Aeson.decodeFileStrict (T.unpack fp)
+      mspf :: Maybe (SPotatoFlow, ControllerMeta) <- liftIO $ Aeson.decodeFileStrict fp
       return mspf
 
 
