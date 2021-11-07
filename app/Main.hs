@@ -12,6 +12,8 @@ import           Potato.Flow.Vty.Main
 import           GHC.IO.Handle
 import           GHC.IO.Handle.FD
 import           System.IO
+import System.Directory
+import System.FilePath
 import System.Console.ANSI
 
 
@@ -35,6 +37,17 @@ mainWithDebug = do
   fd <- openFile "stderr.txt" WriteMode
   hDuplicateTo fd stderr  -- redirect stdout to file
   hPutStrLn stderr "STDERR" -- will print to stderr
+
+  -- pull/create config files
+  configPath <- getXdgDirectory XdgConfig "potato"
+  createDirectoryIfMissing True configPath
+  doesConfigExist <- doesFileExist (configPath </> "potato.config")
+  config <- if doesConfigExist
+    then return () -- TODO load the config file
+    else return ()
+  -- TODO do stuff with config
+
+
 
   hPutStr stdout pushTitleStack
 
