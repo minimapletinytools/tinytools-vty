@@ -70,6 +70,8 @@ holdFileExplorerWidget :: forall t m. (MonadLayoutWidget t m, HasPotato t m)
   -> m (FileExplorerWidget t)
 holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
 
+  isInitialFileDir <- liftIO (FP.doesDirectoryExist _fileExplorerWidgetConfig_initialFile)
+
   -- set up v scrolling stuff
   kup <- key V.KUp
   kdown <- key V.KDown
@@ -101,11 +103,16 @@ holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
   -- set up directory/filename text field stuff
   pb <- getPostBuild
   let
+    initialDirFileEv :: Event t (FilePath, FilePath) = flip pushAlways pb $ \_ -> do
+      let
+        dir = FP.takeDirectory _fileExplorerWidgetConfig_initialFile
+        file = FP.takeFileName _fileExplorerWidgetConfig_initialFile
+      return $ if isInitialFileDir then (_fileExplorerWidgetConfig_initialFile, "") else (dir, file)
     foldDirDynFn new old = case FP.takeFileName new of
       "." -> old
       ".." -> FP.takeDirectory old
       _ -> new
-  dirDyn <- foldDyn foldDirDynFn "" (leftmost [pb $> FP.takeDirectory _fileExplorerWidgetConfig_initialFile, clickFolderEvent, setFolderEvent])
+  dirDyn <- foldDyn foldDirDynFn "" (leftmost [fmap fst initialDirFileEv, clickFolderEvent, setFolderEvent])
   fetchDirComplete <- fetchDirectory (updated dirDyn)
   dirContentsDyn <- holdDyn [] fetchDirComplete
 
@@ -135,7 +142,7 @@ holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
   (clickEvents, setFolderRawEvent, filenameDyn, enterEv) <- col $ do
     -- TODO consider combining filename and directory into one...
     let
-      setFileEv = fmap T.pack $ leftmost [pb $> FP.takeFileName _fileExplorerWidgetConfig_initialFile, clickFileEvent]
+      setFileEv = fmap T.pack $ leftmost [fmap snd initialDirFileEv, clickFileEvent]
     -- input for filename
     (filenameDyn', enterEv') <- (tile . fixed) 1 $ do
       (,)

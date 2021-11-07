@@ -233,7 +233,8 @@ data MainPFWidgetConfig t = MainPFWidgetConfig {
 instance (Reflex t) => Default (MainPFWidgetConfig t) where
   def = MainPFWidgetConfig {
       _mainPFWidgetConfig_initialFile = Nothing
-      , _mainPFWidgetConfig_homeDirectory = ""
+      --, _mainPFWidgetConfig_homeDirectory = "/"
+      , _mainPFWidgetConfig_homeDirectory = "/home/minimaple/kitchen/faucet/potato-flow-vty"
       , _mainPFWidgetConfig_initialState = emptyOwlPFState
       , _mainPFWidgetConfig_bypassEvent = never
     }
@@ -284,7 +285,7 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
         }
     handle (\(SomeException e) -> return . Left $ "ERROR, Could not save to file " <> show fn <> " got exception \"" <> show e <> "\"") $ do
       --liftIO $ Aeson.encodeFile "potato.flow" spf
-      print $ "wrote to file: " <> fn
+      --print $ "wrote to file: " <> fn
       LBS.writeFile fn $ PrettyAeson.encodePretty (spf, cm)
       return $ Right fn
 

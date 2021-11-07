@@ -5,6 +5,7 @@
 dist-newstyle
 cabal.project.local
 potato.flow
+potato2.flow
 potato.txt
 stderr.txt
 *_termwidthfile
