@@ -19,6 +19,8 @@ import           Reflex.Vty
 import           Data.Default
 import qualified Data.Sequence as Seq
 import Data.Fixed (div')
+import Data.These
+import Data.Align (align)
 
 
 
@@ -33,6 +35,11 @@ emptyDrag2 = Drag2  {
 
 componentSub :: (Num a) => (a,a) -> (a,a) -> (a,a)
 componentSub (a,b) (c,d) = (a-c,b-d)
+
+onlyIfSimultaneous :: (Reflex t) => Event t a -> Event t b -> Event t a
+onlyIfSimultaneous eva evb = fforMaybe (align eva evb) $ \case 
+  These a _ -> Just a
+  _ -> Nothing
 
 
 -- TODO write UTs
@@ -52,17 +59,22 @@ vScrollBar handleStyleBeh contentSizeDyn = mdo
     boxHeightDyn = fmap ceiling $ liftA2 (*) screen_over_content_dyn (fromIntegral <$> maxSizeDyn)
     boxRegionDyn = Region <$> 0 <*> offsetScreenUnitDyn <*> 1 <*> boxHeightDyn
 
-  deltaDragEv <- pane boxRegionDyn (constDyn True) $ do
-    fill (constant '#')
-    -- this works and I don't know why because the pane is moving when you move the mouse and the mouse is relative to the pane 🤷🏼‍♀️
-    d2ev <- drag2 V.BLeft
-    let
-      moveDragEv = fmapMaybe (\d2 -> if _drag2_state d2 == Dragging then Just d2 else Nothing) d2ev
-    lastDrag <- holdDyn emptyDrag2 d2ev
-    let
-      deltaDragEv_d1' = attach (current lastDrag) moveDragEv
-      deltaDragEv_d1 = fmap (\(pd,d) -> _drag2_to d `componentSub` _drag2_to pd) deltaDragEv_d1'
-    return $ fmap snd deltaDragEv_d1
+  --innerDragEv will only fire on drag events that started on the scroll bar handle portion
+  innerDragEv <- pane boxRegionDyn (constDyn True) $ do
+    -- render the scroll bar handle
+    fill (constant '#') 
+    drag2 V.BLeft
+
+  d2ev <- drag2 V.BLeft
+  let
+    moveDragEv = fmapMaybe (\d2 -> if _drag2_state d2 == Dragging then Just d2 else Nothing) d2ev
+  lastDrag <- holdDyn emptyDrag2 d2ev
+  let
+    deltaDragEv_d1' = attach (current lastDrag) moveDragEv
+    deltaDragEv_d1 = fmap (\(pd,d) -> _drag2_to d `componentSub` _drag2_to pd) deltaDragEv_d1'
+    -- only process the event if they are simultaneous with innerDragEv (thus meaning they started on the scroll bar handle)
+    -- the reason we need to do it this way is because `pane` messes with the mouse coords so we need to get the mouse coords from outside
+    deltaDragEv = onlyIfSimultaneous (fmap snd deltaDragEv_d1) innerDragEv
 
   let
     content_over_screen_dyn = fmap (\x -> 1 / x) screen_over_content_dyn

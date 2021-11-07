@@ -185,8 +185,7 @@ holdLayerWidget lwc@LayerWidgetConfig {..} = do
         let
           contentSizeDyn = fmap ((+1) . Seq.length . _layersViewHandlerRenderOutput_entries) _layerWidgetConfig_layersView
           handleStyleBeh = undefined
-        vScrollBar handleStyleBeh 40 
-        --vScrollBar handleStyleBeh contentSizeDyn
+        vScrollBar handleStyleBeh contentSizeDyn
 
       return layerInpEv_d2
 
