@@ -6,6 +6,6 @@ This repository contains the vty based view implementation built on top of the [
 
 # runninng
 
-You can try out potato-illustrator already bearing in mind that several features are incomplete or missing.
+You can try out potato-illustrator already. Several features are incomplete or missing.
 
 Once you have stack installed, just run `stack run`. You may need to manually pull the potato_flow subrepo.
