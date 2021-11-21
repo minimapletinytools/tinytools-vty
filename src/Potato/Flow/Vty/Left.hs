@@ -103,7 +103,7 @@ holdLeftWidget LeftWidgetConfig {..} = do
 
     hdivider
 
-    params <- (grout . fixed) 10 $ holdParamsWidget $ ParamsWidgetConfig {
+    params <- (grout . fixed) (_paramsWidget_widgetHeight params) $ holdParamsWidget $ ParamsWidgetConfig {
         _paramsWidgetConfig_selectionDyn = _goatWidget_selection _layersWidgetConfig_goatW
         , _paramsWidgetConfig_canvasDyn = _goatWidget_canvas _layersWidgetConfig_goatW
       }
