@@ -172,6 +172,9 @@ makeSuperStyleEvent tl v bl h f tr br trig = pushAlways pushfn trig where
         , _superStyle_fill       = FillStyle_Simple f'
       }
 
+presetSuperStyles :: [[Char]]
+presetSuperStyles = ["╔╗╚╝║═ ","****|- ", "██████ ", "┌┐└┘│─ "]
+
 holdSuperStyleWidget :: forall t m. (MonadLayoutWidget t m, HasPotato t m) => ParamsWidgetFn t m SuperStyle ControllersWithId
 holdSuperStyleWidget inputDyn = constDyn $ mdo
 
@@ -181,7 +184,7 @@ holdSuperStyleWidget inputDyn = constDyn $ mdo
     1 -> do
       setStyleEv' <- initLayout $ col $ do
         (grout . fixed) 1 emptyWidget -- just to make a space
-        presetClicks <- forM presetStyles $ \s -> (grout . fixed) 1 $ row $ (grout . stretch) 1 $ do
+        presetClicks <- forM presetSuperStyles $ \s -> (grout . fixed) 1 $ row $ (grout . stretch) 1 $ do
           -- TODO highlight if style matches selection
           text (constant (T.pack s))
           fmap (fmap (\_ -> s)) (mouseDown V.BLeft)
@@ -377,9 +380,6 @@ data ParamsWidget t = ParamsWidget {
   , _paramsWidget_widgetHeight :: Dynamic t Int
 
 }
-
-presetStyles :: [[Char]]
-presetStyles = ["╔╗╚╝║═ ","****|- ", "██████ ", "┌┐└┘│─ "]
 
 -- TODO move to potato reflex
 switchHoldPair :: (Reflex t, MonadHold t m) => Event t a -> Event t b -> Event t (Event t a, Event t b) -> m (Event t a, Event t b)
