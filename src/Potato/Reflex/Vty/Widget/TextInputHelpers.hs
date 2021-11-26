@@ -36,6 +36,10 @@ import           Reflex.Potato.Helpers
 import           Reflex.Vty
 
 
+infiniteWidthDyn :: (Reflex t) => Dynamic t Int
+infiniteWidthDyn = constDyn 99999
+
+
 type UpdateTextZipperMethod = V.Event -> Maybe (TZ.TextZipper -> TZ.TextZipper)
 
 makeCaptureFromUpdateTextZipperMethod :: (Reflex t, MonadFix m, MonadNodeId m, HasInput t m) => UpdateTextZipperMethod -> m (Event t())
@@ -99,6 +103,8 @@ dimensionInput valueDyn = do
   --tDyn <- fmap _textInput_value $ textInput (def { _textInputConfig_initialValue = (toText v0)})
   return $ ffor2 valueDyn tDyn $ \v t -> fromMaybe v (readMaybe (T.unpack t))
 
+
+
 updateTextZipperForFilenameCharacters :: UpdateTextZipperMethod
 updateTextZipperForFilenameCharacters ev = case ev of
   -- TODO you need to do more filtering here
@@ -126,7 +132,7 @@ filenameInputFireEventOnLoseFocus t0 overrideEv' = mdo
   let
     overrideEv = ffor overrideEv' $ \t -> const (TZ.fromText t)
     offsetx = ffor2 dw dt $ \w fn -> max 0 (T.length fn - w + 4)
-  dt <- textInputCustom' offsetx (mergeWith (.) [fmap (makeModifyEventFromUpdateTextZipperMethod updateTextZipperForFilenameCharacters) i, overrideEv]) (TZ.fromText t0)
+  dt <- textInputCustom' infiniteWidthDyn offsetx (mergeWith (.) [fmap (makeModifyEventFromUpdateTextZipperMethod updateTextZipperForFilenameCharacters) i, overrideEv]) (TZ.fromText t0)
   focusDyn <- focusedId
   lastTextDyn <- holdDyn t0 updatedtextev
   let
@@ -150,7 +156,7 @@ filenameInput t0 overrideEv' = mdo
   let
     overrideEv = ffor overrideEv' $ \t -> const (TZ.fromText t)
     offsetx = ffor2 dw dt $ \w fn -> max 0 (T.length fn - w + 4)
-  dt <- textInputCustom' offsetx (mergeWith (.) [fmap (makeModifyEventFromUpdateTextZipperMethod updateTextZipperForFilenameCharacters) i, overrideEv]) (TZ.fromText t0)
+  dt <- textInputCustom' infiniteWidthDyn offsetx (mergeWith (.) [fmap (makeModifyEventFromUpdateTextZipperMethod updateTextZipperForFilenameCharacters) i, overrideEv]) (TZ.fromText t0)
   return dt
 
 -- | Turn a 'Span' into an 'Graphics.Vty.Image'
@@ -192,10 +198,11 @@ renderTextZipper offsetDyn dw tz = do
 textInputCustom'
   :: (MonadWidget t m, HasPotato t m)
   => Dynamic t Int
+  -> Dynamic t Int
   -> Event t (TZ.TextZipper -> TZ.TextZipper)
   -> TZ.TextZipper
   -> m (Dynamic t Text)
-textInputCustom' offsetDyn modifyEv c0 = mdo
+textInputCustom' widthDyn offsetDyn modifyEv c0 = mdo
   rec v <- foldDyn ($) c0 $ mergeWith (.)
         [ modifyEv
         , let displayInfo = current ((,) <$> dls <*> offsetDyn)
@@ -203,7 +210,7 @@ textInputCustom' offsetDyn modifyEv c0 = mdo
             TZ.goToDisplayLinePosition (ox+mx) my dl
         ]
       click <- mouseDown V.BLeft
-      dls <- renderTextZipper offsetDyn (constDyn 999999) v
+      dls <- renderTextZipper offsetDyn widthDyn v
   return $ TZ.value <$> v
 
 textInputCustom
@@ -211,4 +218,4 @@ textInputCustom
   => Event t (TZ.TextZipper -> TZ.TextZipper)
   -> TZ.TextZipper
   -> m (Dynamic t Text)
-textInputCustom = textInputCustom' (constDyn 0)
+textInputCustom = textInputCustom' infiniteWidthDyn (constDyn 0)
