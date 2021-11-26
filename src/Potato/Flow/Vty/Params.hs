@@ -310,7 +310,22 @@ holdSBoxTypeWidget inputDyn = constDyn $ do
     mBoxType = fmap snd inputDyn
     selectionDyn = fmap fst inputDyn
   mbt0 <- sample . current $ mBoxType
+
   let
+    -- TODO use this
+    stateDyn = ffor mBoxType $ \case
+      Nothing                 -> Nothing
+      Just SBoxType_Box       -> Just (False,False)
+      Just SBoxType_BoxText   -> Just (False,True)
+      Just SBoxType_NoBox     -> Just (True,False)
+      Just SBoxType_NoBoxText -> Just (True,True)
+
+    -- TODO
+    borderDyn = constDyn False
+    textDyn = constDyn False
+
+  let
+    -- DELETE
     (startbox,starttext) = case mbt0 of
       Nothing                 -> ([], [])
       Just SBoxType_Box       -> ([0],[0])
@@ -318,17 +333,21 @@ holdSBoxTypeWidget inputDyn = constDyn $ do
       Just SBoxType_NoBox     -> ([1],[0])
       Just SBoxType_NoBoxText -> ([1],[1])
 
-  _ <- col $ do
-    b <- (grout . fixed) 1 $ row $ do
+  -- TODO only show if stateDyn is Just
+  (b,t) <- col $ do
+    b_d1 <- (grout . fixed) 1 $ row $ do
       (grout . fixed) 8 $ text "border:"
-      (grout . stretch) 1 $ text "TODO CHECKBOX"
-    t <- (grout . fixed) 1 $ row $ do
+      (grout . stretch) 1 $ checkBox borderDyn
+    t_d1 <- (grout . fixed) 1 $ row $ do
       (grout . fixed) 8 $ text "  text:"
-      (grout . stretch) 1 $ text "TODO CHECKBOX"
-    return (b,t)
+      (grout . stretch) 1 $ checkBox textDyn
+    return (b_d1,t_d1)
+
+  let
+    captureEv = void $ leftmost [b,t]
 
   -- TODO
-  return (2, never, never)
+  return (2, captureEv, never)
 
 holdCanvasSizeWidget :: forall t m. (MonadLayoutWidget t m, HasPotato t m) => Dynamic t SCanvas -> ParamsWidgetFn t m () XY
 holdCanvasSizeWidget canvasDyn nothingDyn = ffor nothingDyn $ \_ -> do

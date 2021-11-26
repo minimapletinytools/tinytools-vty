@@ -7,6 +7,7 @@ module Potato.Flow.Vty.Common (
   , buttonList
   , radioList
   , radioListSimple
+  , checkBox
 ) where
 
 import           Relude
@@ -80,6 +81,7 @@ buttonList buttonsDyn mWidthDyn = do
   return $ (selectEv, heightDyn)
 
 -- | option to pass in height is a hack to work around circular dependency issues as when using Layout, displayWidth may be dependent on returned dynamic height
+-- override style: does not modify state internally, instead state must be passed back in
 radioList :: forall t m. (Reflex t, MonadNodeId m, HasDisplayRegion t m, HasImageWriter t m, HasInput t m, HasTheme t m)
   => Dynamic t [Text] -- ^ list of button contents
   -> Dynamic t [Int] -- ^ which buttons are "active"
@@ -129,3 +131,18 @@ radioListSimple initial buttons = mdo
   (radioEvs,_) <- radioList (constDyn buttons) radioDyn Nothing
   radioDyn <- holdDyn [0] $ fmap (\x->[x]) radioEvs
   return $ fmap (Unsafe.head) radioDyn
+
+
+
+-- TODO focus + enter to select via keyboard
+-- | creates a check box "[x]" in upper left corner of region
+-- override style: does not modify state internally, instead state must be passed back in
+checkBox
+  :: forall t m. (Reflex t, MonadFix m, MonadHold t m, MonadNodeId m, HasDisplayRegion t m, HasImageWriter t m, HasInput t m, HasTheme t m)
+  => Dynamic t Bool
+  -> m (Event t Bool)
+checkBox stateDyn = do
+  text (ffor (current stateDyn) (\s -> if s then "[x]" else "[ ]"))
+  mouseDownEv <- mouseDown V.BLeft
+  let toggleEv = fforMaybe mouseDownEv $ \(MouseDown _ (px,py) _) -> if px >= 0 && px < 3 && py == 0 then Just () else Nothing
+  return $ tag (current (fmap not stateDyn)) toggleEv
