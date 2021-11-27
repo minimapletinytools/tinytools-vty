@@ -82,8 +82,8 @@ selectParamsFromSelection ps (SuperOwlParliament selection) = r where
 
 
 type MaybeParamsWidgetOutputDyn t m b = Dynamic t (Maybe (m (Dynamic t Int, Event t (), Event t b)))
-
 type ParamsWidgetOutputDyn t m b = Dynamic t (m (Dynamic t Int, Event t (), Event t b))
+-- if the `Maybe a` part is `Nothing` then the selection has different such properties
 type ParamsWidgetFn t m a b = Dynamic t (Selection, Maybe a) -> ParamsWidgetOutputDyn t m b
 
 networkParamsWidgetOutputDynForTesting :: (MonadWidget t m, HasPotato t m) => ParamsWidgetOutputDyn t m b -> m (Dynamic t Int, Event t (), Event t b)
@@ -260,7 +260,101 @@ holdSuperStyleWidget inputDyn = constDyn $ mdo
     ssparamsEv = push pushSuperStyleFn setStyleEv
   return (ffor heightDyn (+1), captureEv, ssparamsEv)
 
+data LineStyleCell = LSC_L | LSC_R | LSC_U | LSC_D
 
+updateFromLineStyle :: LineStyleCell -> (LineStyle -> TZ.TextZipper)
+updateFromLineStyle lsc = TZ.top . TZ.fromText . gettfn lsc where
+  gettfn = \case
+    LSC_L -> _lineStyle_leftArrows
+    LSC_R -> _lineStyle_rightArrows
+    LSC_U -> _lineStyle_upArrows
+    LSC_D -> _lineStyle_downArrows
+
+makeLineStyleEvent :: (Reflex t)
+  => Behavior t Text
+  -> Behavior t Text
+  -> Behavior t Text
+  -> Behavior t Text
+  -> Event t ()
+  -> Event t LineStyle
+makeLineStyleEvent l r u d trig = pushAlways pushfn trig where
+  pushfn _ = do
+    l' <- sample l
+    r' <- sample r
+    u' <- sample u
+    d' <- sample d
+    return $ def {
+        _lineStyle_leftArrows    = l'
+        , _lineStyle_rightArrows = r'
+        , _lineStyle_upArrows    = u'
+        , _lineStyle_downArrows  = d'
+      }
+
+-- TODO FINISH
+-- TODO someday do backwards expanding text entry boxes for LSC_R and LSC_D
+makeLineStyleTextEntry :: (MonadWidget t m, HasPotato t m) => LineStyleCell -> Dynamic t (Maybe LineStyle) -> m (Behavior t Text)
+makeLineStyleTextEntry lsc mlsDyn = do
+  mls0 <- sample . current $ mlsDyn
+  let modifyEv = (fmap (maybe id (\ss -> const (updateFromLineStyle lsc ss))) (updated mlsDyn))
+  -- TODO need to use different text input type
+  ti <- singleCellTextInput modifyEv $ case mls0 of
+    Nothing  -> ""
+    Just ls0 -> updateFromLineStyle lsc ls0
+  return . current $ ti
+
+-- | ignore _lineStyle_autoStyle part of LineStyle output
+holdLineStyleWidget :: forall t m. (MonadLayoutWidget t m, HasPotato t m) => ParamsWidgetFn t m LineStyle ControllersWithId
+holdLineStyleWidget inputDyn = constDyn $ do
+
+  let
+    lssDyn = fmap snd inputDyn
+
+
+  noRepeatNavigation
+  (focusDyn,l,r,u,d) <-  col $ do
+    (grout . fixed) 1 emptyWidget -- just to make a space
+    --(tile . fixed) 1 $ text (fmap (T.pack . superStyle_toListFormat . Data.Maybe.fromJust) $ current mssDyn)
+    l_d1 <- (grout . fixed) 1 $ row $ do
+      (grout . fixed) 8 $ text " left:"
+      (tile . stretch) 1 $ makeLineStyleTextEntry LSC_L lssDyn
+    r_d1 <- (grout . fixed) 1 $ row $ do
+      (grout . fixed) 8 $ text "right:"
+      (tile . stretch) 1 $ makeLineStyleTextEntry LSC_R lssDyn
+    (u_d1, d_d1) <- (grout . fixed) 3 $ row $ (grout . stretch) 1 $ do
+      col $ (grout . fixed) 3 $ text "up:"
+      u_d2 <- col $ (tile . fixed) 1 $ makeLineStyleTextEntry LSC_U lssDyn
+      col $ (grout . fixed) 5 $ text "down:"
+      d_d2 <- col $ (tile . fixed) 1 $ makeLineStyleTextEntry LSC_D lssDyn
+      -- pad the end
+      (tile . stretch) 0 $ return ()
+      return (u_d2, d_d2)
+    -- pad the end
+    (tile . stretch) 0 $ return ()
+    focusDyn' <- focusedId
+    return (focusDyn',l_d1,r_d1,u_d1,d_d1)
+
+  captureEv <- makeCaptureFromUpdateTextZipperMethod updateTextZipperForSingleCharacter
+
+  let
+    selectionDyn = fmap fst inputDyn
+    pushLineStyleFn :: LineStyle -> PushM t (Maybe ControllersWithId)
+    pushLineStyleFn ss = do
+      SuperOwlParliament selection <- sample . current $ selectionDyn
+      let
+        overrideAutoStyle oldss newss = newss { _lineStyle_autoStyle = _lineStyle_autoStyle oldss }
+        fmapfn sowl = case getSEltLabelLineStyle (superOwl_toSEltLabel_hack sowl) of
+          Nothing -> Nothing
+          Just oldss -> if oldss == overrideAutoStyle oldss ss
+            then Nothing
+            else Just (_superOwl_id sowl, CTagLineStyle :=> Identity (CLineStyle (DeltaLineStyle (oldss, overrideAutoStyle oldss ss))))
+      return $ case Data.Maybe.mapMaybe fmapfn . toList $ selection of
+        [] -> Nothing
+        x  -> Just $ IM.fromList x
+    setStyleEv = makeLineStyleEvent l r u d (void $ updated focusDyn)
+    ssparamsEv = push pushLineStyleFn setStyleEv
+
+
+  return (constDyn 6, captureEv, ssparamsEv)
 
 
 
@@ -312,28 +406,17 @@ holdSBoxTypeWidget inputDyn = constDyn $ do
   mbt0 <- sample . current $ mBoxType
 
   let
-    -- TODO use this
     stateDyn = ffor mBoxType $ \case
-      Nothing                 -> Nothing
-      Just SBoxType_Box       -> Just (False,False)
-      Just SBoxType_BoxText   -> Just (False,True)
-      Just SBoxType_NoBox     -> Just (True,False)
-      Just SBoxType_NoBoxText -> Just (True,True)
+      -- Not great, this will override everything in selection without having a "grayed out state" and do the override in a not so great way, but whatever
+      Nothing                 -> (False,False)
+      Just SBoxType_Box       -> (True,False)
+      Just SBoxType_BoxText   -> (True,True)
+      Just SBoxType_NoBox     -> (False,False)
+      Just SBoxType_NoBoxText -> (False,True)
 
-    -- TODO
-    borderDyn = constDyn False
-    textDyn = constDyn False
+    borderDyn = fmap fst stateDyn
+    textDyn = fmap snd stateDyn
 
-  let
-    -- DELETE
-    (startbox,starttext) = case mbt0 of
-      Nothing                 -> ([], [])
-      Just SBoxType_Box       -> ([0],[0])
-      Just SBoxType_BoxText   -> ([0],[1])
-      Just SBoxType_NoBox     -> ([1],[0])
-      Just SBoxType_NoBoxText -> ([1],[1])
-
-  -- TODO only show if stateDyn is Just
   (b,t) <- col $ do
     b_d1 <- (grout . fixed) 1 $ row $ do
       (grout . fixed) 8 $ text "border:"
@@ -346,8 +429,27 @@ holdSBoxTypeWidget inputDyn = constDyn $ do
   let
     captureEv = void $ leftmost [b,t]
 
+    pushSBoxTypeFn :: These Bool Bool -> PushM t (Maybe ControllersWithId)
+    pushSBoxTypeFn bt = do
+      let
+        fmapfn sowl = case getSEltLabelBoxType (superOwl_toSEltLabel_hack sowl) of
+          Nothing -> Nothing
+          Just oldbt -> if oldbt == newbt
+            then Nothing
+            else Just (_superOwl_id sowl, CTagBoxType :=> Identity (CBoxType (oldbt, newbt)))
+            where
+              newbt = case bt of
+                This border -> make_sBoxType border (sBoxType_isText oldbt)
+                That text -> make_sBoxType (sBoxType_hasBorder oldbt) text
+                These border text -> make_sBoxType border text
+      SuperOwlParliament selection <- sample . current $ selectionDyn
+      return $ case Data.Maybe.mapMaybe fmapfn . toList $ selection of
+        [] -> Nothing
+        x  -> Just $ IM.fromList x
+    sBoxTypeParamsEv = push pushSBoxTypeFn (align b t)
+
   -- TODO
-  return (2, captureEv, never)
+  return (2, captureEv, sBoxTypeParamsEv)
 
 holdCanvasSizeWidget :: forall t m. (MonadLayoutWidget t m, HasPotato t m) => Dynamic t SCanvas -> ParamsWidgetFn t m () XY
 holdCanvasSizeWidget canvasDyn nothingDyn = ffor nothingDyn $ \_ -> do
@@ -438,7 +540,8 @@ holdParamsWidget ParamsWidgetConfig {..} = do
     textAlignSelector = (fmap (\(TextStyle ta) -> ta)) . getSEltLabelBoxTextStyle . superOwl_toSEltLabel_hack
     mTextAlignInputDyn = fmap ( selectParamsFromSelection textAlignSelector) selectionDyn
     mSuperStyleInputDyn = fmap (selectParamsFromSelection (getSEltLabelSuperStyle . superOwl_toSEltLabel_hack)) selectionDyn
-    --mSBoxTypeInputDyn = fmap (selectParamsFromSelection (getSEltLabelBoxType . superOwl_toSEltLabel_hack)) selectionDyn
+    mLineStyleInputDyn = fmap (selectParamsFromSelection (getSEltLabelLineStyle . superOwl_toSEltLabel_hack)) selectionDyn
+    mSBoxTypeInputDyn = fmap (selectParamsFromSelection (getSEltLabelBoxType . superOwl_toSEltLabel_hack)) selectionDyn
 
     -- show canvas params when nothing is selected
     mCanvasSizeInputDyn = fmap (\s -> if isParliament_null s then Just (isParliament_empty, Nothing) else Nothing) selectionDyn
@@ -446,12 +549,16 @@ holdParamsWidget ParamsWidgetConfig {..} = do
   (paramsOutputEv, captureEv, canvasSizeOutputEv, heightDyn) <- initManager_ $ do
     textAlignmentWidget <- holdMaybeParamsWidget mTextAlignInputDyn holdTextAlignmentWidget
     superStyleWidget2 <- holdMaybeParamsWidget mSuperStyleInputDyn holdSuperStyleWidget
-    --sBoxTypeWidget <- holdMaybeParamsWidget mSBoxTypeInputDyn holdSBoxTypeWidget
+
+    -- TODO FINISH
+    lineStyleWidget <- holdMaybeParamsWidget mLineStyleInputDyn holdLineStyleWidget
+    sBoxTypeWidget <- holdMaybeParamsWidget mSBoxTypeInputDyn holdSBoxTypeWidget
+
     canvasSizeWidget <- holdMaybeParamsWidget mCanvasSizeInputDyn (holdCanvasSizeWidget canvasDyn)
 
     -- apparently textAlignmentWidget gets updated after any change which causes the whole network to rerender and we lose our focus state...
     let
-      controllersWithIdParamsWidgets = fmap catMaybes . mconcat . (fmap (fmap (:[]))) $ [textAlignmentWidget, superStyleWidget2]
+      controllersWithIdParamsWidgets = fmap catMaybes . mconcat . (fmap (fmap (:[]))) $ [textAlignmentWidget, superStyleWidget2, lineStyleWidget, sBoxTypeWidget]
 
     paramsNetwork <- networkView . ffor2 controllersWithIdParamsWidgets canvasSizeWidget $ \widgets mcsw -> col $ do
       outputs <- forM widgets $ \w -> mdo
