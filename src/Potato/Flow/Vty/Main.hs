@@ -316,7 +316,7 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
 
   let
     goatWidgetConfig = GoatWidgetConfig {
-        _goatWidgetConfig_initialState = _mainPFWidgetConfig_initialState
+        _goatWidgetConfig_initialState = (_mainPFWidgetConfig_initialState, emptyControllerMeta)
         , _goatWidgetConfig_load = fmapMaybe id mLoadFileEv
 
         -- canvas direct input
