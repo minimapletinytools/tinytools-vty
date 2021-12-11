@@ -84,7 +84,7 @@ selectParamsFromSelection ps (SuperOwlParliament selection) = r where
 makeParamsInputDyn :: (Eq a) => ParamsSelector a -> DefaultParamsSelector a -> Bool -> Selection -> PotatoDefaultParameters -> Maybe (Selection, Maybe a)
 makeParamsInputDyn psf dpsf tooloverride sop pdp = r where
   nsel = isParliament_length sop
-  r = if tooloverride || nsel == 0
+  r = if tooloverride
     then Just (sop, Just (dpsf pdp))
     else selectParamsFromSelection psf sop
 
@@ -545,11 +545,20 @@ holdParamsWidget ParamsWidgetConfig {..} = do
   let
     selectionDyn = _paramsWidgetConfig_selectionDyn
     canvasDyn = _paramsWidgetConfig_canvasDyn
+    defaultParamsDyn = _paramsWidgetConfig_defaultParamsDyn
     textAlignSelector = (fmap (\(TextStyle ta) -> ta)) . getSEltLabelBoxTextStyle . superOwl_toSEltLabel_hack
-    mTextAlignInputDyn = fmap ( selectParamsFromSelection textAlignSelector) selectionDyn
-    mSuperStyleInputDyn = fmap (selectParamsFromSelection (getSEltLabelSuperStyle . superOwl_toSEltLabel_hack)) selectionDyn
-    mLineStyleInputDyn = fmap (selectParamsFromSelection (getSEltLabelLineStyle . superOwl_toSEltLabel_hack)) selectionDyn
-    mSBoxTypeInputDyn = fmap (selectParamsFromSelection (getSEltLabelBoxType . superOwl_toSEltLabel_hack)) selectionDyn
+
+    -- DELETE
+    --mTextAlignInputDyn = fmap ( selectParamsFromSelection textAlignSelector) selectionDyn
+    --mSuperStyleInputDyn = fmap (selectParamsFromSelection (getSEltLabelSuperStyle . superOwl_toSEltLabel_hack)) selectionDyn
+    --mLineStyleInputDyn = fmap (selectParamsFromSelection (getSEltLabelLineStyle . superOwl_toSEltLabel_hack)) selectionDyn
+    --mSBoxTypeInputDyn = fmap (selectParamsFromSelection (getSEltLabelBoxType . superOwl_toSEltLabel_hack)) selectionDyn
+
+    -- TODO connect tool overrides
+    mTextAlignInputDyn = ffor2 selectionDyn defaultParamsDyn $ makeParamsInputDyn textAlignSelector _potatoDefaultParameters_box_text_textAlign False
+    mSuperStyleInputDyn = ffor2 selectionDyn defaultParamsDyn $ makeParamsInputDyn (getSEltLabelSuperStyle . superOwl_toSEltLabel_hack) _potatoDefaultParameters_superStyle False
+    mLineStyleInputDyn = ffor2 selectionDyn defaultParamsDyn $ makeParamsInputDyn (getSEltLabelLineStyle . superOwl_toSEltLabel_hack) _potatoDefaultParameters_lineStyle False
+    mSBoxTypeInputDyn = ffor2 selectionDyn defaultParamsDyn $ makeParamsInputDyn (getSEltLabelBoxType . superOwl_toSEltLabel_hack) _potatoDefaultParameters_sBoxType False
 
     -- show canvas params when nothing is selected
     mCanvasSizeInputDyn = fmap (\s -> if isParliament_null s then Just (isParliament_empty, Nothing) else Nothing) selectionDyn

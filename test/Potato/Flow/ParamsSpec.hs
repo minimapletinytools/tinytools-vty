@@ -47,6 +47,7 @@ $(declareStuff "ParamsNetwork"
         paramsWidget <- flip runPotatoReader def $ holdParamsWidget $ ParamsWidgetConfig {
             _paramsWidgetConfig_selectionDyn = setSelectionDyn
             , _paramsWidgetConfig_canvasDyn = setCanvasDyn
+            , _paramsWidgetConfig_defaultParamsDyn = constDyn def
           }
         return $ $(toutputcon "ParamsNetwork") paramsWidget
     |]
