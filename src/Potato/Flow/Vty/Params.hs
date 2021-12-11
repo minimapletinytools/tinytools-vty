@@ -63,7 +63,8 @@ noRepeatNavigation = do
 
 -- | method type for picking out params from SuperSEltLabel
 type ParamsSelector a = (Eq a) => SuperOwl -> Maybe a
-
+-- | method type for picking out params when there is no selection
+type DefaultParamsSelector a = PotatoDefaultParameters -> a
 
 -- | method to extract common parameters from a selection
 -- returns Nothing if nothing in the selection has the selected param
@@ -80,7 +81,12 @@ selectParamsFromSelection ps (SuperOwlParliament selection) = r where
       then Just (subSelection, Just x)
       else Just (subSelection, Nothing)
 
-
+makeParamsInputDyn :: (Eq a) => ParamsSelector a -> DefaultParamsSelector a -> Bool -> Selection -> PotatoDefaultParameters -> Maybe (Selection, Maybe a)
+makeParamsInputDyn psf dpsf tooloverride sop pdp = r where
+  nsel = isParliament_length sop
+  r = if tooloverride || nsel == 0
+    then Just (sop, Just (dpsf pdp))
+    else selectParamsFromSelection psf sop
 
 type MaybeParamsWidgetOutputDyn t m b = Dynamic t (Maybe (m (Dynamic t Int, Event t (), Event t b)))
 type ParamsWidgetOutputDyn t m b = Dynamic t (m (Dynamic t Int, Event t (), Event t b))
