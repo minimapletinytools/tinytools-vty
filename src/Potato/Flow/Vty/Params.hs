@@ -64,6 +64,7 @@ noRepeatNavigation = do
 -- | method type for picking out params from SuperSEltLabel
 type ParamsSelector a = (Eq a) => SuperOwl -> Maybe a
 
+
 -- | method to extract common parameters from a selection
 -- returns Nothing if nothing in the selection has the selected param
 -- returns Just (selection, Nothing) if selection that has the selected param do not share the same value
@@ -488,8 +489,9 @@ data SEltParams = SEltParams {
   }
 
 data ParamsWidgetConfig t = ParamsWidgetConfig {
-  _paramsWidgetConfig_selectionDyn :: Dynamic t Selection
+   _paramsWidgetConfig_selectionDyn :: Dynamic t Selection
   , _paramsWidgetConfig_canvasDyn :: Dynamic t SCanvas
+  , _paramsWidgetConfig_defaultParamsDyn :: Dynamic t PotatoDefaultParameters
 }
 
 data ParamsWidget t = ParamsWidget {
@@ -549,11 +551,8 @@ holdParamsWidget ParamsWidgetConfig {..} = do
   (paramsOutputEv, captureEv, canvasSizeOutputEv, heightDyn) <- initManager_ $ do
     textAlignmentWidget <- holdMaybeParamsWidget mTextAlignInputDyn holdTextAlignmentWidget
     superStyleWidget2 <- holdMaybeParamsWidget mSuperStyleInputDyn holdSuperStyleWidget
-
-    -- TODO FINISH
     lineStyleWidget <- holdMaybeParamsWidget mLineStyleInputDyn holdLineStyleWidget
     sBoxTypeWidget <- holdMaybeParamsWidget mSBoxTypeInputDyn holdSBoxTypeWidget
-
     canvasSizeWidget <- holdMaybeParamsWidget mCanvasSizeInputDyn (holdCanvasSizeWidget canvasDyn)
 
     -- apparently textAlignmentWidget gets updated after any change which causes the whole network to rerender and we lose our focus state...
