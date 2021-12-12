@@ -469,6 +469,7 @@ holdSBoxTypeWidget _ inputDyn = constDyn $ do
     pushSBoxTypeFn :: These Bool Bool -> PushM t (Maybe (Either ControllersWithId SetPotatoDefaultParameters))
     pushSBoxTypeFn bt = do
       (SuperOwlParliament selection, _, tool) <- sample . current $ inputDyn
+      curState <- sample . current $ stateDyn
       let
         fmapfn sowl = case getSEltLabelBoxType (superOwl_toSEltLabel_hack sowl) of
           Nothing -> Nothing
@@ -481,11 +482,12 @@ holdSBoxTypeWidget _ inputDyn = constDyn $ do
                 That text -> make_sBoxType (sBoxType_hasBorder oldbt) text
                 These border text -> make_sBoxType border text
       return $  if toolOverrideSBoxType tool
-
-        -- TODO set this appropriately, read from stateDyn and update whatever
-        -- I didn't do it here because tool overrides whatever this is so it doesn't matter right now (ok well border settings probably do so you should still do it)
-        then Just . Right $ def { _setPotatoDefaultParameters_sBoxType = Nothing }
-
+        -- UNTESTED, it's probably currect but the tool overrides this default so I never actually tested it
+        then Just . Right $ def { _setPotatoDefaultParameters_sBoxType = Just $ case bt of
+            This border -> make_sBoxType border (snd curState)
+            That text -> make_sBoxType (fst curState) text
+            These border text -> make_sBoxType border text
+          }
         else case Data.Maybe.mapMaybe fmapfn . toList $ selection of
           [] -> Nothing
           x  -> Just . Left $ IM.fromList x

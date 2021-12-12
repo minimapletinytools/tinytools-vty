@@ -63,7 +63,7 @@ extra-deps:
 - github: pdlla/reflex-test-host
   commit: 5f367c2e720cdd588e1dffa34cd8223c310f5f43
 - github: pdlla/reflex-potatoes
-  commit: 9fc5f55748cf1f6d662c33bf1799bcab3d168403
+  commit: 9e31bcd6f180896771e7cc66b60894518a303d8c
 - github: pdlla/reflex-vty
   commit: 6079383b31b1668e5d998bb84724969162bb5044
 
