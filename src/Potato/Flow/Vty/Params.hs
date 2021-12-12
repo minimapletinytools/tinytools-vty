@@ -82,17 +82,17 @@ selectParamsFromSelection ps (SuperOwlParliament selection) = r where
       then Just (subSelection, Just x)
       else Just (subSelection, Nothing)
 
-makeParamsInputDyn :: (Eq a) => ToolOverrideSelector -> ParamsSelector a -> DefaultParamsSelector a -> Tool -> Selection -> PotatoDefaultParameters -> Maybe (Selection, Maybe a)
+makeParamsInputDyn :: (Eq a) => ToolOverrideSelector -> ParamsSelector a -> DefaultParamsSelector a -> Tool -> Selection -> PotatoDefaultParameters -> Maybe (Selection, Maybe a, Tool)
 makeParamsInputDyn tooloverridef psf dpsf tool selection pdp = r where
   nsel = isParliament_length selection
   r = if tooloverridef tool
-    then Just (selection, Just (dpsf pdp))
-    else selectParamsFromSelection psf selection
+    then Just (selection, Just (dpsf pdp), tool)
+    else fmap (\(a,b) -> (a,b,tool)) $ selectParamsFromSelection psf selection
 
 type MaybeParamsWidgetOutputDyn t m b = Dynamic t (Maybe (m (Dynamic t Int, Event t (), Event t b)))
 type ParamsWidgetOutputDyn t m b = Dynamic t (m (Dynamic t Int, Event t (), Event t b))
 -- if the `Maybe a` part is `Nothing` then the selection has different such properties
-type ParamsWidgetFn t m a b = Dynamic t (Selection, Maybe a) -> ParamsWidgetOutputDyn t m b
+type ParamsWidgetFn t m a b = Dynamic t (Selection, Maybe a, Tool) -> ParamsWidgetOutputDyn t m b
 
 networkParamsWidgetOutputDynForTesting :: (MonadWidget t m, HasPotato t m) => ParamsWidgetOutputDyn t m b -> m (Dynamic t Int, Event t (), Event t b)
 networkParamsWidgetOutputDynForTesting p = do
@@ -108,7 +108,7 @@ networkParamsWidgetOutputDynForTesting p = do
 -- remember that input dynamic must not be disconnected from output event or there will be an infinite loop!
 -- maybe use delayEvent :: forall t m a. (Adjustable t m) => Event t a -> m) (Event t a) 😱
 holdMaybeParamsWidget :: forall t m a b. (MonadWidget t m)
-  => Dynamic t (Maybe (Selection, Maybe a)) -- ^ selection/params input
+  => Dynamic t (Maybe (Selection, Maybe a, Tool)) -- ^ selection/params input
   -> ParamsWidgetFn t m a b -- ^ function creating widget, note that it should always return non-nothing but using Maybe type makes life easier
   -> m (MaybeParamsWidgetOutputDyn t m b)
 holdMaybeParamsWidget mInputDyn widgetFn = do
@@ -116,8 +116,8 @@ holdMaybeParamsWidget mInputDyn widgetFn = do
   uniqDyn <- holdUniqDynBy (\a b -> isJust a == isJust b) mInputDyn
   return . join . ffor uniqDyn $ \case
     Nothing -> constDyn Nothing
-    -- eh this is weird, maybe using fromJust is ok due to laziness but I don't care to find out
-    Just _ -> Just <$> widgetFn (fmap (fromMaybe (isParliament_empty, Nothing)) mInputDyn)
+    -- eh this is weird, fromMaybe should always succeed, maybe using fromJust is ok due to laziness but I don't care to find out
+    Just _ -> Just <$> widgetFn (fmap (fromMaybe (isParliament_empty, Nothing, Tool_Select)) mInputDyn)
 
 emptyWidget :: (Monad m) => m ()
 emptyWidget = return ()
@@ -202,7 +202,7 @@ holdSuperStyleWidget inputDyn = constDyn $ mdo
       -- TODO the awesome version of this has a toggle box so that you can choose to do horiz/vertical together (once you support separate horiz/vert left/right/top/down styles)
       -- TODO also a toggle for setting corners to common sets
       let
-        mssDyn = fmap snd inputDyn
+        mssDyn = fmap snd3 inputDyn
       -- TODO arrow nav would be super cool
       noRepeatNavigation
       (focusDyn,tl,v,bl,h,f,tr,br) <- col $ do
@@ -252,7 +252,7 @@ holdSuperStyleWidget inputDyn = constDyn $ mdo
   heightDyn <- holdDyn 0 (fmap fst3 setStyleEvEv)
 
   let
-    selectionDyn = fmap fst inputDyn
+    selectionDyn = fmap fst3 inputDyn
     pushSuperStyleFn :: SuperStyle -> PushM t (Maybe (Either ControllersWithId SetPotatoDefaultParameters))
     pushSuperStyleFn ss = do
       SuperOwlParliament selection <- sample . current $ selectionDyn
@@ -315,7 +315,7 @@ holdLineStyleWidget :: forall t m. (MonadLayoutWidget t m, HasPotato t m) => Par
 holdLineStyleWidget inputDyn = constDyn $ do
 
   let
-    lssDyn = fmap snd inputDyn
+    lssDyn = fmap snd3 inputDyn
 
 
   noRepeatNavigation
@@ -344,7 +344,7 @@ holdLineStyleWidget inputDyn = constDyn $ do
   captureEv <- makeCaptureFromUpdateTextZipperMethod updateTextZipperForSingleCharacter
 
   let
-    selectionDyn = fmap fst inputDyn
+    selectionDyn = fmap fst3 inputDyn
     pushLineStyleFn :: LineStyle -> PushM t (Maybe (Either ControllersWithId SetPotatoDefaultParameters))
     pushLineStyleFn ss = do
       SuperOwlParliament selection <- sample . current $ selectionDyn
@@ -370,8 +370,8 @@ holdLineStyleWidget inputDyn = constDyn $ do
 holdTextAlignmentWidget :: forall t m. (MonadWidget t m) => ParamsWidgetFn t m TextAlign (Either ControllersWithId SetPotatoDefaultParameters)
 holdTextAlignmentWidget inputDyn = constDyn $ do
   let
-    mtaDyn = fmap snd inputDyn
-    selectionDyn = fmap fst inputDyn
+    mtaDyn = fmap snd3 inputDyn
+    selectionDyn = fmap fst3 inputDyn
 
   mta0 <- sample . current $ mtaDyn
 
@@ -409,8 +409,8 @@ holdTextAlignmentWidget inputDyn = constDyn $ do
 holdSBoxTypeWidget :: forall t m. (MonadLayoutWidget t m) => ParamsWidgetFn t m SBoxType (Either ControllersWithId SetPotatoDefaultParameters)
 holdSBoxTypeWidget inputDyn = constDyn $ do
   let
-    mBoxType = fmap snd inputDyn
-    selectionDyn = fmap fst inputDyn
+    mBoxType = fmap snd3 inputDyn
+    selectionDyn = fmap fst3 inputDyn
   mbt0 <- sample . current $ mBoxType
 
   let
@@ -568,7 +568,7 @@ holdParamsWidget ParamsWidgetConfig {..} = do
       _potatoDefaultParameters_sBoxType
 
     -- show canvas params when nothing is selected
-    mCanvasSizeInputDyn = fmap (\s -> if isParliament_null s then Just (isParliament_empty, Nothing) else Nothing) selectionDyn
+    mCanvasSizeInputDyn = ffor2 toolDyn selectionDyn (\t s -> if isParliament_null s then Just (isParliament_empty, Nothing, t) else Nothing)
 
   (paramsOutputEv, captureEv, canvasSizeOutputEv, heightDyn) <- initManager_ $ do
     textAlignmentWidget <- holdMaybeParamsWidget mTextAlignInputDyn holdTextAlignmentWidget

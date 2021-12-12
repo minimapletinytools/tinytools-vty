@@ -109,8 +109,8 @@ $(declareStuff "SuperStyleWidgetNetwork"
 
         let
           selectFn s = case selectParamsFromSelection (getSEltLabelSuperStyle . superOwl_toSEltLabel_hack) s of
-            Nothing -> (isParliament_empty, Nothing)
-            Just x -> x
+            Nothing -> (isParliament_empty, Nothing, Tool_Select)
+            Just (a,b) -> (a,b,Tool_Select)
           mSuperStyleInputDyn = fmap selectFn selectionDyn
         (heightDyn, captureEv, outputEv) <- flip runPotatoReader def $ networkParamsWidgetOutputDynForTesting (holdSuperStyleWidget mSuperStyleInputDyn)
         -- TODO consider convert outputEv back to Event t SuperStyle...
