@@ -102,7 +102,7 @@ $(declareStuff "SuperStyleWidgetNetwork"
   [("setSelection", [t|Selection|])]
   [("height", [t|Dynamic $(tv) Int|])
   , ("capture", [t|Event $(tv) ()|])
-  , ("output", [t|Event $(tv) ControllersWithId|])]
+  , ("output", [t|Event $(tv) (Either ControllersWithId SetPotatoDefaultParameters)|])]
   [|
       initManager_ $ col $ do
         selectionDyn <- holdDyn isParliament_empty $(tinput "SuperStyleWidgetNetwork" "setSelection")

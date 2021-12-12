@@ -183,7 +183,7 @@ makeSuperStyleEvent tl v bl h f tr br trig = pushAlways pushfn trig where
 presetSuperStyles :: [[Char]]
 presetSuperStyles = ["╔╗╚╝║═ ","****|- ", "██████ ", "┌┐└┘│─ "]
 
-holdSuperStyleWidget :: forall t m. (MonadLayoutWidget t m, HasPotato t m) => ParamsWidgetFn t m SuperStyle ControllersWithId
+holdSuperStyleWidget :: forall t m. (MonadLayoutWidget t m, HasPotato t m) => ParamsWidgetFn t m SuperStyle (Either ControllersWithId SetPotatoDefaultParameters)
 holdSuperStyleWidget inputDyn = constDyn $ mdo
 
   typeChoiceDyn <- radioListSimple 0 ["custom", "presets"]
@@ -253,7 +253,7 @@ holdSuperStyleWidget inputDyn = constDyn $ mdo
 
   let
     selectionDyn = fmap fst inputDyn
-    pushSuperStyleFn :: SuperStyle -> PushM t (Maybe ControllersWithId)
+    pushSuperStyleFn :: SuperStyle -> PushM t (Maybe (Either ControllersWithId SetPotatoDefaultParameters))
     pushSuperStyleFn ss = do
       SuperOwlParliament selection <- sample . current $ selectionDyn
       let
@@ -264,7 +264,7 @@ holdSuperStyleWidget inputDyn = constDyn $ mdo
             else Just (_superOwl_id sowl, CTagSuperStyle :=> Identity (CSuperStyle (DeltaSuperStyle (oldss, ss))))
       return $ case Data.Maybe.mapMaybe fmapfn . toList $ selection of
         [] -> Nothing
-        x  -> Just $ IM.fromList x
+        x  -> Just . Left $ IM.fromList x
     ssparamsEv = push pushSuperStyleFn setStyleEv
   return (ffor heightDyn (+1), captureEv, ssparamsEv)
 
@@ -311,7 +311,7 @@ makeLineStyleTextEntry lsc mlsDyn = do
   return . current $ ti
 
 -- | ignore _lineStyle_autoStyle part of LineStyle output
-holdLineStyleWidget :: forall t m. (MonadLayoutWidget t m, HasPotato t m) => ParamsWidgetFn t m LineStyle ControllersWithId
+holdLineStyleWidget :: forall t m. (MonadLayoutWidget t m, HasPotato t m) => ParamsWidgetFn t m LineStyle (Either ControllersWithId SetPotatoDefaultParameters)
 holdLineStyleWidget inputDyn = constDyn $ do
 
   let
@@ -345,7 +345,7 @@ holdLineStyleWidget inputDyn = constDyn $ do
 
   let
     selectionDyn = fmap fst inputDyn
-    pushLineStyleFn :: LineStyle -> PushM t (Maybe ControllersWithId)
+    pushLineStyleFn :: LineStyle -> PushM t (Maybe (Either ControllersWithId SetPotatoDefaultParameters))
     pushLineStyleFn ss = do
       SuperOwlParliament selection <- sample . current $ selectionDyn
       let
@@ -357,7 +357,7 @@ holdLineStyleWidget inputDyn = constDyn $ do
             else Just (_superOwl_id sowl, CTagLineStyle :=> Identity (CLineStyle (DeltaLineStyle (oldss, overrideAutoStyle oldss ss))))
       return $ case Data.Maybe.mapMaybe fmapfn . toList $ selection of
         [] -> Nothing
-        x  -> Just $ IM.fromList x
+        x  -> Just . Left $ IM.fromList x
     setStyleEv = makeLineStyleEvent l r u d (void $ updated focusDyn)
     ssparamsEv = push pushLineStyleFn setStyleEv
 
@@ -367,7 +367,7 @@ holdLineStyleWidget inputDyn = constDyn $ do
 
 
 -- Text Alignment stuff
-holdTextAlignmentWidget :: forall t m. (MonadWidget t m) => ParamsWidgetFn t m TextAlign ControllersWithId
+holdTextAlignmentWidget :: forall t m. (MonadWidget t m) => ParamsWidgetFn t m TextAlign (Either ControllersWithId SetPotatoDefaultParameters)
 holdTextAlignmentWidget inputDyn = constDyn $ do
   let
     mtaDyn = fmap snd inputDyn
@@ -390,7 +390,7 @@ holdTextAlignmentWidget inputDyn = constDyn $ do
         1 -> TextAlign_Center
         2 -> TextAlign_Right
       ) $ setAlignmentEv'
-    pushAlignmentFn :: TextAlign -> PushM t (Maybe ControllersWithId)
+    pushAlignmentFn :: TextAlign -> PushM t (Maybe (Either ControllersWithId SetPotatoDefaultParameters))
     pushAlignmentFn ta = do
       let
         fmapfn sowl = case getSEltLabelBoxTextStyle (superOwl_toSEltLabel_hack sowl) of
@@ -401,12 +401,12 @@ holdTextAlignmentWidget inputDyn = constDyn $ do
       SuperOwlParliament selection <- sample . current $ selectionDyn
       return $ case Data.Maybe.mapMaybe fmapfn . toList $ selection of
         [] -> Nothing
-        x  -> Just $ IM.fromList x
+        x  -> Just . Left $ IM.fromList x
     alignmentParamsEv = push pushAlignmentFn setAlignmentEv
 
   return (1, never, alignmentParamsEv)
 
-holdSBoxTypeWidget :: forall t m. (MonadLayoutWidget t m) => ParamsWidgetFn t m SBoxType ControllersWithId
+holdSBoxTypeWidget :: forall t m. (MonadLayoutWidget t m) => ParamsWidgetFn t m SBoxType (Either ControllersWithId SetPotatoDefaultParameters)
 holdSBoxTypeWidget inputDyn = constDyn $ do
   let
     mBoxType = fmap snd inputDyn
@@ -437,7 +437,7 @@ holdSBoxTypeWidget inputDyn = constDyn $ do
   let
     captureEv = void $ leftmost [b,t]
 
-    pushSBoxTypeFn :: These Bool Bool -> PushM t (Maybe ControllersWithId)
+    pushSBoxTypeFn :: These Bool Bool -> PushM t (Maybe (Either ControllersWithId SetPotatoDefaultParameters))
     pushSBoxTypeFn bt = do
       let
         fmapfn sowl = case getSEltLabelBoxType (superOwl_toSEltLabel_hack sowl) of
@@ -453,7 +453,7 @@ holdSBoxTypeWidget inputDyn = constDyn $ do
       SuperOwlParliament selection <- sample . current $ selectionDyn
       return $ case Data.Maybe.mapMaybe fmapfn . toList $ selection of
         [] -> Nothing
-        x  -> Just $ IM.fromList x
+        x  -> Just . Left $ IM.fromList x
     sBoxTypeParamsEv = push pushSBoxTypeFn (align b t)
 
   -- TODO
@@ -600,10 +600,16 @@ holdParamsWidget ParamsWidgetConfig {..} = do
 
     return (paramsOutputEv', captureEv', canvasSizeOutputEv', heightDyn')
 
+  let
+    maybeLeft (Left a) = Just a
+    maybeLeft _ = Nothing
+    maybeRight (Right a) = Just a
+    maybeRight _ = Nothing
+
   return ParamsWidget {
-    _paramsWidget_paramsEvent = paramsOutputEv
+    _paramsWidget_paramsEvent = fmapMaybe maybeLeft paramsOutputEv
     , _paramsWidget_canvasSizeEvent = canvasSizeOutputEv
-    , _paramsWidget_setDefaultParamsEvent = never -- TODO connect me ;_;
+    , _paramsWidget_setDefaultParamsEvent = fmapMaybe maybeRight paramsOutputEv
     , _paramsWidget_captureInputEv = captureEv
     , _paramsWidget_widgetHeight = heightDyn
   }
