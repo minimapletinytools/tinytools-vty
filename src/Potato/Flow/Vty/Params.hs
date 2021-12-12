@@ -273,6 +273,7 @@ holdSuperStyleWidget pdpDyn inputDyn = constDyn $ mdo
     pushSuperStyleFn :: SuperStyle -> PushM t (Maybe (Either ControllersWithId SetPotatoDefaultParameters))
     pushSuperStyleFn ss = do
       (SuperOwlParliament selection, _, tool) <- sample . current $ inputDyn
+      pdp <- sample . current $ pdpDyn
       let
         fmapfn sowl = case getSEltLabelSuperStyle (superOwl_toSEltLabel_hack sowl) of
           Nothing -> Nothing
@@ -280,7 +281,9 @@ holdSuperStyleWidget pdpDyn inputDyn = constDyn $ mdo
             then Nothing
             else Just (_superOwl_id sowl, CTagSuperStyle :=> Identity (CSuperStyle (DeltaSuperStyle (oldss, ss))))
       return $ if toolOverrideSuperStyle tool
-        then Just . Right $ def { _setPotatoDefaultParameters_superStyle = Just ss }
+        then if _potatoDefaultParameters_superStyle pdp == ss
+          then Nothing
+          else Just . Right $ def { _setPotatoDefaultParameters_superStyle = Just ss }
         else case Data.Maybe.mapMaybe fmapfn . toList $ selection of
           [] -> Nothing
           x  -> Just . Left $ IM.fromList x
@@ -365,6 +368,7 @@ holdLineStyleWidget pdpDyn inputDyn = constDyn $ do
     selectionDyn = fmap fst3 inputDyn
     pushLineStyleFn :: LineStyle -> PushM t (Maybe (Either ControllersWithId SetPotatoDefaultParameters))
     pushLineStyleFn ss = do
+      pdp <- sample . current $ pdpDyn
       (SuperOwlParliament selection, _, tool) <- sample . current $ inputDyn
       let
         overrideAutoStyle oldss newss = newss { _lineStyle_autoStyle = _lineStyle_autoStyle oldss }
@@ -374,7 +378,9 @@ holdLineStyleWidget pdpDyn inputDyn = constDyn $ do
             then Nothing
             else Just (_superOwl_id sowl, CTagLineStyle :=> Identity (CLineStyle (DeltaLineStyle (oldss, overrideAutoStyle oldss ss))))
       return $ if toolOverrideLineStyle tool
-        then Just . Right $ def { _setPotatoDefaultParameters_lineStyle = Just ss }
+        then if _potatoDefaultParameters_lineStyle pdp == ss
+          then Nothing
+          else Just . Right $ def { _setPotatoDefaultParameters_lineStyle = Just ss }
         else case Data.Maybe.mapMaybe fmapfn . toList $ selection of
           [] -> Nothing
           x  -> Just . Left $ IM.fromList x
