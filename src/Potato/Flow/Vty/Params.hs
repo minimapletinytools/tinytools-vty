@@ -503,9 +503,9 @@ data ParamsWidgetConfig t = ParamsWidgetConfig {
 }
 
 data ParamsWidget t = ParamsWidget {
-  -- TODO make into generic WSEvent bc we want to modify canvas as well
   _paramsWidget_paramsEvent       :: Event t ControllersWithId
   , _paramsWidget_canvasSizeEvent :: Event t XY
+  , _paramsWidget_setDefaultParamsEvent :: Event t SetPotatoDefaultParameters
   , _paramsWidget_captureInputEv  :: Event t ()
 
   , _paramsWidget_widgetHeight :: Dynamic t Int
@@ -549,17 +549,10 @@ holdParamsWidget ParamsWidgetConfig {..} = do
     canvasDyn = _paramsWidgetConfig_canvasDyn
     defaultParamsDyn = _paramsWidgetConfig_defaultParamsDyn
     toolDyn = _paramsWidgetConfig_toolDyn
-    textAlignSelector = (fmap (\(TextStyle ta) -> ta)) . getSEltLabelBoxTextStyle . superOwl_toSEltLabel_hack
-
-    -- DELETE
-    --mTextAlignInputDyn = fmap ( selectParamsFromSelection textAlignSelector) selectionDyn
-    --mSuperStyleInputDyn = fmap (selectParamsFromSelection (getSEltLabelSuperStyle . superOwl_toSEltLabel_hack)) selectionDyn
-    --mLineStyleInputDyn = fmap (selectParamsFromSelection (getSEltLabelLineStyle . superOwl_toSEltLabel_hack)) selectionDyn
-    --mSBoxTypeInputDyn = fmap (selectParamsFromSelection (getSEltLabelBoxType . superOwl_toSEltLabel_hack)) selectionDyn
 
     mTextAlignInputDyn = ffor3 toolDyn selectionDyn defaultParamsDyn $ makeParamsInputDyn
       (== Tool_Text)
-      textAlignSelector
+      ((fmap (\(TextStyle ta) -> ta)) . getSEltLabelBoxTextStyle . superOwl_toSEltLabel_hack)
       _potatoDefaultParameters_box_text_textAlign
     mSuperStyleInputDyn = ffor3 toolDyn selectionDyn defaultParamsDyn $ makeParamsInputDyn
       (\t -> t == Tool_Box || t == Tool_Text || t == Tool_Line || t == Tool_CartLine)
@@ -610,6 +603,7 @@ holdParamsWidget ParamsWidgetConfig {..} = do
   return ParamsWidget {
     _paramsWidget_paramsEvent = paramsOutputEv
     , _paramsWidget_canvasSizeEvent = canvasSizeOutputEv
+    , _paramsWidget_setDefaultParamsEvent = never -- TODO connect me ;_;
     , _paramsWidget_captureInputEv = captureEv
-    , _paramsWidget_widgetHeight = heightDyn -- UNTESTED but should be ok
+    , _paramsWidget_widgetHeight = heightDyn
   }

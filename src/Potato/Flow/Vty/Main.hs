@@ -329,7 +329,7 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
         , _goatWidgetConfig_paramsEvent = _paramsWidget_paramsEvent (_leftWidget_paramsW leftW)
         , _goatWidgetConfig_canvasSize = _paramsWidget_canvasSizeEvent (_leftWidget_paramsW leftW)
         , _goatWidgetConfig_newFolder = _layerWidget_newFolderEv (_leftWidget_layersW leftW)
-        , _goatWidgetConfig_setPotatoDefaultParameters = never -- TODO
+        , _goatWidgetConfig_setPotatoDefaultParameters = _paramsWidget_setDefaultParamsEvent (_leftWidget_paramsW leftW)
 
         -- debugging stuff
         , _goatWidgetConfig_setDebugLabel = never
