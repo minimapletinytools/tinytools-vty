@@ -67,6 +67,20 @@ type ParamsSelector a = (Eq a) => SuperOwl -> Maybe a
 type DefaultParamsSelector a = PotatoDefaultParameters -> a
 type ToolOverrideSelector = Tool -> Bool
 
+
+toolOverrideTextAlign :: ToolOverrideSelector
+toolOverrideTextAlign = (== Tool_Text)
+
+toolOverrideSuperStyle :: ToolOverrideSelector
+toolOverrideSuperStyle = (\t -> t == Tool_Box || t == Tool_Text || t == Tool_Line || t == Tool_CartLine)
+
+toolOverrideLineStyle :: ToolOverrideSelector
+toolOverrideLineStyle = (\t -> t == Tool_Line || t == Tool_CartLine)
+
+toolOverrideSBoxType :: ToolOverrideSelector
+toolOverrideSBoxType = (const False) -- NOTE default variant here does nothing as this is always overriden based on tool
+
+
 -- | method to extract common parameters from a selection
 -- returns Nothing if nothing in the selection has the selected param
 -- returns Just (selection, Nothing) if selection that has the selected param do not share the same value
@@ -121,6 +135,8 @@ holdMaybeParamsWidget mInputDyn widgetFn = do
 
 emptyWidget :: (Monad m) => m ()
 emptyWidget = return ()
+
+
 
 -- SuperStyle stuff
 data SuperStyleCell = SSC_TL | SSC_TR | SSC_BL | SSC_BR | SSC_V | SSC_H | SSC_Fill deriving (Show)
@@ -255,16 +271,18 @@ holdSuperStyleWidget inputDyn = constDyn $ mdo
     selectionDyn = fmap fst3 inputDyn
     pushSuperStyleFn :: SuperStyle -> PushM t (Maybe (Either ControllersWithId SetPotatoDefaultParameters))
     pushSuperStyleFn ss = do
-      SuperOwlParliament selection <- sample . current $ selectionDyn
+      (SuperOwlParliament selection, _, tool) <- sample . current $ inputDyn
       let
         fmapfn sowl = case getSEltLabelSuperStyle (superOwl_toSEltLabel_hack sowl) of
           Nothing -> Nothing
           Just oldss -> if oldss == ss
             then Nothing
             else Just (_superOwl_id sowl, CTagSuperStyle :=> Identity (CSuperStyle (DeltaSuperStyle (oldss, ss))))
-      return $ case Data.Maybe.mapMaybe fmapfn . toList $ selection of
-        [] -> Nothing
-        x  -> Just . Left $ IM.fromList x
+      return $ if toolOverrideSuperStyle tool
+        then Just . Right $ def { _setPotatoDefaultParameters_superStyle = Just ss }
+        else case Data.Maybe.mapMaybe fmapfn . toList $ selection of
+          [] -> Nothing
+          x  -> Just . Left $ IM.fromList x
     ssparamsEv = push pushSuperStyleFn setStyleEv
   return (ffor heightDyn (+1), captureEv, ssparamsEv)
 
@@ -347,7 +365,7 @@ holdLineStyleWidget inputDyn = constDyn $ do
     selectionDyn = fmap fst3 inputDyn
     pushLineStyleFn :: LineStyle -> PushM t (Maybe (Either ControllersWithId SetPotatoDefaultParameters))
     pushLineStyleFn ss = do
-      SuperOwlParliament selection <- sample . current $ selectionDyn
+      (SuperOwlParliament selection, _, tool) <- sample . current $ inputDyn
       let
         overrideAutoStyle oldss newss = newss { _lineStyle_autoStyle = _lineStyle_autoStyle oldss }
         fmapfn sowl = case getSEltLabelLineStyle (superOwl_toSEltLabel_hack sowl) of
@@ -355,9 +373,11 @@ holdLineStyleWidget inputDyn = constDyn $ do
           Just oldss -> if oldss == overrideAutoStyle oldss ss
             then Nothing
             else Just (_superOwl_id sowl, CTagLineStyle :=> Identity (CLineStyle (DeltaLineStyle (oldss, overrideAutoStyle oldss ss))))
-      return $ case Data.Maybe.mapMaybe fmapfn . toList $ selection of
-        [] -> Nothing
-        x  -> Just . Left $ IM.fromList x
+      return $ if toolOverrideLineStyle tool
+        then Just . Right $ def { _setPotatoDefaultParameters_lineStyle = Just ss }
+        else case Data.Maybe.mapMaybe fmapfn . toList $ selection of
+          [] -> Nothing
+          x  -> Just . Left $ IM.fromList x
     setStyleEv = makeLineStyleEvent l r u d (void $ updated focusDyn)
     ssparamsEv = push pushLineStyleFn setStyleEv
 
@@ -392,16 +412,18 @@ holdTextAlignmentWidget inputDyn = constDyn $ do
       ) $ setAlignmentEv'
     pushAlignmentFn :: TextAlign -> PushM t (Maybe (Either ControllersWithId SetPotatoDefaultParameters))
     pushAlignmentFn ta = do
+      (SuperOwlParliament selection, _, tool) <- sample . current $ inputDyn
       let
         fmapfn sowl = case getSEltLabelBoxTextStyle (superOwl_toSEltLabel_hack sowl) of
           Nothing -> Nothing
           Just oldts -> if oldts == TextStyle ta
             then Nothing
             else Just (_superOwl_id sowl, CTagBoxTextStyle :=> Identity (CTextStyle (DeltaTextStyle (oldts, TextStyle ta))))
-      SuperOwlParliament selection <- sample . current $ selectionDyn
-      return $ case Data.Maybe.mapMaybe fmapfn . toList $ selection of
-        [] -> Nothing
-        x  -> Just . Left $ IM.fromList x
+      return $ if toolOverrideTextAlign tool
+        then Just . Right $ def { _setPotatoDefaultParameters_box_text_textAlign = Just ta }
+        else case Data.Maybe.mapMaybe fmapfn . toList $ selection of
+          [] -> Nothing
+          x  -> Just . Left $ IM.fromList x
     alignmentParamsEv = push pushAlignmentFn setAlignmentEv
 
   return (1, never, alignmentParamsEv)
@@ -439,6 +461,7 @@ holdSBoxTypeWidget inputDyn = constDyn $ do
 
     pushSBoxTypeFn :: These Bool Bool -> PushM t (Maybe (Either ControllersWithId SetPotatoDefaultParameters))
     pushSBoxTypeFn bt = do
+      (SuperOwlParliament selection, _, tool) <- sample . current $ inputDyn
       let
         fmapfn sowl = case getSEltLabelBoxType (superOwl_toSEltLabel_hack sowl) of
           Nothing -> Nothing
@@ -450,10 +473,15 @@ holdSBoxTypeWidget inputDyn = constDyn $ do
                 This border -> make_sBoxType border (sBoxType_isText oldbt)
                 That text -> make_sBoxType (sBoxType_hasBorder oldbt) text
                 These border text -> make_sBoxType border text
-      SuperOwlParliament selection <- sample . current $ selectionDyn
-      return $ case Data.Maybe.mapMaybe fmapfn . toList $ selection of
-        [] -> Nothing
-        x  -> Just . Left $ IM.fromList x
+      return $  if toolOverrideSBoxType tool
+
+        -- TODO set this appropriately, read from stateDyn and update whatever
+        -- I didn't do it here because tool overrides whatever this is so it doesn't matter right now (ok well border settings probably do so you should still do it)
+        then Just . Right $ def { _setPotatoDefaultParameters_sBoxType = Nothing }
+
+        else case Data.Maybe.mapMaybe fmapfn . toList $ selection of
+          [] -> Nothing
+          x  -> Just . Left $ IM.fromList x
     sBoxTypeParamsEv = push pushSBoxTypeFn (align b t)
 
   -- TODO
@@ -551,19 +579,19 @@ holdParamsWidget ParamsWidgetConfig {..} = do
     toolDyn = _paramsWidgetConfig_toolDyn
 
     mTextAlignInputDyn = ffor3 toolDyn selectionDyn defaultParamsDyn $ makeParamsInputDyn
-      (== Tool_Text)
+      toolOverrideTextAlign
       ((fmap (\(TextStyle ta) -> ta)) . getSEltLabelBoxTextStyle . superOwl_toSEltLabel_hack)
       _potatoDefaultParameters_box_text_textAlign
     mSuperStyleInputDyn = ffor3 toolDyn selectionDyn defaultParamsDyn $ makeParamsInputDyn
-      (\t -> t == Tool_Box || t == Tool_Text || t == Tool_Line || t == Tool_CartLine)
+      toolOverrideSuperStyle
       (getSEltLabelSuperStyle . superOwl_toSEltLabel_hack)
       _potatoDefaultParameters_superStyle
     mLineStyleInputDyn = ffor3 toolDyn selectionDyn defaultParamsDyn $ makeParamsInputDyn
-      (\t -> t == Tool_Line || t == Tool_CartLine)
+      toolOverrideLineStyle
       (getSEltLabelLineStyle . superOwl_toSEltLabel_hack)
       _potatoDefaultParameters_lineStyle
     mSBoxTypeInputDyn = ffor3 toolDyn selectionDyn defaultParamsDyn $ makeParamsInputDyn
-      (const False) -- NOTE default variant here does nothing as this is always overriden based on tool
+      toolOverrideSBoxType
       (getSEltLabelBoxType . superOwl_toSEltLabel_hack)
       _potatoDefaultParameters_sBoxType
 
