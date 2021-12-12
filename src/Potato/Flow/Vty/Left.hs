@@ -33,6 +33,7 @@ data MenuButtonsWidget t = MenuButtonsWidget {
 }
 
 data LeftWidgetConfig t = LeftWidgetConfig {
+  -- TODO rename to _leftWidgetConfig_goatW
   _layersWidgetConfig_goatW :: GoatWidget t
   -- TODO other stuff
 }
@@ -107,6 +108,7 @@ holdLeftWidget LeftWidgetConfig {..} = do
         _paramsWidgetConfig_selectionDyn = _goatWidget_selection _layersWidgetConfig_goatW
         , _paramsWidgetConfig_canvasDyn = _goatWidget_canvas _layersWidgetConfig_goatW
         , _paramsWidgetConfig_defaultParamsDyn = _goatWidget_potatoDefaultParameters _layersWidgetConfig_goatW
+        , _paramsWidgetConfig_toolDyn = _goatWidget_tool _layersWidgetConfig_goatW
       }
     return LeftWidget {
         _leftWidget_layersW = layers

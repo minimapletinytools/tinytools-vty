@@ -65,6 +65,7 @@ noRepeatNavigation = do
 type ParamsSelector a = (Eq a) => SuperOwl -> Maybe a
 -- | method type for picking out params when there is no selection
 type DefaultParamsSelector a = PotatoDefaultParameters -> a
+type ToolOverrideSelector = Tool -> Bool
 
 -- | method to extract common parameters from a selection
 -- returns Nothing if nothing in the selection has the selected param
@@ -81,12 +82,12 @@ selectParamsFromSelection ps (SuperOwlParliament selection) = r where
       then Just (subSelection, Just x)
       else Just (subSelection, Nothing)
 
-makeParamsInputDyn :: (Eq a) => ParamsSelector a -> DefaultParamsSelector a -> Bool -> Selection -> PotatoDefaultParameters -> Maybe (Selection, Maybe a)
-makeParamsInputDyn psf dpsf tooloverride sop pdp = r where
-  nsel = isParliament_length sop
-  r = if tooloverride
-    then Just (sop, Just (dpsf pdp))
-    else selectParamsFromSelection psf sop
+makeParamsInputDyn :: (Eq a) => ToolOverrideSelector -> ParamsSelector a -> DefaultParamsSelector a -> Tool -> Selection -> PotatoDefaultParameters -> Maybe (Selection, Maybe a)
+makeParamsInputDyn tooloverridef psf dpsf tool selection pdp = r where
+  nsel = isParliament_length selection
+  r = if tooloverridef tool
+    then Just (selection, Just (dpsf pdp))
+    else selectParamsFromSelection psf selection
 
 type MaybeParamsWidgetOutputDyn t m b = Dynamic t (Maybe (m (Dynamic t Int, Event t (), Event t b)))
 type ParamsWidgetOutputDyn t m b = Dynamic t (m (Dynamic t Int, Event t (), Event t b))
@@ -498,6 +499,7 @@ data ParamsWidgetConfig t = ParamsWidgetConfig {
    _paramsWidgetConfig_selectionDyn :: Dynamic t Selection
   , _paramsWidgetConfig_canvasDyn :: Dynamic t SCanvas
   , _paramsWidgetConfig_defaultParamsDyn :: Dynamic t PotatoDefaultParameters
+  , _paramsWidgetConfig_toolDyn :: Dynamic t Tool
 }
 
 data ParamsWidget t = ParamsWidget {
@@ -546,6 +548,7 @@ holdParamsWidget ParamsWidgetConfig {..} = do
     selectionDyn = _paramsWidgetConfig_selectionDyn
     canvasDyn = _paramsWidgetConfig_canvasDyn
     defaultParamsDyn = _paramsWidgetConfig_defaultParamsDyn
+    toolDyn = _paramsWidgetConfig_toolDyn
     textAlignSelector = (fmap (\(TextStyle ta) -> ta)) . getSEltLabelBoxTextStyle . superOwl_toSEltLabel_hack
 
     -- DELETE
@@ -554,11 +557,22 @@ holdParamsWidget ParamsWidgetConfig {..} = do
     --mLineStyleInputDyn = fmap (selectParamsFromSelection (getSEltLabelLineStyle . superOwl_toSEltLabel_hack)) selectionDyn
     --mSBoxTypeInputDyn = fmap (selectParamsFromSelection (getSEltLabelBoxType . superOwl_toSEltLabel_hack)) selectionDyn
 
-    -- TODO connect tool overrides
-    mTextAlignInputDyn = ffor2 selectionDyn defaultParamsDyn $ makeParamsInputDyn textAlignSelector _potatoDefaultParameters_box_text_textAlign False
-    mSuperStyleInputDyn = ffor2 selectionDyn defaultParamsDyn $ makeParamsInputDyn (getSEltLabelSuperStyle . superOwl_toSEltLabel_hack) _potatoDefaultParameters_superStyle False
-    mLineStyleInputDyn = ffor2 selectionDyn defaultParamsDyn $ makeParamsInputDyn (getSEltLabelLineStyle . superOwl_toSEltLabel_hack) _potatoDefaultParameters_lineStyle False
-    mSBoxTypeInputDyn = ffor2 selectionDyn defaultParamsDyn $ makeParamsInputDyn (getSEltLabelBoxType . superOwl_toSEltLabel_hack) _potatoDefaultParameters_sBoxType False
+    mTextAlignInputDyn = ffor3 toolDyn selectionDyn defaultParamsDyn $ makeParamsInputDyn
+      (== Tool_Text)
+      textAlignSelector
+      _potatoDefaultParameters_box_text_textAlign
+    mSuperStyleInputDyn = ffor3 toolDyn selectionDyn defaultParamsDyn $ makeParamsInputDyn
+      (\t -> t == Tool_Box || t == Tool_Text || t == Tool_Line || t == Tool_CartLine)
+      (getSEltLabelSuperStyle . superOwl_toSEltLabel_hack)
+      _potatoDefaultParameters_superStyle
+    mLineStyleInputDyn = ffor3 toolDyn selectionDyn defaultParamsDyn $ makeParamsInputDyn
+      (\t -> t == Tool_Line || t == Tool_CartLine)
+      (getSEltLabelLineStyle . superOwl_toSEltLabel_hack)
+      _potatoDefaultParameters_lineStyle
+    mSBoxTypeInputDyn = ffor3 toolDyn selectionDyn defaultParamsDyn $ makeParamsInputDyn
+      (const False) -- NOTE default variant here does nothing as this is always overriden based on tool
+      (getSEltLabelBoxType . superOwl_toSEltLabel_hack)
+      _potatoDefaultParameters_sBoxType
 
     -- show canvas params when nothing is selected
     mCanvasSizeInputDyn = fmap (\s -> if isParliament_null s then Just (isParliament_empty, Nothing) else Nothing) selectionDyn

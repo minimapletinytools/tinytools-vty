@@ -48,6 +48,7 @@ $(declareStuff "ParamsNetwork"
             _paramsWidgetConfig_selectionDyn = setSelectionDyn
             , _paramsWidgetConfig_canvasDyn = setCanvasDyn
             , _paramsWidgetConfig_defaultParamsDyn = constDyn def
+            , _paramsWidgetConfig_toolDyn = constDyn Tool_Select
           }
         return $ $(toutputcon "ParamsNetwork") paramsWidget
     |]
