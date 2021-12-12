@@ -106,7 +106,7 @@ makeParamsInputDyn tooloverridef psf dpsf tool selection pdp = r where
 type MaybeParamsWidgetOutputDyn t m b = Dynamic t (Maybe (m (Dynamic t Int, Event t (), Event t b)))
 type ParamsWidgetOutputDyn t m b = Dynamic t (m (Dynamic t Int, Event t (), Event t b))
 -- if the `Maybe a` part is `Nothing` then the selection has different such properties
-type ParamsWidgetFn t m a b = Dynamic t (Selection, Maybe a, Tool) -> ParamsWidgetOutputDyn t m b
+type ParamsWidgetFn t m a b = Dynamic t PotatoDefaultParameters -> Dynamic t (Selection, Maybe a, Tool) -> ParamsWidgetOutputDyn t m b
 
 networkParamsWidgetOutputDynForTesting :: (MonadWidget t m, HasPotato t m) => ParamsWidgetOutputDyn t m b -> m (Dynamic t Int, Event t (), Event t b)
 networkParamsWidgetOutputDynForTesting p = do
@@ -122,16 +122,17 @@ networkParamsWidgetOutputDynForTesting p = do
 -- remember that input dynamic must not be disconnected from output event or there will be an infinite loop!
 -- maybe use delayEvent :: forall t m a. (Adjustable t m) => Event t a -> m) (Event t a) 😱
 holdMaybeParamsWidget :: forall t m a b. (MonadWidget t m)
-  => Dynamic t (Maybe (Selection, Maybe a, Tool)) -- ^ selection/params input
+  => Dynamic t PotatoDefaultParameters
+  -> Dynamic t (Maybe (Selection, Maybe a, Tool)) -- ^ selection/params input
   -> ParamsWidgetFn t m a b -- ^ function creating widget, note that it should always return non-nothing but using Maybe type makes life easier
   -> m (MaybeParamsWidgetOutputDyn t m b)
-holdMaybeParamsWidget mInputDyn widgetFn = do
+holdMaybeParamsWidget pdpDyn mInputDyn widgetFn = do
   -- only remake the widget if it goes from Just to Nothing
   uniqDyn <- holdUniqDynBy (\a b -> isJust a == isJust b) mInputDyn
   return . join . ffor uniqDyn $ \case
     Nothing -> constDyn Nothing
     -- eh this is weird, fromMaybe should always succeed, maybe using fromJust is ok due to laziness but I don't care to find out
-    Just _ -> Just <$> widgetFn (fmap (fromMaybe (isParliament_empty, Nothing, Tool_Select)) mInputDyn)
+    Just _ -> Just <$> widgetFn pdpDyn (fmap (fromMaybe (isParliament_empty, Nothing, Tool_Select)) mInputDyn)
 
 emptyWidget :: (Monad m) => m ()
 emptyWidget = return ()
@@ -200,7 +201,7 @@ presetSuperStyles :: [[Char]]
 presetSuperStyles = ["╔╗╚╝║═ ","****|- ", "██████ ", "┌┐└┘│─ "]
 
 holdSuperStyleWidget :: forall t m. (MonadLayoutWidget t m, HasPotato t m) => ParamsWidgetFn t m SuperStyle (Either ControllersWithId SetPotatoDefaultParameters)
-holdSuperStyleWidget inputDyn = constDyn $ mdo
+holdSuperStyleWidget pdpDyn inputDyn = constDyn $ mdo
 
   typeChoiceDyn <- radioListSimple 0 ["custom", "presets"]
 
@@ -330,11 +331,10 @@ makeLineStyleTextEntry lsc mlsDyn = do
 
 -- | ignore _lineStyle_autoStyle part of LineStyle output
 holdLineStyleWidget :: forall t m. (MonadLayoutWidget t m, HasPotato t m) => ParamsWidgetFn t m LineStyle (Either ControllersWithId SetPotatoDefaultParameters)
-holdLineStyleWidget inputDyn = constDyn $ do
+holdLineStyleWidget pdpDyn inputDyn = constDyn $ do
 
   let
     lssDyn = fmap snd3 inputDyn
-
 
   noRepeatNavigation
   (focusDyn,l,r,u,d) <-  col $ do
@@ -388,7 +388,7 @@ holdLineStyleWidget inputDyn = constDyn $ do
 
 -- Text Alignment stuff
 holdTextAlignmentWidget :: forall t m. (MonadWidget t m) => ParamsWidgetFn t m TextAlign (Either ControllersWithId SetPotatoDefaultParameters)
-holdTextAlignmentWidget inputDyn = constDyn $ do
+holdTextAlignmentWidget _ inputDyn = constDyn $ do
   let
     mtaDyn = fmap snd3 inputDyn
     selectionDyn = fmap fst3 inputDyn
@@ -430,7 +430,7 @@ holdTextAlignmentWidget inputDyn = constDyn $ do
   return (1, never, alignmentParamsEv)
 
 holdSBoxTypeWidget :: forall t m. (MonadLayoutWidget t m) => ParamsWidgetFn t m SBoxType (Either ControllersWithId SetPotatoDefaultParameters)
-holdSBoxTypeWidget inputDyn = constDyn $ do
+holdSBoxTypeWidget _ inputDyn = constDyn $ do
   let
     mBoxType = fmap snd3 inputDyn
     selectionDyn = fmap fst3 inputDyn
@@ -489,7 +489,7 @@ holdSBoxTypeWidget inputDyn = constDyn $ do
   return (2, captureEv, sBoxTypeParamsEv)
 
 holdCanvasSizeWidget :: forall t m. (MonadLayoutWidget t m, HasPotato t m) => Dynamic t SCanvas -> ParamsWidgetFn t m () XY
-holdCanvasSizeWidget canvasDyn nothingDyn = ffor nothingDyn $ \_ -> do
+holdCanvasSizeWidget canvasDyn _ nothingDyn = ffor nothingDyn $ \_ -> do
   let
     cSizeDyn = fmap (_lBox_size . _sCanvas_box) canvasDyn
     cWidthDyn = fmap (\(V2 x _) -> x) cSizeDyn
@@ -600,11 +600,11 @@ holdParamsWidget ParamsWidgetConfig {..} = do
     mCanvasSizeInputDyn = ffor2 toolDyn selectionDyn (\t s -> if isParliament_null s then Just (isParliament_empty, Nothing, t) else Nothing)
 
   (paramsOutputEv, captureEv, canvasSizeOutputEv, heightDyn) <- initManager_ $ do
-    textAlignmentWidget <- holdMaybeParamsWidget mTextAlignInputDyn holdTextAlignmentWidget
-    superStyleWidget2 <- holdMaybeParamsWidget mSuperStyleInputDyn holdSuperStyleWidget
-    lineStyleWidget <- holdMaybeParamsWidget mLineStyleInputDyn holdLineStyleWidget
-    sBoxTypeWidget <- holdMaybeParamsWidget mSBoxTypeInputDyn holdSBoxTypeWidget
-    canvasSizeWidget <- holdMaybeParamsWidget mCanvasSizeInputDyn (holdCanvasSizeWidget canvasDyn)
+    textAlignmentWidget <- holdMaybeParamsWidget defaultParamsDyn mTextAlignInputDyn holdTextAlignmentWidget
+    superStyleWidget2 <- holdMaybeParamsWidget defaultParamsDyn mSuperStyleInputDyn holdSuperStyleWidget
+    lineStyleWidget <- holdMaybeParamsWidget defaultParamsDyn mLineStyleInputDyn holdLineStyleWidget
+    sBoxTypeWidget <- holdMaybeParamsWidget defaultParamsDyn mSBoxTypeInputDyn holdSBoxTypeWidget
+    canvasSizeWidget <- holdMaybeParamsWidget defaultParamsDyn mCanvasSizeInputDyn (holdCanvasSizeWidget canvasDyn)
 
     -- apparently textAlignmentWidget gets updated after any change which causes the whole network to rerender and we lose our focus state...
     let

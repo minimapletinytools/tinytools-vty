@@ -112,7 +112,7 @@ $(declareStuff "SuperStyleWidgetNetwork"
             Nothing -> (isParliament_empty, Nothing, Tool_Select)
             Just (a,b) -> (a,b,Tool_Select)
           mSuperStyleInputDyn = fmap selectFn selectionDyn
-        (heightDyn, captureEv, outputEv) <- flip runPotatoReader def $ networkParamsWidgetOutputDynForTesting (holdSuperStyleWidget mSuperStyleInputDyn)
+        (heightDyn, captureEv, outputEv) <- flip runPotatoReader def $ networkParamsWidgetOutputDynForTesting (holdSuperStyleWidget (constDyn def) mSuperStyleInputDyn)
         -- TODO consider convert outputEv back to Event t SuperStyle...
         return $ $(toutputcon "SuperStyleWidgetNetwork") heightDyn captureEv outputEv
     |]
