@@ -393,16 +393,17 @@ holdTextAlignmentWidget inputDyn = constDyn $ do
     mtaDyn = fmap snd3 inputDyn
     selectionDyn = fmap fst3 inputDyn
 
-  mta0 <- sample . current $ mtaDyn
-
   let
-    startAlign = case mta0 of
+
+    alignDyn = ffor mtaDyn $ \case
       Nothing               -> []
       Just TextAlign_Left   -> [0]
       Just TextAlign_Center -> [1]
       Just TextAlign_Right  -> [2]
 
-  (setAlignmentEv', _) <- radioList (constDyn ["left","center","right"]) (constDyn startAlign) Nothing
+  -- I'm actually not sure why using alignDyn here isn't causing an infinite loop
+  -- I guess the whole widget is getting recreated when alignment changes... but when I sampled alignDyn instead, it didn't update correctly 🤷🏼‍♀️
+  (setAlignmentEv', _) <- radioList (constDyn ["left","center","right"]) alignDyn Nothing
 
   let
     setAlignmentEv = fmap (\case
