@@ -2,9 +2,11 @@
 {-# LANGUAGE RecursiveDo     #-}
 
 module Potato.Flow.Vty.Main (
-  flowMain
+  potatoMainWidget
   , mainPFWidget
+  , mainPFWidgetWithBypass
   , MainPFWidgetConfig(..)
+  , somedefaultpfcfg
 ) where
 import           Relude
 
@@ -145,17 +147,11 @@ eitherMaybeLeft :: Either a b -> Maybe a
 eitherMaybeLeft (Left a) = Just a
 eitherMaybeLeft _ = Nothing
 
-pfcfg :: (Reflex t) => MainPFWidgetConfig t
-pfcfg = def {
+somedefaultpfcfg :: MainPFWidgetConfig
+somedefaultpfcfg = def {
     --_mainPFWidgetConfig_initialFile = Just "potato.flow"
     _mainPFWidgetConfig_initialState = owlpfstate_basic2
   }
-
-
-flowMain :: IO ()
-flowMain = do
-  --mainWidget mainPFWidget
-  potatoMainWidget $ mainPFWidget pfcfg
 
 {-
 verifyInput :: (Reflex t, MonadHold t m) => Event t VtyEvent -> m (Event t VtyEvent)
@@ -223,26 +219,30 @@ captureInputEvents capture child = do
   localInput (\inp -> difference (gate (fmap not beh) inp) ev) $
     child
 
-data MainPFWidgetConfig t = MainPFWidgetConfig {
+data MainPFWidgetConfig = MainPFWidgetConfig {
   _mainPFWidgetConfig_initialFile :: Maybe FP.FilePath
   , _mainPFWidgetConfig_homeDirectory :: FP.FilePath
   , _mainPFWidgetConfig_initialState :: OwlPFState -- ^ will be overriden by initialFile if set
-  , _mainPFWidgetConfig_bypassEvent :: Event t WSEvent -- ^ used for testing
 }
 
-instance (Reflex t) => Default (MainPFWidgetConfig t) where
+instance Default MainPFWidgetConfig where
   def = MainPFWidgetConfig {
       _mainPFWidgetConfig_initialFile = Nothing
       --, _mainPFWidgetConfig_homeDirectory = "/"
       , _mainPFWidgetConfig_homeDirectory = "/home/minimaple/kitchen/faucet/potato-flow-vty"
       , _mainPFWidgetConfig_initialState = emptyOwlPFState
-      , _mainPFWidgetConfig_bypassEvent = never
     }
 
 mainPFWidget :: forall t m. (MonadWidget t m)
-  => MainPFWidgetConfig t
+  => MainPFWidgetConfig
   -> m (Event t ())
-mainPFWidget MainPFWidgetConfig {..} = mdo
+mainPFWidget cfg = mainPFWidgetWithBypass cfg never
+
+mainPFWidgetWithBypass :: forall t m. (MonadWidget t m)
+  => MainPFWidgetConfig
+  -> Event t WSEvent
+  -> m (Event t ())
+mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
   -- external inputs
   currentTime <- liftIO $ getCurrentTime
 
@@ -261,8 +261,9 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
   mLoadFileEv <- performEvent $ ffor
     (fforMaybe postBuildEv (const _mainPFWidgetConfig_initialFile))
     $ \fp -> do
-      mspf :: Maybe (SPotatoFlow, ControllerMeta) <- liftIO $ Aeson.decodeFileStrict fp
-      return mspf
+      absfp <- liftIO $ FP.makeAbsolute fp
+      mspf :: Maybe (SPotatoFlow, ControllerMeta) <- liftIO $ Aeson.decodeFileStrict absfp
+      return (mspf, absfp)
 
 
   -- TODO finish hooking up the event
@@ -304,20 +305,19 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
   AppKbCmd {..} <- captureInputEvents (That inputCapturedByPopupBeh) holdAppKbCmd
 
   -- setup PotatoConfig
-  -- TODO pass in mLoadFileEv (except it need sto be filename)
-  currentOpenFileDyn <- holdDyn Nothing $ fmap Just $ leftmost [snd (fanEither finishSaveEv)]
+  currentOpenFileDyn <- holdDyn Nothing $ fmap Just $ leftmost [snd (fanEither finishSaveEv), fmap snd mLoadFileEv]
   let
     potatoConfig = PotatoConfig {
         _potatoConfig_style = constant def
-        , _potatoConfig_appCurrentOpenFile = current currentOpenFileDyn
+        , _potatoConfig_appCurrentOpenFile = current (traceDyn "boop" currentOpenFileDyn)
+        , _potatoConfig_appCurrentDirectory = fmap (maybe _mainPFWidgetConfig_homeDirectory FP.takeDirectory) $ current currentOpenFileDyn
         -- TODO
         , _potatoConfig_appPrintFile = constant Nothing
       }
 
-  let
     goatWidgetConfig = GoatWidgetConfig {
         _goatWidgetConfig_initialState = (_mainPFWidgetConfig_initialState, emptyControllerMeta)
-        , _goatWidgetConfig_load = fmapMaybe id mLoadFileEv
+        , _goatWidgetConfig_load = fmapMaybe fst mLoadFileEv
 
         -- canvas direct input
         , _goatWidgetConfig_mouse = leftmostWarn "mouse" [(_layerWidget_mouse (_leftWidget_layersW leftW)), (_canvasWidget_mouse canvasW)]
@@ -333,7 +333,7 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
 
         -- debugging stuff
         , _goatWidgetConfig_setDebugLabel = never
-        , _goatWidgetConfig_bypassEvent = _mainPFWidgetConfig_bypassEvent
+        , _goatWidgetConfig_bypassEvent = bypassEvent
       }
 
   everythingW <- holdGoatWidget goatWidgetConfig
@@ -380,7 +380,7 @@ mainPFWidget MainPFWidgetConfig {..} = mdo
   (_, popupStateDyn1) <- popupPaneSimple def (never $> welcomeWidget)
 
   -- TODO correct initial state (tag potatoConfig)
-  (saveAsEv, popupStateDyn2) <- flip runPotatoReader potatoConfig $ popupSaveAsWindow $ SaveAsWindowConfig (clickSaveAsEv $> _mainPFWidgetConfig_homeDirectory)
+  (saveAsEv, popupStateDyn2) <- flip runPotatoReader potatoConfig $ popupSaveAsWindow $ SaveAsWindowConfig (tag (_potatoConfig_appCurrentDirectory potatoConfig) clickSaveAsEv)
 
   let
     alertEv = leftmost [fmapMaybe eitherMaybeLeft finishSaveEv]

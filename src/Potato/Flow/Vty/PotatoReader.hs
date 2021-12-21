@@ -43,6 +43,7 @@ data PotatoConfig t = PotatoConfig {
 
   -- TODO these need to be per document if you ever want MDI
   , _potatoConfig_appCurrentOpenFile :: Behavior t (Maybe FP.FilePath)
+  , _potatoConfig_appCurrentDirectory :: Behavior t FP.FilePath
   , _potatoConfig_appPrintFile :: Behavior t (Maybe FP.FilePath)
   -- TODO
   --, _potatoConfig_unsavedChanges :: Behavior t Bool

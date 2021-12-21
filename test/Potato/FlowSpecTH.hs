@@ -71,11 +71,13 @@ $(declareStuff "PotatoNetwork"
   [("exitEv", [t|Event $(tv) ()|])]
   [|
       do
-        exitEv <- mainPFWidget $ MainPFWidgetConfig {
-            _mainPFWidgetConfig_initialFile = Nothing
-            , _mainPFWidgetConfig_initialState = emptyOwlPFState
-            , _mainPFWidgetConfig_bypassEvent = $(tinput "PotatoNetwork" "bypassEvent")
-          }
+        exitEv <- mainPFWidgetWithBypass
+          (MainPFWidgetConfig {
+              _mainPFWidgetConfig_initialFile = Nothing
+              , _mainPFWidgetConfig_initialState = emptyOwlPFState
+            })
+          $(tinput "PotatoNetwork" "bypassEvent")
+
         return $ $(toutputcon "PotatoNetwork") exitEv
 
         -- you can also do it yourself
