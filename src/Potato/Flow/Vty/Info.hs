@@ -45,7 +45,7 @@ holdInfoWidget InfoWidgetConfig {..} = do
         let
           sowl = selectionToSuperOwl (CanvasSelection sowls)
           rid = _superOwl_id sowl
-          label = isOwl_name sowl
+          label = hasOwlElt_name sowl
           selt = superOwl_toSElt_hack sowl
         initLayout $ col $ do
           (grout . fixed) 1 $ text (constant ("rid: " <> show rid <> " name: " <> label))

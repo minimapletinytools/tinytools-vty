@@ -153,7 +153,7 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
   localTheme (const (fmap _potatoStyle_selected potatostylebeh)) $ do
     textNoRenderSpaces . current . ffor3 _canvasWidgetConfig_pan screenRegion _canvasWidgetConfig_renderedSelection $ debugRenderRegionFn
 
-    
+
 
 
 
@@ -164,8 +164,8 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
       attr = attr' -- TODO eventually RenderHandle may be styled somehow
       r = V.translate (x+px) (y+py) $ V.charFill attr rc w h
 
-  tellImages $ ffor3 (current _canvasWidgetConfig_handles) (fmap _potatoStyle_canvasCursor potatostylebeh) (current trueRegion')
-    $ \(HandlerRenderOutput hs) attr reg -> fmap (makerhimage attr reg) hs
+  tellImages $ ffor3 (current _canvasWidgetConfig_handles) (fmap _potatoStyle_makeCanvasManipulator potatostylebeh) (current trueRegion')
+    $ \(HandlerRenderOutput hs) attrfn reg -> fmap (\rh -> makerhimage (attrfn (_renderHandle_color rh)) reg rh) hs
 
   inp <- makeLMouseDataInputEv (constDyn (0,0)) False
   postBuildEv <- getPostBuild

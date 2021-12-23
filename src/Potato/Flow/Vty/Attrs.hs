@@ -5,7 +5,10 @@ module Potato.Flow.Vty.Attrs where
 
 import           Relude
 
+import Potato.Flow.Controller.Handler
+
 import           Graphics.Vty
+
 
 -- TODO PROBLEM this isn't used everywhere DDDDD:
 lg_default :: Attr
@@ -56,5 +59,19 @@ lg_canvas_oob = Attr {
   attrStyle = SetTo defaultStyleMask
   , attrForeColor = SetTo black
   , attrBackColor = SetTo brightWhite
+  , attrURL = Default
+}
+
+renderHandlerColorToVtyColor :: RenderHandleColor -> Color
+renderHandlerColorToVtyColor = \case
+  RHC_Default -> brightMagenta
+  RHC_Attachment -> brightBlue
+  RHC_AttachmentHighlight -> brightCyan
+
+lg_make_canvas_cursor :: RenderHandleColor -> Attr
+lg_make_canvas_cursor rhc = Attr {
+  attrStyle = SetTo blink
+  , attrForeColor = SetTo black
+  , attrBackColor = SetTo (renderHandlerColorToVtyColor rhc)
   , attrURL = Default
 }

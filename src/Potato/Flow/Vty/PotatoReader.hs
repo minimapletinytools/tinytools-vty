@@ -4,6 +4,8 @@ module Potato.Flow.Vty.PotatoReader where
 
 import           Relude
 
+import Potato.Flow
+
 import Data.Default
 import Control.Monad.Fix (MonadFix)
 import Control.Monad.IO.Class (MonadIO)
@@ -23,7 +25,11 @@ import           Reflex.Vty
 import Potato.Flow.Vty.Attrs
 
 data PotatoStyle = PotatoStyle {
+
+  -- TODO you can DELETE this now prob
   _potatoStyle_canvasCursor :: V.Attr
+
+  , _potatoStyle_makeCanvasManipulator :: RenderHandleColor -> V.Attr
   , _potatoStyle_normal :: V.Attr
   , _potatoStyle_selected :: V.Attr
   , _potatoStyle_softSelected :: V.Attr
@@ -33,6 +39,7 @@ data PotatoStyle = PotatoStyle {
 instance Default PotatoStyle where
   def = PotatoStyle {
       _potatoStyle_canvasCursor = lg_canvas_cursor
+      , _potatoStyle_makeCanvasManipulator = lg_make_canvas_cursor
       , _potatoStyle_normal = lg_default
       , _potatoStyle_selected = lg_layer_selected
       , _potatoStyle_softSelected = lg_layer_inheritselect

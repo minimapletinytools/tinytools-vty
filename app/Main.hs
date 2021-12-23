@@ -9,6 +9,7 @@ import           Relude
 
 import           Potato.Flow.Vty.Main
 import           Potato.Flow
+import           Potato.Flow.TestStates
 
 import           GHC.IO.Handle
 import           GHC.IO.Handle.FD
@@ -73,8 +74,8 @@ mainWithDebug = runCommand $ \(opts :: PotatoCLIOptions) args -> do
       , _mainPFWidgetConfig_homeDirectory = homeDir
       , _mainPFWidgetConfig_initialState = if _potatoCLIOptions_empty opts
         then emptyOwlPFState
-        -- TODO load tutorial here
-        else emptyOwlPFState
+        -- TODO load tutorial here owlpfstate_tutorial
+        else owlpfstate_basic2
     }
 
   -- set the title
