@@ -25,7 +25,7 @@ import           Reflex.Vty
 -- UNTESTED
 popupAlert :: forall t m. (MonadWidget t m, HasPotato t m)
   => Event t Text
-  -> m (Dynamic t Bool) -- ^ (file to save to, popup state)
+  -> m (Dynamic t Bool) -- ^ (popup state)
 popupAlert alertEv = do
   -- TODO style
   let

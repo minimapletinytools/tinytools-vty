@@ -276,7 +276,7 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
 
 
   let
-    performSaveEv = attach (current $ _goatWidget_DEBUG_goatState everythingW) $ leftmost [saveAsEv, clickSaveEv]
+    performSaveEv = attach (current $ _goatWidget_DEBUG_goatState everythingW) $ leftmost [saveAsEv, clickSaveEv, _saveBeforeExitOutput_save]
   finishSaveEv <- performEvent $ ffor performSaveEv $ \(gs,fn) -> liftIO $ do
     let
       spf = owlPFState_to_sPotatoFlow . _owlPFWorkspace_pFState . _goatState_workspace $ gs
@@ -330,6 +330,7 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
         , _goatWidgetConfig_canvasSize = _paramsWidget_canvasSizeEvent (_leftWidget_paramsW leftW)
         , _goatWidgetConfig_newFolder = _layerWidget_newFolderEv (_leftWidget_layersW leftW)
         , _goatWidgetConfig_setPotatoDefaultParameters = _paramsWidget_setDefaultParamsEvent (_leftWidget_paramsW leftW)
+        , _goatWidgetConfig_markSaved = void performSaveEv
 
         -- debugging stuff
         , _goatWidgetConfig_setDebugLabel = never
@@ -373,27 +374,31 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
       return (kb, stuff)
 
   let
+    doesNeedSaveOnExitEv = tag (current $ _goatWidget_unsavedChanges everythingW) $ leftmost [_appKbCmd_quit, _menuButtonsWidget_quitEv . _leftWidget_menuButtonsW $ leftW]
     (clickSaveEv, nothingClickSaveEv)  = fanMaybe $ tag (_potatoConfig_appCurrentOpenFile potatoConfig) $ leftmost [_menuButtonsWidget_saveEv . _leftWidget_menuButtonsW $ leftW, _appKbCmd_save]
-    clickSaveAsEv = leftmost $ [_menuButtonsWidget_saveAsEv . _leftWidget_menuButtonsW $ leftW, nothingClickSaveEv]
+    clickSaveAsEv = leftmost $ [_menuButtonsWidget_saveAsEv . _leftWidget_menuButtonsW $ leftW, nothingClickSaveEv, _saveBeforeExitOutput_saveAs]
 
+  -- TODO probably have some sort of PopupManager -__-
+  -- 1 welcome popup
   --(_, popupStateDyn1) <- popupPaneSimple def (postBuildEv $> welcomeWidget)
   (_, popupStateDyn1) <- popupPaneSimple def (never $> welcomeWidget)
 
-  -- TODO correct initial state (tag potatoConfig)
+  -- 2 save as popup
   (saveAsEv, popupStateDyn2) <- flip runPotatoReader potatoConfig $ popupSaveAsWindow $ SaveAsWindowConfig (tag (_potatoConfig_appCurrentDirectory potatoConfig) clickSaveAsEv)
 
+  -- 3 alert popup
   let
-    alertEv = leftmost [fmapMaybe eitherMaybeLeft finishSaveEv]
-  popupStateDyn3 <- flip runPotatoReader potatoConfig $ popupAlert alertEv
+    saveFailAlertEv = fmapMaybe eitherMaybeLeft finishSaveEv
+  popupStateDyn3 <- flip runPotatoReader potatoConfig $ popupAlert saveFailAlertEv
 
+  -- 4 unsaved changes on quit popup
+  (SaveBeforeExitOutput {..}, popupStateDyn4) <- flip runPotatoReader potatoConfig $ popupSaveBeforeExit (SaveBeforeExitConfig (void $ ffilter id doesNeedSaveOnExitEv))
 
   let
     -- TODO assert that we never have more than 1 popup open at once
     -- block input if any popup is currently open
-    inputCapturedByPopupBeh = current . fmap getAny . mconcat . fmap (fmap Any) $ [popupStateDyn1, popupStateDyn2, popupStateDyn3]
-
+    inputCapturedByPopupBeh = current . fmap getAny . mconcat . fmap (fmap Any) $ [popupStateDyn1, popupStateDyn2, popupStateDyn3, popupStateDyn4]
 
 
   -- handle escape event
-  -- TODO we want to prompt for save first, use popupSaveBeforeExit
-  return $ leftmost [_appKbCmd_quit, _menuButtonsWidget_quitEv . _leftWidget_menuButtonsW $ leftW]
+  return $ void $ ffilter not doesNeedSaveOnExitEv
