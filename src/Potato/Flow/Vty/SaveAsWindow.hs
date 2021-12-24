@@ -78,25 +78,54 @@ data SaveBeforeExitConfig t = SaveBeforeExitConfig {
   _saveBeforeExitConfig_exitWithChanges :: Event t ()
 }
 data SaveBeforeExitOutput t = SaveBeforeExitOutput {
+
+  -- TODO you should be able to get this to work...
+  --_saveBeforeExitOutput_save :: Event t FP.FilePath
   _saveBeforeExitOutput_save :: Event t ()
+
   , _saveBeforeExitOutput_saveAs :: Event t ()
+  , _saveBeforeExitOutput_quit :: Event t ()
 }
 
+hackAlign3 :: (Reflex t) => Event t a -> Event t b -> Event t c -> Event t (These a (These b c))
+hackAlign3 a b c = align a (align b c)
+
+hackFanThese3 :: (Reflex t) =>  Event t (These a (These b c)) -> (Event t a, Event t b, Event t c)
+hackFanThese3 ev = r where
+  (a, bc) = fanThese ev
+  (b, c) = fanThese bc
+  r = (a,b,c)
+
+-- TODO somehow allow auto save on exit
 popupSaveBeforeExit :: forall t m. (MonadWidget t m, HasPotato t m)
   => SaveBeforeExitConfig t
   -> m (SaveBeforeExitOutput t, Dynamic t Bool)
 popupSaveBeforeExit SaveBeforeExitConfig {..} = do
+  mopenfilebeh <- fmap _potatoConfig_appCurrentOpenFile askPotato
+
+  -- TODO unsure why this doesn't get resampled each time popup is created :(
+  --mopenfile <- sample mopenfilebeh
+
   -- TODO style everything
   let
     popupSaveBeforeExitEv = ffor _saveBeforeExitConfig_exitWithChanges $ \f0 -> mdo
       boxTitle (constant def) "You have unsaved changes. Would you like to save?" $ do
         initManager_ $ col $ mdo
-          (cancelEv, saveButtonEv, saveAsButtonEv) <- (tile . fixed) 3 $ row $ do
-            cancelEv' <- (tile . stretch) 10 $ textButton def "cancel"
-            saveEv' <- (tile . stretch) 10 $ textButton def "save"
-            saveAsEv' <- (tile . stretch) 10 $ textButton def "save as"
-            return (cancelEv', saveEv', saveAsEv')
-          return (cancelEv, align saveButtonEv saveAsButtonEv)
+          (quitEv, cancelEv, saveButtonEv, saveAsButtonEv) <- do
+            (tile . stretch) 0 $ col $ return ()
+            (tile . fixed) 3 $ row $ do
+              cancelEv' <- (tile . stretch) 9 $ textButton def "cancel"
+
+              -- TODO you should be able to get this to work...
+              --saveEv' <- case mopenfile of
+              --  Nothing -> return never
+              --  Just x -> (tile . stretch) 9 $ (const x <<$>> textButton def "save")
+              saveEv' <- (tile . stretch) 9 $ textButton def "save"
+
+              saveAsEv' <- (tile . stretch) 9 $ textButton def "save as"
+              quitEv' <- (tile . stretch) 9 $ textButton def "quit"
+              return (quitEv', cancelEv', saveEv', saveAsEv')
+          return (cancelEv, hackAlign3 saveButtonEv saveAsButtonEv quitEv)
     fmapfn w = \escEv clickOutsideEv -> fmap (\(cancelEv, outputEv) -> (leftmost [escEv, cancelEv, void outputEv], outputEv)) w
   (outputEv, stateDyn) <- popupPane def $ (fmap fmapfn popupSaveBeforeExitEv)
-  return (uncurry SaveBeforeExitOutput (fanThese outputEv), stateDyn)
+  return (uncurry3 SaveBeforeExitOutput (hackFanThese3 outputEv), stateDyn)
