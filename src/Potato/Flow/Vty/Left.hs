@@ -29,7 +29,8 @@ import           Reflex.Vty
 data MenuButtonsWidget t = MenuButtonsWidget {
   _menuButtonsWidget_saveEv :: Event t ()
   , _menuButtonsWidget_saveAsEv :: Event t ()
-  --, _menuButtonsWidget_exportEv ::
+  , _menuButtonsWidget_exportEv :: Event t ()
+  , _menuButtonsWidget_quitEv :: Event t ()
 }
 
 data LeftWidgetConfig t = LeftWidgetConfig {
@@ -60,23 +61,27 @@ holdLeftWidget LeftWidgetConfig {..} = do
 
     -- TODO consider
     -- TODO height should be dynamic but not sure if there's away to do this dynamically because width (from which buttonsHeightDyn) is derived depends on `grout . fixed`. You need to pull width from outside of the `grout . fixed` call to make this work right...
-    (clickSaveEv_d1, clickSaveAsEv_d1, buttonsHeightDyn) <- (grout . fixed) buttonsHeightDyn $ row $ do
+    (clickSaveEv_d1, clickSaveAsEv_d1, exportEv_d1, quitEv_d1, buttonsHeightDyn) <- (grout . fixed) buttonsHeightDyn $ row $ do
 
-      (buttonsEv, heightDyn) <- buttonList (constDyn ["save", "save as", "export to \"potato.txt\""]) (Just widthDyn)
+      (buttonsEv, heightDyn) <- buttonList (constDyn ["save", "save as", "export to \"potato.txt\"", "quit"]) (Just widthDyn)
       let
         clickSaveEv_d2 = ffilterButtonIndex 0 buttonsEv
         clickSaveAsEv_d2 = ffilterButtonIndex 1 buttonsEv
-        exportEv = ffilterButtonIndex 2 buttonsEv
-        clickPrintEv = tag (current $ _goatWidget_renderedCanvas _layersWidgetConfig_goatW) (void exportEv)
+        exportEv_d2 = ffilterButtonIndex 2 buttonsEv
+        quitEv_d2 = ffilterButtonIndex 3 buttonsEv
+        clickPrintEv = tag (current $ _goatWidget_renderedCanvas _layersWidgetConfig_goatW) (void exportEv_d2)
+      -- TODO don't do this here cmon...
       performEvent_ $ ffor clickPrintEv $ \rc -> do
          let t = renderedCanvasToText rc
+         -- TODO at least use filename...
          liftIO $ T.writeFile "potato.txt" t
-      return (clickSaveEv_d2, clickSaveAsEv_d2, heightDyn)
+      return (clickSaveEv_d2, clickSaveAsEv_d2, exportEv_d2, quitEv_d2, heightDyn)
     let
       menuButtons = MenuButtonsWidget {
           _menuButtonsWidget_saveEv = clickSaveEv_d1
           , _menuButtonsWidget_saveAsEv = clickSaveAsEv_d1
-          --, _menuButtonsWidget_exportEv ::
+          , _menuButtonsWidget_exportEv = exportEv_d1
+          , _menuButtonsWidget_quitEv = quitEv_d1
         }
 
 
