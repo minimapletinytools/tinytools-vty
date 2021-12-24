@@ -1,3 +1,4 @@
+-- TODO rename this file to PopupDialogs or something
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE RecursiveDo     #-}
 
@@ -41,7 +42,6 @@ data SaveAsWindowConfig t = SaveAsWindowConfig {
   _saveAsWindowConfig_saveAs :: Event t FP.FilePath -- ^ Event to launch the popup window to save file as Text is previous file name or empty string
 }
 
--- UNTESTED
 popupSaveAsWindow :: forall t m. (MonadWidget t m, HasPotato t m)
   => SaveAsWindowConfig t
   -> m (Event t FP.FilePath, Dynamic t Bool) -- ^ (file to save to, popup state)
@@ -72,3 +72,31 @@ popupSaveAsWindow SaveAsWindowConfig {..} = do
           return (cancelEv, saveAsFileEv)
     fmapfn w = \escEv clickOutsideEv -> fmap (\(cancelEv, outputEv) -> (leftmost [escEv, cancelEv, void outputEv], outputEv)) w
   popupPane def $ (fmap fmapfn popupSaveAsEv)
+
+
+data SaveBeforeExitConfig t = SaveBeforeExitConfig {
+  _saveBeforeExitConfig_exitWithChanges :: Event t ()
+}
+data SaveBeforeExitOutput t = SaveBeforeExitOutput {
+  _saveBeforeExitOutput_save :: Event t ()
+  , _saveBeforeExitOutput_saveAs :: Event t ()
+}
+
+popupSaveBeforeExit :: forall t m. (MonadWidget t m, HasPotato t m)
+  => SaveBeforeExitConfig t
+  -> m (SaveBeforeExitOutput t, Dynamic t Bool)
+popupSaveBeforeExit SaveBeforeExitConfig {..} = do
+  -- TODO style everything
+  let
+    popupSaveBeforeExitEv = ffor _saveBeforeExitConfig_exitWithChanges $ \f0 -> mdo
+      boxTitle (constant def) "You have unsaved changes. Would you like to save?" $ do
+        initManager_ $ col $ mdo
+          (cancelEv, saveButtonEv, saveAsButtonEv) <- (tile . fixed) 3 $ row $ do
+            cancelEv' <- (tile . stretch) 10 $ textButton def "cancel"
+            saveEv' <- (tile . stretch) 10 $ textButton def "save"
+            saveAsEv' <- (tile . stretch) 10 $ textButton def "save as"
+            return (cancelEv', saveEv', saveAsEv')
+          return (cancelEv, align saveButtonEv saveAsButtonEv)
+    fmapfn w = \escEv clickOutsideEv -> fmap (\(cancelEv, outputEv) -> (leftmost [escEv, cancelEv, void outputEv], outputEv)) w
+  (outputEv, stateDyn) <- popupPane def $ (fmap fmapfn popupSaveBeforeExitEv)
+  return (uncurry SaveBeforeExitOutput (fanThese outputEv), stateDyn)

@@ -395,5 +395,5 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
 
 
   -- handle escape event
-  -- TODO we want to prompt for save first
+  -- TODO we want to prompt for save first, use popupSaveBeforeExit
   return $ leftmost [_appKbCmd_quit, _menuButtonsWidget_quitEv . _leftWidget_menuButtonsW $ leftW]
