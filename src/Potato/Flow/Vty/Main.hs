@@ -265,14 +265,12 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
       mspf :: Maybe (SPotatoFlow, ControllerMeta) <- liftIO $ Aeson.decodeFileStrict absfp
       return (mspf, absfp)
 
-
-  -- TODO finish hooking up the event
-  -- TODO how to tell if dirty or not (with undos etc)
   -- set the title
   let
-    setOpenFileStateEv = never
-  performEvent_ $ ffor setOpenFileStateEv $ \(fn, dirty) -> do
-    liftIO $ hSetTitle stdout $ fn <> (if dirty then "*" else "")
+    setOpenFileStateEv = traceEvent "hi" $ updated $ ffor2 currentOpenFileDyn (_goatWidget_unsavedChanges everythingW) (,)
+  performEvent_ $ ffor setOpenFileStateEv $ \(mfn, dirty) -> do
+    -- this only seems to sometimes work 🤷🏼‍♀️
+    liftIO $ hSetTitle stdout $ fromMaybe "<>" mfn <> (if dirty then "*" else "")
 
 
   let
@@ -309,7 +307,7 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
   let
     potatoConfig = PotatoConfig {
         _potatoConfig_style = constant def
-        , _potatoConfig_appCurrentOpenFile = current (traceDyn "set open file:" currentOpenFileDyn)
+        , _potatoConfig_appCurrentOpenFile = current currentOpenFileDyn
         , _potatoConfig_appCurrentDirectory = fmap (maybe _mainPFWidgetConfig_homeDirectory FP.takeDirectory) $ current currentOpenFileDyn
         -- TODO
         , _potatoConfig_appPrintFile = constant Nothing
