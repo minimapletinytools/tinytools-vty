@@ -17,12 +17,6 @@ import           Test.HUnit
 import           Potato.Flow.Vty.Main
 import Potato.Flow
 
-import           Control.Monad.IO.Class     (liftIO)
-import           Control.Monad.Ref
-import           Data.Default
-import qualified           Data.Kind
-import qualified Data.List                  as L
-
 import qualified Graphics.Vty               as V
 import           Reflex
 import           Reflex.Host.Class
@@ -30,8 +24,6 @@ import           Reflex.Vty
 import           Reflex.Vty.Test.Monad.Host
 import           Reflex.Vty.Test.Monad.Host.TH
 import Reflex.Vty.Test.Common
-
-import Language.Haskell.TH
 
 -- for reference, non-TH equivalent network
 {-
@@ -75,6 +67,7 @@ $(declareStuff "PotatoNetwork"
           (MainPFWidgetConfig {
               _mainPFWidgetConfig_initialFile = Nothing
               , _mainPFWidgetConfig_initialState = emptyOwlPFState
+              , _mainPFWidgetConfig_homeDirectory = ""
             })
           $(tinput "PotatoNetwork" "bypassEvent")
 

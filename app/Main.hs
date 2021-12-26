@@ -15,8 +15,6 @@ import           GHC.IO.Handle
 import           GHC.IO.Handle.FD
 import           System.IO
 import System.Directory
-import System.FilePath
-import System.Console.ANSI
 import Options
 
 

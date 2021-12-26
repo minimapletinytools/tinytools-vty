@@ -12,42 +12,34 @@ import           Relude
 
 
 import           Potato.Flow
-import           Potato.Flow.Controller
 import           Potato.Flow.TestStates
-import           Potato.Flow.Vty.Attrs
 import           Potato.Flow.Vty.Canvas
-import           Potato.Flow.Vty.Info
 import           Potato.Flow.Vty.Input
 import           Potato.Flow.Vty.Layer
 import           Potato.Flow.Vty.Params
 import           Potato.Flow.Vty.PotatoReader
 import           Potato.Flow.Vty.Tools
 import           Potato.Flow.Vty.Left
-import Potato.Flow.Vty.Common
 import           Potato.Reflex.Vty.Helpers
 import           Potato.Reflex.Vty.Widget.Popup
-import           Potato.Reflex.Vty.Widget.FileExplorer
 import           Potato.Reflex.Vty.Widget
 import qualified Potato.Reflex.Vty.Host
 import Potato.Flow.Vty.SaveAsWindow
 import Potato.Flow.Vty.Alert
 import Potato.Flow.Vty.AppKbCmd
 
-import System.IO (stderr, stdout, hFlush)
+import System.IO (hFlush)
 import System.Console.ANSI (hSetTitle)
 import qualified System.FilePath as FP
 import qualified System.Directory as FP
 
 import           Control.Concurrent
-import           Control.Monad.Fix
 import           Control.Monad.NodeId
 import Control.Exception (handle)
 import qualified Data.Aeson                        as Aeson
 import qualified Data.Aeson.Encode.Pretty as PrettyAeson
 import           Data.Maybe
-import           Data.Monoid                       (Any)
 import           Data.Default
-import qualified Data.Text                as T
 import qualified Data.Text.Encoding                as T
 import qualified Data.Text.Lazy                    as LT
 import qualified Data.Text.Lazy.Encoding           as LT
@@ -60,10 +52,8 @@ import Data.These
 import           Network.HTTP.Simple
 
 import qualified Graphics.Vty                      as V
-import qualified Graphics.Vty.Input.Events         as V
-import qualified Graphics.Vty.UnicodeWidthTable.IO as V
+--import qualified Graphics.Vty.UnicodeWidthTable.IO as V
 import           Reflex
-import           Reflex.Host.Class
 import           Reflex.Potato.Helpers
 import           Reflex.Vty
 
@@ -89,7 +79,7 @@ potatoMainWidgetWithHandle vty child =
     let inp' = fforMaybe inp $ \case
           V.EvResize {} -> Nothing
           x -> Just x
-    (shutdown, images) <- runThemeReader (constant V.defAttr) $
+    (shutdown, imgs) <- runThemeReader (constant V.defAttr) $
       runFocusReader (pure True) $
         runDisplayRegion (fmap (\(w, h) -> Region 0 0 w h) size) $
           runImageWriter $
@@ -98,7 +88,7 @@ potatoMainWidgetWithHandle vty child =
                 tellImages . ffor (current size) $ \(w, h) -> [V.charFill V.defAttr ' ' w h]
                 child
     return $ Potato.Reflex.Vty.Host.VtyResult
-      { _vtyResult_picture = fmap (V.picForLayers . reverse) images
+      { _vtyResult_picture = fmap (V.picForLayers . reverse) imgs
       , _vtyResult_shutdown = shutdown
       }
 
@@ -133,7 +123,7 @@ potatoMainWidget child = do
 
 
 -- | tick once (redraw widgets) upon event firing
-tickOnEvent :: (Reflex t, Adjustable t m) => Event t a -> m ()
+tickOnEvent :: (Adjustable t m) => Event t a -> m ()
 tickOnEvent ev = void $ runWithReplace (return ()) (ev $> return ())
 
 -- | TODO move to ReflexHelpers
@@ -189,6 +179,10 @@ welcomeWidget = do
       (grout . stretch) 1 $ text (current welcomeMessageDyn)
       (grout . fixed) 3 $ textButton def (constant "bye")
 
+
+
+
+-- TODO DELETE OR MOVE UNUSED
 -- | toggle the focus of a widget
 -- also forces unfocused widget to ignore mouse inputs
 focusWidgetNoMouse :: forall t m a. (MonadWidget t m)
@@ -200,6 +194,7 @@ focusWidgetNoMouse f child = do
     localInput (gate (current f)) $
       child
 
+-- TODO DELETE OR MOVE UNUSED
 -- | ignores mouse input unless widget is focused
 ignoreMouseUnlessFocused :: forall t m a. (MonadWidget t m)
   => m a
@@ -207,6 +202,8 @@ ignoreMouseUnlessFocused :: forall t m a. (MonadWidget t m)
 ignoreMouseUnlessFocused child = do
   f <- focus
   focusWidgetNoMouse f child
+
+
 
 -- | block all or some input events, always focused if parent is focused
 captureInputEvents :: forall t m a. (MonadWidget t m)
@@ -244,7 +241,7 @@ mainPFWidgetWithBypass :: forall t m. (MonadWidget t m)
   -> m (Event t ())
 mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
   -- external inputs
-  currentTime <- liftIO $ getCurrentTime
+  --currentTime <- liftIO $ getCurrentTime
 
   -- note tickEv triggers 2 ticks
   --tickEv <- tickLossy 1 currentTime
@@ -329,6 +326,9 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
         , _goatWidgetConfig_newFolder = _layerWidget_newFolderEv (_leftWidget_layersW leftW)
         , _goatWidgetConfig_setPotatoDefaultParameters = _paramsWidget_setDefaultParamsEvent (_leftWidget_paramsW leftW)
         , _goatWidgetConfig_markSaved = void performSaveEv
+
+        -- TODO
+        --, _goatWidgetConfig_unicodeWidthFn =
 
         -- debugging stuff
         , _goatWidgetConfig_setDebugLabel = never

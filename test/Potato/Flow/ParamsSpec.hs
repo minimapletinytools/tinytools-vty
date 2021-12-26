@@ -18,13 +18,7 @@ import           Potato.Flow.Vty.Params
 import Potato.Flow
 import Potato.Flow.Vty.PotatoReader
 
-import           Control.Monad.IO.Class     (liftIO)
-import           Control.Monad.Ref
 import           Data.Default
-import qualified           Data.Kind
-import qualified Data.List                  as L
-import qualified Data.Sequence as Seq
-import Data.Tuple.Extra (thd3)
 
 import qualified Graphics.Vty               as V
 import           Reflex
@@ -34,7 +28,6 @@ import           Reflex.Vty.Test.Monad.Host
 import           Reflex.Vty.Test.Monad.Host.TH
 import Reflex.Vty.Test.Common
 
-import Language.Haskell.TH
 
 $(declareStuff "ParamsNetwork"
   [("setSelection", [t|Selection|])
@@ -122,7 +115,7 @@ test_superStyleWidget_basic :: Test
 test_superStyleWidget_basic = TestLabel "set canvas size" $ TestCase $ runSpiderHost $
   runReflexVtyTestApp @ (SuperStyleWidgetNetwork (SpiderTimeline Global) (SpiderHost Global)) (100,100) $ do
 
-    let queueVtyEventAndFire x = queueVtyEvent x >> fireQueuedEvents
+    --let queueVtyEventAndFire x = queueVtyEvent x >> fireQueuedEvents
 
     -- get our app's input triggers
     SuperStyleWidgetNetwork_InputTriggerRefs {..} <- userInputTriggerRefs

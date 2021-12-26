@@ -14,14 +14,6 @@ import           Test.Hspec
 import           Test.Hspec.Contrib.HUnit   (fromHUnitTest)
 import           Test.HUnit
 
-import           Potato.Flow.Vty.Main
-import Potato.Flow
-import Potato.Flow.ParamsSpec hiding (spec)
-
-import           Control.Monad.IO.Class     (liftIO)
-import           Control.Monad.Ref
-import           Data.Default
-import           Data.Kind
 import qualified Data.List                  as L
 
 import qualified Graphics.Vty               as V
@@ -30,11 +22,6 @@ import           Reflex.Host.Class
 import           Reflex.Vty
 import           Reflex.Vty.Test.Monad.Host
 import           Reflex.Vty.Test.Monad.Host.TH
-import Reflex.Vty.Test.Common
-
-import           Reflex.Vty.Test.Monad.Host.TH
-
-import Language.Haskell.TH
 
 
 $(declareStuff "BasicNetworkTest1"
@@ -86,13 +73,13 @@ test_basic = TestLabel "basic" $ TestCase $ runSpiderHost $
 
     -- fire a dummy input event and enusre the output is as expected
     queueEventTriggerRef _basicNetworkTest1_InputTriggerRefs_dummy 'p'
-    a2 :: [Maybe VtyEvent] <- fireQueuedEventsAndRead $ sequence =<< readEvent vtyH
-    liftIO $ a2 @?= [Just $ V.EvKey (V.KChar 'p') []]
+    a3 :: [Maybe VtyEvent] <- fireQueuedEventsAndRead $ sequence =<< readEvent vtyH
+    liftIO $ a3 @?= [Just $ V.EvKey (V.KChar 'p') []]
 
     -- resize the screen and check that the changes are reflected
     queueVtyEvent $ V.EvResize 10 10
-    a3  :: [Maybe Int] <- fireQueuedEventsAndRead $ sequence =<< readEvent dwH
-    liftIO $ a3 @?= [Just 10]
+    a4  :: [Maybe Int] <- fireQueuedEventsAndRead $ sequence =<< readEvent dwH
+    liftIO $ a4 @?= [Just 10]
 
 
 
