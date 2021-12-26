@@ -11,18 +11,10 @@ module Potato.Flow.Vty.Canvas (
 import           Relude
 
 import           Potato.Flow
-import           Potato.Flow.Controller
-import           Potato.Flow.Controller.Handler
-import           Potato.Flow.Math
 import           Potato.Flow.Vty.Input
 import           Potato.Reflex.Vty.Helpers
-import           Potato.Reflex.Vty.Widget
-import           Reflex.Potato.Helpers
 import Potato.Flow.Vty.PotatoReader
 
-import           Control.Lens
-import qualified Data.IntMap.Strict             as IM
-import           Data.These
 import qualified Data.Text as T
 import qualified Data.List.Index as L
 import Data.Tuple.Extra (thd3)
@@ -34,7 +26,7 @@ import           Reflex.Vty
 
 -- alternative text rendering methods that don't show spaces
 textNoRenderSpaces
-  :: (Reflex t, Monad m, HasDisplayRegion t m, HasImageWriter t m, HasTheme t m)
+  :: (HasDisplayRegion t m, HasImageWriter t m, HasTheme t m)
   => Behavior t Text
   -> m ()
 textNoRenderSpaces t = do
@@ -54,18 +46,13 @@ textNoRenderSpaces t = do
             (x,n):xs -> (0, (c:x,n):xs)
             -- first character case
             [] -> (0, [([c], 0)])
-    makeimages theme =
+    makeimages th =
       -- (\x -> traceShow (length x) x) .
       join
       . L.imap (\i -> fmap (V.translateY i)) -- for each line, offset the image vertically
-      . fmap (fmap (\(t,offset) -> V.translateX offset $  V.string theme (reverse t))) -- for each chunk and offset, convert to image
+      . fmap (fmap (\(txt,offset) -> V.translateX offset $  V.string th (reverse txt))) -- for each chunk and offset, convert to image
       . fmap (thd3 . foldl' foldlinefn (0,0,[]) . T.unpack) -- for each line, split into chunks with offset
       . T.split (=='\n') -- split into lines
-
-
--- TODO this needs to come from Potato.Flow
-defaultCanvasLBox :: LBox
-defaultCanvasLBox = LBox (V2 0 0) (V2 100 50)
 
 lBox_to_region :: LBox -> Region
 lBox_to_region (LBox (V2 x y) (V2 w h)) = Region x y w h
@@ -76,11 +63,13 @@ region_to_lBox (Region x y w h) = (LBox (V2 x y) (V2 w h))
 dynLBox_to_dynRegion :: (Reflex t) => Dynamic t LBox -> Dynamic t Region
 dynLBox_to_dynRegion dlb = ffor dlb $ lBox_to_region
 
+{- DELETE ME
 translate_dynRegion :: (Reflex t) => Dynamic t XY -> Dynamic t Region -> Dynamic t Region
 translate_dynRegion dpos dr = ffor2 dpos dr $ \(V2 x y) region -> region {
     _region_left = _region_left region + x
     , _region_top = _region_top region + y
   }
+-}
 
 pan_lBox :: XY -> LBox -> LBox
 pan_lBox pan (LBox p s) = LBox (p+pan) s
@@ -144,6 +133,7 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
   localTheme (const (fmap _potatoStyle_softSelected potatostylebeh)) $ do
     fill (constant ' ')
     simpleList oobRegions renderRegion
+    return ()
 
   -- 2. render the canvas region
   renderRegion trueRegion
@@ -152,6 +142,7 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
   -- TODO use correct theme
   localTheme (const (fmap _potatoStyle_selected potatostylebeh)) $ do
     textNoRenderSpaces . current . ffor3 _canvasWidgetConfig_pan screenRegion _canvasWidgetConfig_renderedSelection $ debugRenderRegionFn
+    return ()
 
 
 

@@ -2,7 +2,6 @@ module Potato.Flow.Vty.AppKbCmd where
 
 import           Relude
 
-import           Potato.Flow
 import           Potato.Reflex.Vty.Helpers
 
 import           Reflex

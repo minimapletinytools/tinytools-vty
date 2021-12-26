@@ -11,18 +11,13 @@ module Potato.Flow.Vty.Tools (
 import           Relude
 
 import           Potato.Flow.Controller
-import           Potato.Flow.Vty.Attrs
 import           Potato.Flow.Vty.Common
 import           Potato.Reflex.Vty.Helpers
 
 import           Control.Monad.Fix
 import           Control.Monad.NodeId
-import qualified Data.List.Index                    as L
-import qualified Data.Text                          as T
 
-import qualified Graphics.Vty                       as V
 import           Reflex
-import           Reflex.Vty
 
 
 data ToolWidgetConfig t = ToolWidgetConfig {
@@ -36,11 +31,11 @@ data ToolWidget t = ToolWidget {
 }
 
 
-onlyIfBeh :: (Reflex t) => Event t a -> Behavior t Bool -> Event t a
-onlyIfBeh ev beh = fmapMaybe (\(b,e) -> if b then Just e else Nothing) $ attach beh ev
+--onlyIfBeh :: (Reflex t) => Event t a -> Behavior t Bool -> Event t a
+--onlyIfBeh ev beh = fmapMaybe (\(b,e) -> if b then Just e else Nothing) $ attach beh ev
 
 
-holdToolsWidget :: forall t m. (PostBuild t m, MonadHold t m, MonadFix m, MonadNodeId m, MonadWidget t m)
+holdToolsWidget :: forall t m. (PostBuild t m, MonadWidget t m)
   => ToolWidgetConfig t
   -> m (ToolWidget t)
 holdToolsWidget ToolWidgetConfig {..} = mdo
@@ -55,16 +50,6 @@ holdToolsWidget ToolWidgetConfig {..} = mdo
     textareaB = void $ ffilter (==5) radioEvs
 
   let
-    -- TODO DELETE, we don't do key press anymore
-    {-
-    allowKB = constant True
-    keyPressEv' k = (flip fmapMaybe) (_pFWidgetCtx_ev_input _toolWidgetConfig_pfctx) $ \case
-      V.EvKey (V.KChar k') [] | k' == k -> Just ()
-      _ -> Nothing
-    keyPressEv k = onlyIfBeh (keyPressEv' k) allowKB
-    -}
-    keyPressEv k = never
-
     setTool = leftmost
       [Tool_Select <$ leftmost [selectB]
       , Tool_Pan <$ leftmost [panB]

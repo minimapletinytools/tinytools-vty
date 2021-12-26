@@ -10,15 +10,8 @@ module Potato.Flow.Vty.Info (
 import           Relude
 
 import           Potato.Flow
-import           Potato.Flow.Vty.Common
 import           Potato.Reflex.Vty.Helpers
 
-import           Control.Monad.Fix
-import           Control.Monad.NodeId
-import qualified Data.Sequence                     as Seq
-import qualified Data.Text                         as T
-
-import qualified Graphics.Vty                      as V
 import           Reflex
 import           Reflex.Network
 import           Reflex.Vty

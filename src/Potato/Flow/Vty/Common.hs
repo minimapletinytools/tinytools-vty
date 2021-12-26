@@ -13,9 +13,7 @@ module Potato.Flow.Vty.Common (
 import           Relude
 import qualified Relude.Unsafe               as Unsafe
 
-import           Potato.Flow.Controller
 import           Potato.Flow.Vty.Attrs
-import           Potato.Reflex.Vty.Helpers
 import Potato.Reflex.Vty.Widget
 
 import           Control.Monad.Fix
@@ -29,6 +27,8 @@ import           Reflex
 import           Reflex.Vty
 
 
+
+
 ffilterButtonIndex :: (Reflex t) => Int -> Event t Int -> Event t ()
 ffilterButtonIndex i = fmapMaybe (\i' -> if i == i' then Just () else Nothing)
 
@@ -39,14 +39,14 @@ maximumlist = foldr (\x y ->if x >= y then x else y) (-1)
 simpleDrag :: (Reflex t, MonadHold t m, MonadFix m, HasInput t m) => V.Button -> m (Event t ((Int, Int), (Int, Int)))
 simpleDrag btn = do
   dragEv <- drag2 btn
-  return $ flip push dragEv $ \d@(Drag2 (fromX, fromY) (toX, toY) _ mods ds) -> do
+  return $ flip push dragEv $ \(Drag2 (fromX, fromY) (toX, toY) _ _ ds) -> do
     return $ if ds == DragEnd
       then Just $ ((fromX, fromY), (toX, toY))
       else Nothing
 
 
 -- | option to pass in height is a hack to work around circular dependency issues as when using Layout, displayWidth may be dependent on returned dynamic height
-buttonList :: forall t m. (Reflex t, MonadFix m, MonadHold t m, MonadNodeId m, HasDisplayRegion t m, HasImageWriter t m, HasInput t m, HasTheme t m)
+buttonList :: forall t m. (MonadFix m, MonadHold t m, HasDisplayRegion t m, HasImageWriter t m, HasInput t m, HasTheme t m)
   => Dynamic t [Text] -- ^ list of button contents
   -> Maybe (Dynamic t Int) -- ^ optional width (displayWidth is used if Nothing)
   -> m (Event t Int, Dynamic t Int) -- ^ (event when button is clicked, height)
@@ -129,7 +129,7 @@ radioListSimple :: forall t m. (Reflex t, MonadFix m, MonadHold t m, MonadNodeId
   -> m (Dynamic t Int) -- ^ which radio is selected
 radioListSimple initial buttons = mdo
   (radioEvs,_) <- radioList (constDyn buttons) radioDyn Nothing
-  radioDyn <- holdDyn [0] $ fmap (\x->[x]) radioEvs
+  radioDyn <- holdDyn [initial] $ fmap (\x->[x]) radioEvs
   return $ fmap (Unsafe.head) radioDyn
 
 
@@ -138,7 +138,7 @@ radioListSimple initial buttons = mdo
 -- | creates a check box "[x]" in upper left corner of region
 -- override style: does not modify state internally, instead state must be passed back in
 checkBox
-  :: forall t m. (Reflex t, MonadFix m, MonadHold t m, MonadNodeId m, HasDisplayRegion t m, HasImageWriter t m, HasInput t m, HasTheme t m)
+  :: forall t m. (Reflex t, MonadFix m, HasDisplayRegion t m, HasImageWriter t m, HasInput t m, HasTheme t m)
   => Dynamic t Bool
   -> m (Event t Bool)
 checkBox stateDyn = do

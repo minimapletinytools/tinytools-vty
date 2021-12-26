@@ -27,14 +27,10 @@ module Potato.Reflex.Vty.Widget
 
 import           Prelude
 
-import           Control.Applicative  (liftA2)
-import           Graphics.Vty         (Image)
 import qualified Graphics.Vty         as V
 
 import           Reflex
 import           Reflex.Class         ()
-import           Reflex.Host.Class    (MonadReflexCreateTrigger)
-import           Reflex.Vty.Host
 import           Reflex.Vty.Widget
 import           Reflex.Vty.Widget.Input.Mouse
 
@@ -62,7 +58,7 @@ singleClick btn = do
     withinBounds (Drag2 (fromX, fromY) (toX, toY) _ _ _) = fromX == toX && fromY == toY
   dragEv <- drag2 btn
   didStayOnDyn <- foldDyn (const . withinBounds) False dragEv
-  return $ flip push dragEv $ \d@(Drag2 (fromX, fromY) (toX, toY) _ mods ds) -> do
+  return $ flip push dragEv $ \d@(Drag2 (fromX, fromY) _ _ mods ds) -> do
     didStayOn <- sample . current $ didStayOnDyn
     return $ if ds == DragEnd && withinBounds d
       then Just $ SingleClick btn (fromX, fromY) mods (not didStayOn)
@@ -80,7 +76,7 @@ integralFractionalDivide n d = fromIntegral n / fromIntegral d
 -- | A split of the available space into two parts with a draggable separator.
 -- Starts with half the space allocated to each, and the first pane has focus.
 -- Clicking in a pane switches focus.
-splitHDrag :: (Reflex t, MonadFix m, MonadHold t m, MonadNodeId m, HasDisplayRegion t m, HasInput t m, HasImageWriter t m, HasFocusReader t m)
+splitHDrag :: (Reflex t, MonadFix m, MonadHold t m, HasDisplayRegion t m, HasInput t m, HasImageWriter t m, HasFocusReader t m)
   => Int -- ^ initial width of left panel
   -> m ()
   -> m a

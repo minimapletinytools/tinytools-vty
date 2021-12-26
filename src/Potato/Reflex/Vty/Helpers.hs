@@ -49,24 +49,24 @@ type MonadWidget t m = (Reflex t, MonadHold t m, MonadFix m, NotReady t m, Adjus
 
 type MonadLayoutWidget t m = (MonadWidget t m, HasFocus t m, HasLayout t m)
 
-debugFocus :: (Reflex t, Monad m, HasFocusReader t m, HasDisplayRegion t m, HasImageWriter t m, HasTheme t m) => m ()
+debugFocus :: (HasFocusReader t m, HasDisplayRegion t m, HasImageWriter t m, HasTheme t m) => m ()
 debugFocus = do
   f <- focus
   text $ T.pack . show <$> current f
 
-debugInput :: (Reflex t, MonadHold t m, HasInput t m, HasDisplayRegion t m, HasImageWriter t m, HasTheme t m) => m ()
+debugInput :: (MonadHold t m, HasInput t m, HasDisplayRegion t m, HasImageWriter t m, HasTheme t m) => m ()
 debugInput = do
   lastEvent <- hold "No event yet" . fmap show =<< input
   text $ T.pack <$> lastEvent
 
-debugSize ::  (Reflex t, MonadHold t m, HasDisplayRegion t m, HasImageWriter t m, HasTheme t m) => m ()
+debugSize ::  (MonadHold t m, HasDisplayRegion t m, HasImageWriter t m, HasTheme t m) => m ()
 debugSize = do
   ldw <- displayWidth
   ldh <- displayHeight
   let combine w h = "w: " <> show w <> " h: " <> show h
   text $ liftA2 combine (current ldw) (current ldh)
 
-dragTest :: (Reflex t, MonadHold t m, MonadFix m, HasDisplayRegion t m, HasImageWriter t m, HasInput t m, HasTheme t m) => m ()
+dragTest :: (MonadHold t m, MonadFix m, HasDisplayRegion t m, HasImageWriter t m, HasInput t m, HasTheme t m) => m ()
 dragTest = do
   lastEvent <- hold "No event yet" . fmap show =<< drag V.BLeft
   text $ T.pack <$> lastEvent
@@ -78,12 +78,12 @@ fmapLabelShow :: (Functor f, Show a) => Text -> f a -> f Text
 fmapLabelShow t = fmap (\x -> t <> ": " <> show x)
 
 -- TODO rename to debugStreamEv
-debugStream :: (Reflex t, MonadHold t m, HasDisplayRegion t m, HasImageWriter t m, HasTheme t m) => [Event t Text] -> m ()
+debugStream :: (MonadHold t m, HasDisplayRegion t m, HasImageWriter t m, HasTheme t m) => [Event t Text] -> m ()
 debugStream evs = do
   t <- holdDyn "" $ mergeWith (\a b -> a <> "\n" <> b) evs
   richText richTextConfig_simpleForeColorAttr (current t)
 
-debugStreamBeh :: (Reflex t, MonadHold t m, HasDisplayRegion t m, HasImageWriter t m, HasTheme t m) => [Behavior t Text] -> m ()
+debugStreamBeh :: (MonadHold t m, HasDisplayRegion t m, HasImageWriter t m, HasTheme t m) => [Behavior t Text] -> m ()
 debugStreamBeh behs = text $ foldr (liftA2 (\t1 t2 -> t1 <> " " <> t2)) "" behs
 
 countEv :: (Reflex t, MonadHold t m, MonadFix m) => Event t a -> m (Dynamic t Int)
