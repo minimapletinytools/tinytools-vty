@@ -267,7 +267,7 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
 
   -- set the title
   let
-    setOpenFileStateEv = traceEvent "hi" $ updated $ ffor2 currentOpenFileDyn (_goatWidget_unsavedChanges everythingW) (,)
+    setOpenFileStateEv = updated $ ffor2 currentOpenFileDyn (_goatWidget_unsavedChanges everythingW) (,)
   performEvent_ $ ffor setOpenFileStateEv $ \(mfn, dirty) -> do
     -- this only seems to sometimes work 🤷🏼‍♀️
     liftIO $ hSetTitle stdout $ fromMaybe "<>" mfn <> (if dirty then "*" else "")
