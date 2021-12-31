@@ -399,4 +399,4 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
 
 
   -- handle escape event
-  return $ leftmost [_saveBeforeExitOutput_quit, void $ ffilter not doesNeedSaveOnExitEv]
+  return $ leftmost [_appKbCmd_forceQuit, _saveBeforeExitOutput_quit, void $ ffilter not doesNeedSaveOnExitEv]
