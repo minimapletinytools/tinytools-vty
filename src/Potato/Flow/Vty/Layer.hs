@@ -59,7 +59,7 @@ unlockedChar = 'a'
 expandChar :: Char
 expandChar = '»'
 closeChar :: Char
-closeChar = '«'
+closeChar = '⇊'
 
 {-# INLINE if' #-}
 if' :: Bool -> a -> a -> a
