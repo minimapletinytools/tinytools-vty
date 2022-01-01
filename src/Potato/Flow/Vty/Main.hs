@@ -272,6 +272,7 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
 
   let
     performSaveEv = attach (current $ _goatWidget_DEBUG_goatState everythingW) $ leftmost [saveAsEv, clickSaveEv]
+    saveSuccessEv = snd (fanEither finishSaveEv)
   finishSaveEv <- performEvent $ ffor performSaveEv $ \(gs,fn) -> liftIO $ do
     let
       spf = owlPFState_to_sPotatoFlow . _owlPFWorkspace_pFState . _goatState_workspace $ gs
@@ -300,7 +301,7 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
   AppKbCmd {..} <- captureInputEvents (That inputCapturedByPopupBeh) holdAppKbCmd
 
   -- setup PotatoConfig
-  currentOpenFileDyn <- holdDyn Nothing $ fmap Just $ leftmost [snd (fanEither finishSaveEv), fmap snd mLoadFileEv]
+  currentOpenFileDyn <- holdDyn Nothing $ fmap Just $ leftmost [saveSuccessEv, fmap snd mLoadFileEv]
   let
     potatoConfig = PotatoConfig {
         _potatoConfig_style = constant def
@@ -325,7 +326,7 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
         , _goatWidgetConfig_canvasSize = _paramsWidget_canvasSizeEvent (_leftWidget_paramsW leftW)
         , _goatWidgetConfig_newFolder = _layerWidget_newFolderEv (_leftWidget_layersW leftW)
         , _goatWidgetConfig_setPotatoDefaultParameters = _paramsWidget_setDefaultParamsEvent (_leftWidget_paramsW leftW)
-        , _goatWidgetConfig_markSaved = void performSaveEv
+        , _goatWidgetConfig_markSaved = void saveSuccessEv
 
         -- TODO
         --, _goatWidgetConfig_unicodeWidthFn =
