@@ -37,7 +37,7 @@ componentSub :: (Num a) => (a,a) -> (a,a) -> (a,a)
 componentSub (a,b) (c,d) = (a-c,b-d)
 
 onlyIfSimultaneous :: (Reflex t) => Event t a -> Event t b -> Event t a
-onlyIfSimultaneous eva evb = fforMaybe (align eva evb) $ \case 
+onlyIfSimultaneous eva evb = fforMaybe (align eva evb) $ \case
   These a _ -> Just a
   _ -> Nothing
 
@@ -62,7 +62,7 @@ vScrollBar handleStyleBeh contentSizeDyn = mdo
   --innerDragEv will only fire on drag events that started on the scroll bar handle portion
   innerDragEv <- pane boxRegionDyn (constDyn True) $ do
     -- render the scroll bar handle
-    fill (constant '#') 
+    fill (constant '#')
     drag2 V.BLeft
 
   d2ev <- drag2 V.BLeft
@@ -107,7 +107,7 @@ vScrollBar handleStyleBeh contentSizeDyn = mdo
   let
     offsetScreenUnitDyn = fmap round . liftA2 (*) screen_over_content_dyn $ offsetFloatDyn
 
-  return $ traceDyn "offset" $ fmap floor offsetFloatDyn
+  return $ fmap floor offsetFloatDyn
 
 
 {-

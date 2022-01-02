@@ -77,6 +77,10 @@ popupSaveAsWindow SaveAsWindowConfig {..} = do
 data SaveBeforeExitConfig t = SaveBeforeExitConfig {
   _saveBeforeExitConfig_exitWithChanges :: Event t ()
 }
+
+-- TODO make this generic, via some PopupManager thingy or what not
+-- you want to use the same NeedSave for close and open when there are unsaved changes
+-- and after the save action, you want to redirect back to the open or quit operation
 data SaveBeforeExitOutput t = SaveBeforeExitOutput {
 
   -- TODO you should be able to get this to work...
