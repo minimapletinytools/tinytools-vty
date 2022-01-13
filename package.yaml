@@ -110,7 +110,9 @@ executables:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
+    - +RTS -A128m -n2m -s -RTS
     - -j
+    - -O0
     dependencies:
     - potato-flow-vty
 
