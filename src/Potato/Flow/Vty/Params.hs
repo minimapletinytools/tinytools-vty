@@ -332,6 +332,11 @@ makeLineStyleTextEntry lsc mlsDyn = do
     Just ls0 -> updateFromLineStyle lsc ls0
   return . current $ ti
 
+
+presetLineStyles :: [(Text, Text, Text, Text)]
+presetLineStyles = [("<",">","v","^"), ("⇦","⇨","⇧","⇩")]
+
+
 -- | ignore _lineStyle_autoStyle part of LineStyle output
 holdLineStyleWidget :: forall t m. (MonadLayoutWidget t m, HasPotato t m) => ParamsWidgetFn t m LineStyle (Either ControllersWithId SetPotatoDefaultParameters)
 holdLineStyleWidget pdpDyn inputDyn = constDyn $ do

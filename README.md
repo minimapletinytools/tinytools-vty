@@ -1,8 +1,8 @@
-# potato-illustrator-vty
+# tinytools-vty
 
-`potato-illustrator` is a mono-space text flow-chart editor written in Haskell. It is currently a WIP and expect to have an ALPHA release by EOY.
+`tinytools-vty` is a mono-space text diagram editor written in Haskell. It is currently a WIP and expect to have an beta release SOON.
 
-This repository contains the vty based view implementation built on top of the [potato-illustrator](https://github.com/pdlla/potato-illustrator) model.
+This repository contains the vty based view implementation built on top of the [tiny-tools](https://github.com/pdlla/potato-illustrator) model.
 
 # runninng
 
