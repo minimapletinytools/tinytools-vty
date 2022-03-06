@@ -363,6 +363,7 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
   (keyboardEv, (leftW, canvasW)) <- flip runPotatoReader potatoConfig $
     captureInputEvents (These _appKbCmd_capturedInput inputCapturedByPopupBeh) $ do
       stuff <- splitHDrag 35 (fill (constant '*')) leftPanel rightPanel
+      -- left panel may capture inputs, rigth panel never captures inputs
       kb <- captureInputEvents (This (_paramsWidget_captureInputEv (_leftWidget_paramsW leftW))) $ do
         inp <- input
         return $ fforMaybe inp $ \case

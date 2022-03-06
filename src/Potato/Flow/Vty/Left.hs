@@ -55,7 +55,12 @@ holdLeftWidget :: forall t m. (MonadWidget t m, HasPotato t m)
   => LeftWidgetConfig t
   -> m (LeftWidget t)
 holdLeftWidget LeftWidgetConfig {..} = do
+
   widthDyn <- displayWidth
+  focusDyn <- focus
+  let
+    loseFocusEv = void $ ffilter (not . id) $ updated focusDyn
+
   initLayout $ col $ mdo
 
 
@@ -114,6 +119,7 @@ holdLeftWidget LeftWidgetConfig {..} = do
         , _paramsWidgetConfig_canvasDyn = _goatWidget_canvas _layersWidgetConfig_goatW
         , _paramsWidgetConfig_defaultParamsDyn = _goatWidget_potatoDefaultParameters _layersWidgetConfig_goatW
         , _paramsWidgetConfig_toolDyn = _goatWidget_tool _layersWidgetConfig_goatW
+        , _paramsWidgetConfig_loseFocusEv = loseFocusEv
       }
     return LeftWidget {
         _leftWidget_layersW = layers

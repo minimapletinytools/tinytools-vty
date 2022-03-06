@@ -42,6 +42,7 @@ $(declareStuff "ParamsNetwork"
             , _paramsWidgetConfig_canvasDyn = setCanvasDyn
             , _paramsWidgetConfig_defaultParamsDyn = constDyn def
             , _paramsWidgetConfig_toolDyn = constDyn Tool_Select
+            , _paramsWidgetConfig_loseFocusEv = never
           }
         return $ $(toutputcon "ParamsNetwork") paramsWidget
     |]

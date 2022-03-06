@@ -542,6 +542,8 @@ data ParamsWidgetConfig t = ParamsWidgetConfig {
   , _paramsWidgetConfig_canvasDyn :: Dynamic t SCanvas
   , _paramsWidgetConfig_defaultParamsDyn :: Dynamic t PotatoDefaultParameters
   , _paramsWidgetConfig_toolDyn :: Dynamic t Tool
+  -- many params don't set anything until they lose focus. However if we lose focus because we clicked onto another pane, that focus event doesn't propogate down far enough so we have to pass it down manually
+  , _paramsWidgetConfig_loseFocusEv :: Event t ()
 }
 
 data ParamsWidget t = ParamsWidget {
@@ -613,6 +615,7 @@ holdParamsWidget ParamsWidgetConfig {..} = do
     mCanvasSizeInputDyn = ffor2 toolDyn selectionDyn (\t s -> if isParliament_null s then Just (isParliament_empty, Nothing, t) else Nothing)
 
   (paramsOutputEv, captureEv, canvasSizeOutputEv, heightDyn) <- initManager_ $ do
+    requestFocus $ (Refocus_Clear <$ _paramsWidgetConfig_loseFocusEv)
     textAlignmentWidget <- holdMaybeParamsWidget defaultParamsDyn mTextAlignInputDyn holdTextAlignmentWidget
     superStyleWidget2 <- holdMaybeParamsWidget defaultParamsDyn mSuperStyleInputDyn holdSuperStyleWidget
     lineStyleWidget <- holdMaybeParamsWidget defaultParamsDyn mLineStyleInputDyn holdLineStyleWidget
