@@ -1,3 +1,7 @@
-# Changelog for potato-flow-vty
+# Changelog for tinytools-vty
 
-## Unreleased changes
+## [Unreleased]
+
+## [0.0.1] - alpha
+### Added
+- tinytools-vty just a test release
