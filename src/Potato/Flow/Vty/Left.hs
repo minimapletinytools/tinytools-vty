@@ -18,6 +18,7 @@ import           Potato.Flow.Vty.Layer
 import           Potato.Flow.Vty.Params
 import           Potato.Flow.Vty.PotatoReader
 import           Potato.Flow.Vty.Tools
+import           Potato.Flow.Vty.ToolOptions
 import Potato.Flow.Vty.Common
 import           Potato.Reflex.Vty.Helpers
 import qualified Data.Text.IO as T
@@ -95,6 +96,12 @@ holdLeftWidget LeftWidgetConfig {..} = do
     tools <- (grout . fixed) (_toolWidget_heightDyn tools) $ holdToolsWidget $  ToolWidgetConfig {
         _toolWidgetConfig_tool =  _goatWidget_tool _layersWidgetConfig_goatW
         , _toolWidgetConfig_widthDyn = widthDyn
+      }
+
+    -- doesn't do anything right now, just a stub
+    toolOptions <- (grout . fixed) (_toolOptionsWidget_heightDyn toolOptions) $ holdToolOptionsWidget $ ToolOptionsWidgetConfig {
+        _toolOptionsWidgetConfig_tool =  _goatWidget_tool _layersWidgetConfig_goatW
+        , _toolOptionsWidgetConfig_widthDyn = widthDyn
       }
 
     hdivider
