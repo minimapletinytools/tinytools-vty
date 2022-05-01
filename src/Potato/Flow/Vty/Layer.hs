@@ -107,7 +107,7 @@ layerContents LayerWidgetConfig {..} scrollDyn = do
         ident = layerEntry_depth lentry
         sowl = _layerEntry_superOwl
         rid = _superOwl_id sowl
-        label = hasOwlElt_name sowl
+        label = hasOwlItem_name sowl
 
         attr = case selected of
           LHRESS_Selected -> _potatoStyle_selected
