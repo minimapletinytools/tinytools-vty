@@ -244,6 +244,7 @@ holdSuperStyleWidget pdpDyn inputDyn = constDyn $ mdo
         return (focusDyn',tl'',v'',bl'',h'',f'',tr'',br'')
       captureEv1 <- makeCaptureFromUpdateTextZipperMethod updateTextZipperForSingleCharacter
 
+      focusDynUnique <- holdUniqDyn focusDyn
 
       let
         fmapfn ss sowl = case getSEltLabelSuperStyle (superOwl_toSEltLabel_hack sowl) of
@@ -254,11 +255,11 @@ holdSuperStyleWidget pdpDyn inputDyn = constDyn $ mdo
         fforfn (SuperOwlParliament selection, ss) = case Data.Maybe.mapMaybe (fmapfn ss) . toList $ selection of
           [] -> Nothing
           x  -> Just $ IM.fromList x
-        outputEv = fforMaybe (attach (current selectionDyn) $ makeSuperStyleEvent tl v bl h f tr br (void $ updated focusDyn)) fforfn
+        outputEv = fforMaybe (attach (current selectionDyn) $ makeSuperStyleEvent tl v bl h f tr br (void $ updated focusDynUnique)) fforfn
 
         -- TODO maybe just do it when any of the cell dynamics are updated rather than when focus changes...
         -- TODO if we do it on focus change, you don't want to set when escape is pressed... so maybe it's better just to do 🖕
-        setStyleEv' = makeSuperStyleEvent tl v bl h f tr br (void $ updated focusDyn)
+        setStyleEv' = makeSuperStyleEvent tl v bl h f tr br (void $ updated focusDynUnique)
         captureEv' = leftmost [void setStyleEv', captureEv1]
       return (4, captureEv', setStyleEv')
 
@@ -368,6 +369,7 @@ holdLineStyleWidget pdpDyn inputDyn = constDyn $ do
     return (focusDyn',l_d1,r_d1,u_d1,d_d1)
 
   captureEv <- makeCaptureFromUpdateTextZipperMethod updateTextZipperForSingleCharacter
+  focusDynUnique <- holdUniqDyn focusDyn
 
   let
     selectionDyn = fmap fst3 inputDyn
@@ -389,7 +391,7 @@ holdLineStyleWidget pdpDyn inputDyn = constDyn $ do
         else case Data.Maybe.mapMaybe fmapfn . toList $ selection of
           [] -> Nothing
           x  -> Just . Left $ IM.fromList x
-    setStyleEv = makeLineStyleEvent l r u d (void $ updated focusDyn)
+    setStyleEv = makeLineStyleEvent l r u d (void $ updated focusDynUnique)
     ssparamsEv = push pushLineStyleFn setStyleEv
 
 
@@ -517,8 +519,9 @@ holdCanvasSizeWidget canvasDyn _ nothingDyn = ffor nothingDyn $ \_ -> do
       (tile . stretch) 1 $ dimensionInput cHeightDyn
     focusDyn' <- focusedId
     return (focusDyn',wDyn',hDyn')
+  focusDynUnique <- holdUniqDyn focusDyn
   let
-    outputEv = flip push (void $ updated focusDyn) $ \_ -> do
+    outputEv = flip push (void $ updated focusDynUnique) $ \_ -> do
       cw <- sample . current $ cWidthDyn
       ch <- sample . current $ cHeightDyn
       w <- sample . current $ wDyn
