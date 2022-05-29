@@ -118,15 +118,15 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
     -- reg is in screen space so we need to translate back to canvas space by undoing the pan
     renderRegionFn pan reg rc = renderedCanvasRegionToText (pan_lBox (-pan) (region_to_lBox reg)) rc
 
-    renderRegion dreg = pane dreg (constDyn False) $ do
-      text . current . ffor3 _canvasWidgetConfig_pan dreg _canvasWidgetConfig_renderedCanvas $ renderRegionFn
-
-
     -- same as renderRegionFn
     debugRenderRegionFn pan reg rc = r where
       txt = renderedCanvasRegionToText (pan_lBox (-pan) (region_to_lBox reg)) rc
       --r = trace (T.unpack txt) txt
       r = txt
+
+    renderRegion dreg = pane dreg (constDyn False) $ do
+      text . current . ffor3 _canvasWidgetConfig_pan dreg _canvasWidgetConfig_renderedCanvas $ renderRegionFn
+
 
   -- 1. render out of bounds region
   -- TODO use correct theme
@@ -144,18 +144,14 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
     textNoRenderSpaces . current . ffor3 _canvasWidgetConfig_pan screenRegion _canvasWidgetConfig_renderedSelection $ debugRenderRegionFn
     return ()
 
-
-
-
-
+  -- 4. render the handlers
   let
-    makerhimage attr' (LBox (V2 px py) _) rh = r where
+    makerhimage attr' (V2 px py) rh = r where
       LBox (V2 x y) (V2 w h) = _renderHandle_box rh
       rc = fromMaybe ' ' $ _renderHandle_char rh
       attr = attr' -- TODO eventually RenderHandle may be styled somehow
       r = V.translate (x+px) (y+py) $ V.charFill attr rc w h
-
-  tellImages $ ffor3 (current _canvasWidgetConfig_handles) (fmap _potatoStyle_makeCanvasManipulator potatostylebeh) (current trueRegion')
+  tellImages $ ffor3 (current _canvasWidgetConfig_handles) (fmap _potatoStyle_makeCanvasManipulator potatostylebeh) (current _canvasWidgetConfig_pan)
     $ \(HandlerRenderOutput hs) attrfn reg -> fmap (\rh -> makerhimage (attrfn (_renderHandle_color rh)) reg rh) hs
 
   inp <- makeLMouseDataInputEv (constDyn (0,0)) False
