@@ -79,7 +79,6 @@ holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
   mscroll <- mouseScroll
   let
     requestedScroll :: Event t Int
-    --requestedScroll = traceEvent "boop" $ leftmost
     requestedScroll = leftmost
       [ 1 <$ kdown
       , (-1) <$ kup

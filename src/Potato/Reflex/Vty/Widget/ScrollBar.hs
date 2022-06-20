@@ -100,7 +100,6 @@ vScrollBar handleStyleBeh contentSizeDyn = mdo
 
   -- then put it all together
   let
-    --foldOffsetFn (maxdiff, delta) c = trace (show c <> " " <> show delta <> " " <> show maxdiff) $ max 0 (min maxdiff (c+delta))
     foldOffsetFn (maxdiff, delta) c = max 0 (min maxdiff (c+delta))
   offsetFloatDyn <- foldDyn foldOffsetFn 0 (attach (current maxContentSizeDiffDyn) (leftmost [dragDeltaAdjustedEv, requestedScroll]))
 

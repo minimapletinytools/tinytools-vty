@@ -47,7 +47,6 @@ textNoRenderSpaces t = do
             -- first character case
             [] -> (0, [([c], 0)])
     makeimages th =
-      -- (\x -> traceShow (length x) x) .
       join
       . L.imap (\i -> fmap (V.translateY i)) -- for each line, offset the image vertically
       . fmap (fmap (\(txt,offset) -> V.translateX offset $  V.string th (reverse txt))) -- for each chunk and offset, convert to image
