@@ -45,6 +45,9 @@ import           Reflex.Vty
 deriving instance Show FocusId
 
 
+listForMi :: (Monad m) => [a] -> ((a, Int) -> m b) -> m [b]
+listForMi x f = forM (zip x [0..]) f
+
 paramsNavigation :: (MonadWidget t m) => m (Event t Int)
 paramsNavigation = do
   tabEv <- key (V.KChar '\t')
@@ -210,9 +213,9 @@ holdSuperStyleWidget pdpDyn inputDyn = constDyn $ mdo
     1 -> do
       setStyleEv' <- initLayout $ col $ do
         (grout . fixed) 1 emptyWidget -- just to make a space
-        presetClicks <- forM presetSuperStyles $ \s -> (grout . fixed) 1 $ row $ (grout . stretch) 1 $ do
+        presetClicks <- listForMi presetSuperStyles $ \(s,i) -> (grout . fixed) 1 $ row $ (grout . stretch) 1 $ do
           -- TODO highlight if style matches selection
-          text (constant (T.pack s))
+          text (show i <> ". " <> constant (T.pack s))
           fmap (fmap (\_ -> s)) (mouseDown V.BLeft)
         return $ fmap superStyle_fromListFormat (leftmost presetClicks)
       return (5, never, setStyleEv')
@@ -325,7 +328,7 @@ makeLineStyleTextEntry lsc mlsDyn = do
 
 
 presetLineStyles :: [([Char], [Char], [Char], [Char])]
-presetLineStyles = [("<",">","v","^"), ("⇦","⇨","⇧","⇩")]
+presetLineStyles = [("","","",""), ("<",">","v","^"), ("⇦","⇨","⇧","⇩")]
 
 presetLineStyle_toText :: ([Char], [Char], [Char], [Char]) -> Text
 presetLineStyle_toText (l,r,u,d) = T.pack $ l <> " " <> r <> " " <> u <> " " <> d
@@ -338,63 +341,60 @@ presetLineStyle_toText (l,r,u,d) = T.pack $ l <> " " <> r <> " " <> u <> " " <> 
 holdLineStyleWidgetNew :: forall t m. (MonadLayoutWidget t m, HasPotato t m) => ParamsWidgetFn t m LineStyle (Either ControllersWithId SetPotatoDefaultParameters)
 holdLineStyleWidgetNew pdpDyn inputDyn = constDyn $ do
 
-  -- TODO need grid (probably with labels too)
-  -- TODO ideally layout through the networkView below...
+  setStyleEvEv <- initLayout $ col $ do
+    (grout . fixed) 1 $ text "line style:"
+    -- TODO in the future, we'd like to be able to disable line ends more easily (without going into presets)
+    -- i.e. [x] start | [x] end
+    -- alternatively, consider combining with super sytyle
+    endChoiceDyn <- (grout . fixed) 1 $ radioListSimple 0 ["start", "end"]
+    typeChoiceDyn <- (grout . fixed) 1 $ radioListSimple 0 ["custom", "presets"]
 
-  -- TODO in the future, we'd like to be able to disable line ends more easily (without going into presets)
-  -- i.e. [x] start | [x] end
-  endChoiceDyn <- radioListSimple 0 ["start", "end"]
+    networkView $ ffor typeChoiceDyn $ \case
+      1 -> do
+        setStyleEv' <- do
+          presetClicks <- listForMi presetLineStyles $ \(s, i) -> (grout . fixed) 1 $ row $ (grout . stretch) 1 $ do
+            -- TODO highlight if style matches selection
+            text (constant (show i <> ". " <> presetLineStyle_toText s))
+            fmap (fmap (\_ -> s)) (mouseDown V.BLeft)
+          return $ fmap lineStyle_fromListFormat (leftmost presetClicks)
+        return (5, never, setStyleEv')
+      0 -> do
+        let
+          lssDyn = fmap snd3 inputDyn
 
-  typeChoiceDyn <- radioListSimple 0 ["custom", "presets"]
-
-  setStyleEvEv <- networkView $ ffor typeChoiceDyn $ \case
-    1 -> do
-      setStyleEv' <- initLayout $ col $ do
-        (grout . fixed) 1 emptyWidget
-        presetClicks <- forM presetLineStyles $ \s -> (grout . fixed) 1 $ row $ (grout . stretch) 1 $ do
-          -- TODO highlight if style matches selection
-          text (constant (presetLineStyle_toText s))
-          fmap (fmap (\_ -> s)) (mouseDown V.BLeft)
-        return $ fmap lineStyle_fromListFormat (leftmost presetClicks)
-      return (5, never, setStyleEv')
-    0 -> do
-      let
-        lssDyn = fmap snd3 inputDyn
-
-      noRepeatNavigation
-      (focusDyn,l,r,u,d) <-  col $ do
-        (grout . fixed) 1 emptyWidget -- just to make a space
-        --(tile . fixed) 1 $ text (fmap (T.pack . superStyle_toListFormat . Data.Maybe.fromJust) $ current mssDyn)
-        l_d1 <- (grout . fixed) 1 $ row $ do
-          (grout . fixed) 8 $ text " left:"
-          (tile . stretch) 1 $ makeLineStyleTextEntry LSC_L lssDyn
-        r_d1 <- (grout . fixed) 1 $ row $ do
-          (grout . fixed) 8 $ text "right:"
-          (tile . stretch) 1 $ makeLineStyleTextEntry LSC_R lssDyn
-        (u_d1, d_d1) <- (grout . fixed) 3 $ row $ (grout . stretch) 1 $ do
-          col $ (grout . fixed) 3 $ text "up:"
-          u_d2 <- col $ (tile . fixed) 1 $ makeLineStyleTextEntry LSC_U lssDyn
-          col $ (grout . fixed) 5 $ text "down:"
-          d_d2 <- col $ (tile . fixed) 1 $ makeLineStyleTextEntry LSC_D lssDyn
+        noRepeatNavigation
+        (focusDyn,l,r,u,d) <- do
+          --(tile . fixed) 1 $ text (fmap (T.pack . superStyle_toListFormat . Data.Maybe.fromJust) $ current mssDyn)
+          l_d1 <- (grout . fixed) 1 $ row $ do
+            (grout . fixed) 8 $ text " left:"
+            (tile . stretch) 1 $ makeLineStyleTextEntry LSC_L lssDyn
+          r_d1 <- (grout . fixed) 1 $ row $ do
+            (grout . fixed) 8 $ text "right:"
+            (tile . stretch) 1 $ makeLineStyleTextEntry LSC_R lssDyn
+          (u_d1, d_d1) <- (grout . fixed) 3 $ row $ (grout . stretch) 1 $ do
+            col $ (grout . fixed) 3 $ text "up:"
+            u_d2 <- col $ (tile . fixed) 1 $ makeLineStyleTextEntry LSC_U lssDyn
+            col $ (grout . fixed) 5 $ text "down:"
+            d_d2 <- col $ (tile . fixed) 1 $ makeLineStyleTextEntry LSC_D lssDyn
+            -- pad the end
+            (tile . stretch) 0 $ return ()
+            return (u_d2, d_d2)
           -- pad the end
           (tile . stretch) 0 $ return ()
-          return (u_d2, d_d2)
-        -- pad the end
-        (tile . stretch) 0 $ return ()
-        focusDyn' <- focusedId
-        return (focusDyn',l_d1,r_d1,u_d1,d_d1)
+          focusDyn' <- focusedId
+          return (focusDyn',l_d1,r_d1,u_d1,d_d1)
 
-      captureEv'' <- makeCaptureFromUpdateTextZipperMethod updateTextZipperForSingleCharacter
-      focusDynUnique <- holdUniqDyn focusDyn
+        captureEv'' <- makeCaptureFromUpdateTextZipperMethod updateTextZipperForSingleCharacter
+        focusDynUnique <- holdUniqDyn focusDyn
 
-      -- TODO needs more stuff here
+        -- TODO needs more stuff here
 
-      let
-        -- TODO maybe just do it when any of the cell dynamics are updated rather than when focus changes...
-        -- TODO if we do it on focus change, you don't want to set when escape is pressed... so maybe it's better just to do 🖕
-        setStyleEv' = makeLineStyleEvent l r u d (void $ updated focusDynUnique)
-        captureEv' = leftmost [void setStyleEv', captureEv'']
-      return (6, captureEv', setStyleEv')
+        let
+          -- TODO maybe just do it when any of the cell dynamics are updated rather than when focus changes...
+          -- TODO if we do it on focus change, you don't want to set when escape is pressed... so maybe it's better just to do 🖕
+          setStyleEv' = makeLineStyleEvent l r u d (void $ updated focusDynUnique)
+          captureEv' = leftmost [void setStyleEv', captureEv'']
+        return (6, captureEv', setStyleEv')
 
   setStyleEv <- switchHold never (fmap thd3 setStyleEvEv)
   captureEv <- switchHold never (fmap snd3 setStyleEvEv)
