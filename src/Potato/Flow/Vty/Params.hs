@@ -338,6 +338,9 @@ presetLineStyle_toText (l,r,u,d) = T.pack $ l <> " " <> r <> " " <> u <> " " <> 
 holdLineStyleWidgetNew :: forall t m. (MonadLayoutWidget t m, HasPotato t m) => ParamsWidgetFn t m LineStyle (Either ControllersWithId SetPotatoDefaultParameters)
 holdLineStyleWidgetNew pdpDyn inputDyn = constDyn $ do
 
+  -- TODO need grid (probably with labels too)
+  -- TODO ideally layout through the networkView below...
+
   -- TODO in the future, we'd like to be able to disable line ends more easily (without going into presets)
   -- i.e. [x] start | [x] end
   endChoiceDyn <- radioListSimple 0 ["start", "end"]
@@ -347,7 +350,7 @@ holdLineStyleWidgetNew pdpDyn inputDyn = constDyn $ do
   setStyleEvEv <- networkView $ ffor typeChoiceDyn $ \case
     1 -> do
       setStyleEv' <- initLayout $ col $ do
-        (grout . fixed) 1 emptyWidget -- just to make a space
+        (grout . fixed) 1 emptyWidget
         presetClicks <- forM presetLineStyles $ \s -> (grout . fixed) 1 $ row $ (grout . stretch) 1 $ do
           -- TODO highlight if style matches selection
           text (constant (presetLineStyle_toText s))
@@ -420,67 +423,6 @@ holdLineStyleWidgetNew pdpDyn inputDyn = constDyn $ do
     ssparamsEv = push pushLineStyleFn setStyleEv
 
   return (constDyn 6, captureEv, ssparamsEv)
-
--- TODO DELETE replace with holdLineStyleWidgetNew (when it's ready)
--- | ignore _lineStyle_autoStyle part of LineStyle output
-holdLineStyleWidget :: forall t m. (MonadLayoutWidget t m, HasPotato t m) => ParamsWidgetFn t m LineStyle (Either ControllersWithId SetPotatoDefaultParameters)
-holdLineStyleWidget pdpDyn inputDyn = constDyn $ do
-
-  let
-    lssDyn = fmap snd3 inputDyn
-
-  noRepeatNavigation
-  (focusDyn,l,r,u,d) <-  col $ do
-    (grout . fixed) 1 emptyWidget -- just to make a space
-    --(tile . fixed) 1 $ text (fmap (T.pack . superStyle_toListFormat . Data.Maybe.fromJust) $ current mssDyn)
-    l_d1 <- (grout . fixed) 1 $ row $ do
-      (grout . fixed) 8 $ text " left:"
-      (tile . stretch) 1 $ makeLineStyleTextEntry LSC_L lssDyn
-    r_d1 <- (grout . fixed) 1 $ row $ do
-      (grout . fixed) 8 $ text "right:"
-      (tile . stretch) 1 $ makeLineStyleTextEntry LSC_R lssDyn
-    (u_d1, d_d1) <- (grout . fixed) 3 $ row $ (grout . stretch) 1 $ do
-      col $ (grout . fixed) 3 $ text "up:"
-      u_d2 <- col $ (tile . fixed) 1 $ makeLineStyleTextEntry LSC_U lssDyn
-      col $ (grout . fixed) 5 $ text "down:"
-      d_d2 <- col $ (tile . fixed) 1 $ makeLineStyleTextEntry LSC_D lssDyn
-      -- pad the end
-      (tile . stretch) 0 $ return ()
-      return (u_d2, d_d2)
-    -- pad the end
-    (tile . stretch) 0 $ return ()
-    focusDyn' <- focusedId
-    return (focusDyn',l_d1,r_d1,u_d1,d_d1)
-
-  captureEv <- makeCaptureFromUpdateTextZipperMethod updateTextZipperForSingleCharacter
-  focusDynUnique <- holdUniqDyn focusDyn
-
-  let
-    selectionDyn = fmap fst3 inputDyn
-    pushLineStyleFn :: LineStyle -> PushM t (Maybe (Either ControllersWithId SetPotatoDefaultParameters))
-    pushLineStyleFn ss = do
-      pdp <- sample . current $ pdpDyn
-      (SuperOwlParliament selection, _, tool) <- sample . current $ inputDyn
-      let
-        overrideAutoStyle oldss newss = newss { _lineStyle_autoStyle = _lineStyle_autoStyle oldss }
-        fmapfn sowl = case getSEltLabelLineStyle (superOwl_toSEltLabel_hack sowl) of
-          Nothing -> Nothing
-          Just oldss -> if oldss == overrideAutoStyle oldss ss
-            then Nothing
-            else Just (_superOwl_id sowl, CTagLineStyle :=> Identity (CLineStyle (DeltaLineStyle (oldss, overrideAutoStyle oldss ss))))
-      return $ if toolOverrideLineStyle tool
-        then if _potatoDefaultParameters_lineStyle pdp == ss
-          then Nothing
-          else Just . Right $ def { _setPotatoDefaultParameters_lineStyle = Just ss }
-        else case Data.Maybe.mapMaybe fmapfn . toList $ selection of
-          [] -> Nothing
-          x  -> Just . Left $ IM.fromList x
-    setStyleEv = makeLineStyleEvent l r u d (void $ updated focusDynUnique)
-    ssparamsEv = push pushLineStyleFn setStyleEv
-
-
-  return (constDyn 6, captureEv, ssparamsEv)
-
 
 
 -- Text Alignment stuff
@@ -705,7 +647,6 @@ holdParamsWidget ParamsWidgetConfig {..} = do
     requestFocus $ (Refocus_Clear <$ _paramsWidgetConfig_loseFocusEv)
     textAlignmentWidget <- holdMaybeParamsWidget defaultParamsDyn mTextAlignInputDyn holdTextAlignmentWidget
     superStyleWidget2 <- holdMaybeParamsWidget defaultParamsDyn mSuperStyleInputDyn holdSuperStyleWidget
-    --lineStyleWidget <- holdMaybeParamsWidget defaultParamsDyn mLineStyleInputDyn holdLineStyleWidget
     lineStyleWidget <- holdMaybeParamsWidget defaultParamsDyn mLineStyleInputDyn holdLineStyleWidgetNew
     sBoxTypeWidget <- holdMaybeParamsWidget defaultParamsDyn mSBoxTypeInputDyn holdSBoxTypeWidget
     canvasSizeWidget <- holdMaybeParamsWidget defaultParamsDyn mCanvasSizeInputDyn (holdCanvasSizeWidget canvasDyn)
