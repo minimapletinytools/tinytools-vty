@@ -248,18 +248,6 @@ holdSuperStyleWidget pdpDyn inputDyn = constDyn $ mdo
       focusDynUnique <- holdUniqDyn focusDyn
 
       let
-        -- TODO DELETE??? I don't think this is being used at all
-        fmapfn ss sowl = case getSEltLabelSuperStyle (superOwl_toSEltLabel_hack sowl) of
-          Nothing -> Nothing
-          Just oldss -> if oldss == ss
-            then Nothing
-            else Just (_superOwl_id sowl, CTagSuperStyle :=> Identity (CSuperStyle (DeltaSuperStyle (oldss, ss))))
-        fforfn (SuperOwlParliament selection, ss) = case Data.Maybe.mapMaybe (fmapfn ss) . toList $ selection of
-          [] -> Nothing
-          x  -> Just $ IM.fromList x
-        outputEv = fforMaybe (attach (current selectionDyn) $ makeSuperStyleEvent tl v bl h f tr br (void $ updated focusDynUnique)) fforfn
-        -- TODO DELETE??? I don't think this is being used at all
-
         -- TODO maybe just do it when any of the cell dynamics are updated rather than when focus changes...
         -- TODO if we do it on focus change, you don't want to set when escape is pressed... so maybe it's better just to do 🖕
         setStyleEv' = makeSuperStyleEvent tl v bl h f tr br (void $ updated focusDynUnique)
