@@ -202,6 +202,7 @@ makeSuperStyleEvent tl v bl h f tr br trig = pushAlways pushfn trig where
         , _superStyle_fill       = FillStyle_Simple f'
       }
 
+-- TODO move to SELts.hs
 presetSuperStyles :: [[Char]]
 presetSuperStyles = ["╔╗╚╝║═ ","****|- ", "██████ ", "┌┐└┘│─ "]
 
@@ -328,8 +329,9 @@ makeLineStyleTextEntry lsc mlsDyn = do
   return . current $ ti
 
 
+-- TODO move to SELts.hs
 presetLineStyles :: [([Char], [Char], [Char], [Char])]
-presetLineStyles = [("","","",""), ("<",">","v","^"), ("⇦","⇨","⇧","⇩")]
+presetLineStyles = [("","","",""), ("<",">","^","v"), ("⇦","⇨","⇧","⇩")]
 
 presetLineStyle_toText :: ([Char], [Char], [Char], [Char]) -> Text
 presetLineStyle_toText (l,r,u,d) = T.pack $ l <> " " <> r <> " " <> u <> " " <> d
