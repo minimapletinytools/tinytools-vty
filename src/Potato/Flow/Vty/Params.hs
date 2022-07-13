@@ -15,6 +15,7 @@ module Potato.Flow.Vty.Params (
 import           Relude
 
 import           Potato.Flow
+import Potato.Flow.OwlHelpers
 import           Potato.Flow.Vty.Common
 import           Potato.Reflex.Vty.Helpers
 import Potato.Flow.Vty.PotatoReader
@@ -407,12 +408,16 @@ holdLineStyleWidgetNew pdpDyn inputDyn = constDyn $ do
       pdp <- sample . current $ pdpDyn
       (SuperOwlParliament selection, _, tool) <- sample . current $ inputDyn
       let
+        -- DELETE this helper after deleting autostyle
         overrideAutoStyle oldss newss = newss { _lineStyle_autoStyle = _lineStyle_autoStyle oldss }
+        -- TODO start/end style stuff
         fmapfn sowl = case getSEltLabelLineStyle (superOwl_toSEltLabel_hack sowl) of
           Nothing -> Nothing
           Just oldss -> if oldss == overrideAutoStyle oldss ss
             then Nothing
             else Just (_superOwl_id sowl, CTagLineStyle :=> Identity (CLineStyle (DeltaLineStyle (oldss, overrideAutoStyle oldss ss))))
+            -- TODO use this, you need to pipe it out first though
+            --where llama = makeLlamaForLineStyle sowl SetLineStyleEnd_Both ss
       return $ if toolOverrideLineStyle tool
         then if _potatoDefaultParameters_lineStyle pdp == ss
           then Nothing
