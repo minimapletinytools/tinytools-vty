@@ -338,7 +338,6 @@ presetLineStyle_toText (l,r,u,d) = T.pack $ l <> " " <> r <> " " <> u <> " " <> 
 -- [x] start | [x] end    (the one being modified is highlighted)
 -- custom | preset
 -- ....
--- | ignore _lineStyle_autoStyle part of LineStyle output
 holdLineStyleWidgetNew :: forall t m. (MonadLayoutWidget t m, HasPotato t m) => ParamsWidgetFn t m LineStyle (Either ControllersWithId SetPotatoDefaultParameters)
 holdLineStyleWidgetNew pdpDyn inputDyn = constDyn $ do
 
@@ -408,14 +407,12 @@ holdLineStyleWidgetNew pdpDyn inputDyn = constDyn $ do
       pdp <- sample . current $ pdpDyn
       (SuperOwlParliament selection, _, tool) <- sample . current $ inputDyn
       let
-        -- DELETE this helper after deleting autostyle
-        overrideAutoStyle oldss newss = newss { _lineStyle_autoStyle = _lineStyle_autoStyle oldss }
         -- TODO start/end style stuff
         fmapfn sowl = case getSEltLabelLineStyle (superOwl_toSEltLabel_hack sowl) of
           Nothing -> Nothing
-          Just oldss -> if oldss == overrideAutoStyle oldss ss
+          Just oldss -> if oldss == ss
             then Nothing
-            else Just (_superOwl_id sowl, CTagLineStyle :=> Identity (CLineStyle (DeltaLineStyle (oldss, overrideAutoStyle oldss ss))))
+            else Just (_superOwl_id sowl, CTagLineStyle :=> Identity (CLineStyle (DeltaLineStyle (oldss, ss))))
             -- TODO use this, you need to pipe it out first though
             --where llama = makeLlamaForLineStyle sowl SetLineStyleEnd_Both ss
       return $ if toolOverrideLineStyle tool
