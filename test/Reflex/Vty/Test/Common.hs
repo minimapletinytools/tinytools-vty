@@ -48,8 +48,8 @@ checkSingleMaybe values a = case nonEmpty values of
   Nothing -> assertFailure "empty list"
   Just x  -> Just a @=? head x
 
-checkNothing :: (Eq a, Show a) => [Maybe a] -> Assertion
+checkNothing :: (Show a) => [Maybe a] -> Assertion
 checkNothing values = case nonEmpty values of
   Nothing -> assertFailure "empty list"
   -- TODO prob check that all elts in list are Nothing
-  Just x  -> Nothing @=? head x
+  Just x  -> True @=? isNothing (head x)
