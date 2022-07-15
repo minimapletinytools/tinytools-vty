@@ -289,7 +289,7 @@ holdSuperStyleWidget pdpDyn inputDyn = constDyn $ mdo
           [] -> Nothing
           x  -> Just . Left . controllersWithId_to_llama $ IM.fromList x
     ssparamsEv = push pushSuperStyleFn setStyleEv
-  return (ffor heightDyn (+1), captureEv, ssparamsEv)
+  return (heightDyn, captureEv, ssparamsEv)
 
 data LineStyleCell = LSC_L | LSC_R | LSC_U | LSC_D
 
@@ -392,8 +392,6 @@ holdLineStyleWidgetNew pdpDyn inputDyn = constDyn $ do
 
         captureEv'' <- makeCaptureFromUpdateTextZipperMethod updateTextZipperForSingleCharacter
         focusDynUnique <- holdUniqDyn focusDyn
-
-        -- TODO needs more stuff here
 
         let
           -- TODO maybe just do it when any of the cell dynamics are updated rather than when focus changes...
@@ -673,6 +671,7 @@ holdParamsWidget ParamsWidgetConfig {..} = do
           return (cssz', cssev', csCaptureEv')
       let
         heightDyn'' = liftA2 (+) cssz $ foldr (liftA2 (+)) 0 $ fmap fst3 outputs
+      -- multiple capture events will fire at once due to the way makeCaptureFromUpdateTextZipperMethod is scoped
       return $ (leftmostWarn "paramsLayout" (fmap snd3 outputs), leftmostWarn "paramsCapture" (captureEv2 : fmap thd3 outputs), cssev, heightDyn'')
 
     heightDyn' <- joinHold (fmap fth4 paramsNetwork) 0
