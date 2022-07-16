@@ -61,9 +61,8 @@ paramsNavigation = do
   back <- fmap (const (-1)) <$> key V.KBackTab
   return $ leftmost [fwd, back]
 
--- TODO figure out how to do norepeat, also why does this norepeat actually not repeat for super style widget?
-noRepeatNavigation :: (MonadWidget t m, HasFocus t m) => m ()
-noRepeatNavigation = do
+repeatNavigation :: (MonadWidget t m, HasFocus t m) => m ()
+repeatNavigation = do
   navEv <- paramsNavigation
   requestFocus $ Refocus_Shift <$> navEv
 
@@ -213,9 +212,7 @@ presetSuperStyles = ["╔╗╚╝║═ ","****|- ", "██████ ", "�
 holdSuperStyleWidget :: forall t m. (MonadLayoutWidget t m, HasPotato t m) => ParamsWidgetFn t m SuperStyle (Either Llama SetPotatoDefaultParameters)
 holdSuperStyleWidget pdpDyn inputDyn = constDyn $ mdo
 
-  -- TODO DELETE NOT NECESSARY
-  initLayout $ col $ do
-
+  do
     (grout . fixed) 1 $ text "style:"
     typeChoiceDyn <- (grout . stretch) 1 $ radioListSimple 0 ["custom", "presets"]
 
@@ -233,9 +230,7 @@ holdSuperStyleWidget pdpDyn inputDyn = constDyn $ mdo
         -- TODO also a toggle for setting corners to common sets
         let
           mssDyn = fmap snd3 inputDyn
-        -- TODO arrow nav would be super cool (maybe not possible with the way we scoped the layout manager)
-        -- TODO DELETE this should at the holdParamsWidget level
-        noRepeatNavigation
+
         (focusDyn,tl,v,bl,h,f,tr,br) <- do
           --(tile . fixed) 1 $ text (fmap (T.pack . superStyle_toListFormat . Data.Maybe.fromJust) $ current mssDyn)
           (tl'',h'',tr'') <- (grout . fixed) 1 $ row $ do
@@ -348,91 +343,87 @@ presetLineStyle_toText (l,r,u,d) = T.pack $ l <> " " <> r <> " " <> u <> " " <> 
 holdLineStyleWidgetNew :: forall t m. (MonadLayoutWidget t m, HasPotato t m) => ParamsWidgetFn t m LineStyle (Either Llama SetPotatoDefaultParameters)
 holdLineStyleWidgetNew pdpDyn inputDyn = constDyn $ do
 
-  -- TODO DELETE not necessary
-  initLayout $ col $ do
-    (grout . fixed) 1 $ text "line end style:"
-    -- TODO in the future, we'd like to be able to disable line ends more easily (without going into presets)
-    -- i.e. [x] start | [x] end
-    -- alternatively, consider combining with super sytyle
-    -- TODO should be way to select both start and end
-    --endChoiceDyn <- (grout . fixed) 1 $ radioListSimple 0 ["start", "end"]
-    typeChoiceDyn <- (grout . stretch) 1 $ radioListSimple 0 ["custom", "presets"]
+  (grout . fixed) 1 $ text "line end style:"
+  -- TODO in the future, we'd like to be able to disable line ends more easily (without going into presets)
+  -- i.e. [x] start | [x] end
+  -- alternatively, consider combining with super sytyle
+  -- TODO should be way to select both start and end
+  --endChoiceDyn <- (grout . fixed) 1 $ radioListSimple 0 ["start", "end"]
+  typeChoiceDyn <- (grout . stretch) 1 $ radioListSimple 0 ["custom", "presets"]
 
-    setStyleEvEv <- do
-      networkView $ ffor typeChoiceDyn $ \case
-        1 -> do
-          setStyleEv' <- do
-            presetClicks <- listForMi presetLineStyles $ \(s, i) -> (grout . fixed) 1 $ row $ (grout . stretch) 1 $ do
-              -- TODO highlight if style matches selection
-              text (constant (show i <> ". " <> presetLineStyle_toText s))
-              fmap (fmap (\_ -> s)) (mouseDown V.BLeft)
-            return $ fmap lineStyle_fromListFormat (leftmost presetClicks)
-          return (5, never, setStyleEv')
-        0 -> do
-          let
-            lssDyn = fmap snd3 inputDyn
+  setStyleEvEv <- do
+    networkView $ ffor typeChoiceDyn $ \case
+      1 -> do
+        setStyleEv' <- do
+          presetClicks <- listForMi presetLineStyles $ \(s, i) -> (grout . fixed) 1 $ row $ (grout . stretch) 1 $ do
+            -- TODO highlight if style matches selection
+            text (constant (show i <> ". " <> presetLineStyle_toText s))
+            fmap (fmap (\_ -> s)) (mouseDown V.BLeft)
+          return $ fmap lineStyle_fromListFormat (leftmost presetClicks)
+        return (5, never, setStyleEv')
+      0 -> do
+        let
+          lssDyn = fmap snd3 inputDyn
 
-          -- TODO DELETE this should at the holdParamsWidget level
-          noRepeatNavigation
-          (focusDyn,l,r,u,d) <- do
-            --(tile . fixed) 1 $ text (fmap (T.pack . superStyle_toListFormat . Data.Maybe.fromJust) $ current mssDyn)
-            l_d1 <- (grout . fixed) 1 $ row $ do
-              (grout . fixed) 8 $ text " left:"
-              (tile . stretch) 1 $ makeLineStyleTextEntry LSC_L lssDyn
-            r_d1 <- (grout . fixed) 1 $ row $ do
-              (grout . fixed) 8 $ text "right:"
-              (tile . stretch) 1 $ makeLineStyleTextEntry LSC_R lssDyn
-            (u_d1, d_d1) <- (grout . fixed) 3 $ row $ (grout . stretch) 1 $ do
-              col $ (grout . fixed) 3 $ text "up:"
-              u_d2 <- col $ (tile . fixed) 1 $ makeLineStyleTextEntry LSC_U lssDyn
-              col $ (grout . fixed) 5 $ text "down:"
-              d_d2 <- col $ (tile . fixed) 1 $ makeLineStyleTextEntry LSC_D lssDyn
-              -- pad the end
-              (tile . stretch) 0 $ return ()
-              return (u_d2, d_d2)
+        (focusDyn,l,r,u,d) <- do
+          --(tile . fixed) 1 $ text (fmap (T.pack . superStyle_toListFormat . Data.Maybe.fromJust) $ current mssDyn)
+          l_d1 <- (grout . fixed) 1 $ row $ do
+            (grout . fixed) 8 $ text " left:"
+            (tile . stretch) 1 $ makeLineStyleTextEntry LSC_L lssDyn
+          r_d1 <- (grout . fixed) 1 $ row $ do
+            (grout . fixed) 8 $ text "right:"
+            (tile . stretch) 1 $ makeLineStyleTextEntry LSC_R lssDyn
+          (u_d1, d_d1) <- (grout . fixed) 3 $ row $ (grout . stretch) 1 $ do
+            col $ (grout . fixed) 3 $ text "up:"
+            u_d2 <- col $ (tile . fixed) 1 $ makeLineStyleTextEntry LSC_U lssDyn
+            col $ (grout . fixed) 5 $ text "down:"
+            d_d2 <- col $ (tile . fixed) 1 $ makeLineStyleTextEntry LSC_D lssDyn
             -- pad the end
             (tile . stretch) 0 $ return ()
-            focusDyn' <- focusedId
-            return (focusDyn',l_d1,r_d1,u_d1,d_d1)
+            return (u_d2, d_d2)
+          -- pad the end
+          (tile . stretch) 0 $ return ()
+          focusDyn' <- focusedId
+          return (focusDyn',l_d1,r_d1,u_d1,d_d1)
 
-          captureEv'' <- makeCaptureFromUpdateTextZipperMethod updateTextZipperForSingleCharacter
-          focusDynUnique <- holdUniqDyn focusDyn
+        captureEv'' <- makeCaptureFromUpdateTextZipperMethod updateTextZipperForSingleCharacter
+        focusDynUnique <- holdUniqDyn focusDyn
 
-          let
-            -- TODO maybe just do it when any of the cell dynamics are updated rather than when focus changes...
-            -- TODO if we do it on focus change, you don't want to set when escape is pressed... so maybe it's better just to do 🖕
-            setStyleEv' = makeLineStyleEvent l r u d (void $ updated focusDynUnique)
-            captureEv' = leftmost [void setStyleEv', captureEv'']
-          return (5, captureEv', setStyleEv')
-
-    setStyleEv <- switchHold never (fmap thd3 setStyleEvEv)
-    captureEv <- switchHold never (fmap snd3 setStyleEvEv)
-    heightDyn <- holdDyn 0 (fmap fst3 setStyleEvEv)
-
-    let
-      selectionDyn = fmap fst3 inputDyn
-      pushLineStyleFn :: LineStyle -> PushM t (Maybe (Either Llama SetPotatoDefaultParameters))
-      pushLineStyleFn ss = do
-        pdp <- sample . current $ pdpDyn
-        --whichEnd' <- sample . current $ endChoiceDyn
-        (SuperOwlParliament selection, _, tool) <- sample . current $ inputDyn
         let
-          -- TODO match linestyle with whichEnd choice  (curernty just pulls from start)
-          fmapfn sowl = case getSEltLabelLineStyle (superOwl_toSEltLabel_hack sowl) of
-            Nothing -> Nothing
-            Just oldss -> if oldss == ss
-              then Nothing
-              else Just $ makeLlamaForLineStyle sowl SetLineStyleEnd_Both ss
-        return $ if toolOverrideLineStyle tool
-          then if _potatoDefaultParameters_lineStyle pdp == ss
-            then Nothing
-            else Just . Right $ def { _setPotatoDefaultParameters_lineStyle = Just ss }
-          else case Data.Maybe.mapMaybe fmapfn . toList $ selection of
-            [] -> Nothing
-            x  -> Just . Left . makeCompositionLlama $ x
-      ssparamsEv = push pushLineStyleFn setStyleEv
+          -- TODO maybe just do it when any of the cell dynamics are updated rather than when focus changes...
+          -- TODO if we do it on focus change, you don't want to set when escape is pressed... so maybe it's better just to do 🖕
+          setStyleEv' = makeLineStyleEvent l r u d (void $ updated focusDynUnique)
+          captureEv' = leftmost [void setStyleEv', captureEv'']
+        return (5, captureEv', setStyleEv')
 
-    return (heightDyn, captureEv, ssparamsEv)
+  setStyleEv <- switchHold never (fmap thd3 setStyleEvEv)
+  captureEv <- switchHold never (fmap snd3 setStyleEvEv)
+  heightDyn <- holdDyn 0 (fmap fst3 setStyleEvEv)
+
+  let
+    selectionDyn = fmap fst3 inputDyn
+    pushLineStyleFn :: LineStyle -> PushM t (Maybe (Either Llama SetPotatoDefaultParameters))
+    pushLineStyleFn ss = do
+      pdp <- sample . current $ pdpDyn
+      --whichEnd' <- sample . current $ endChoiceDyn
+      (SuperOwlParliament selection, _, tool) <- sample . current $ inputDyn
+      let
+        -- TODO match linestyle with whichEnd choice  (curernty just pulls from start)
+        fmapfn sowl = case getSEltLabelLineStyle (superOwl_toSEltLabel_hack sowl) of
+          Nothing -> Nothing
+          Just oldss -> if oldss == ss
+            then Nothing
+            else Just $ makeLlamaForLineStyle sowl SetLineStyleEnd_Both ss
+      return $ if toolOverrideLineStyle tool
+        then if _potatoDefaultParameters_lineStyle pdp == ss
+          then Nothing
+          else Just . Right $ def { _setPotatoDefaultParameters_lineStyle = Just ss }
+        else case Data.Maybe.mapMaybe fmapfn . toList $ selection of
+          [] -> Nothing
+          x  -> Just . Left . makeCompositionLlama $ x
+    ssparamsEv = push pushLineStyleFn setStyleEv
+
+  return (heightDyn, captureEv, ssparamsEv)
 
 
 -- Text Alignment stuff
@@ -497,7 +488,7 @@ holdSBoxTypeWidget _ inputDyn = constDyn $ do
     borderDyn = fmap fst stateDyn
     textDyn = fmap snd stateDyn
 
-  (b,t) <- col $ do
+  (b,t) <- do
     b_d1 <- (grout . fixed) 1 $ row $ do
       (grout . fixed) 8 $ text "border:"
       (grout . stretch) 1 $ checkBox borderDyn
@@ -546,9 +537,7 @@ holdCanvasSizeWidget canvasDyn _ nothingDyn = ffor nothingDyn $ \_ -> do
     cWidthDyn = fmap (\(V2 x _) -> x) cSizeDyn
     cHeightDyn = fmap (\(V2 _ y) -> y) cSizeDyn
 
-  -- TODO this should at the holdParamsWidget level
-  noRepeatNavigation
-  (focusDyn,wDyn,hDyn) <- col $ do
+  (focusDyn,wDyn,hDyn) <- do
     (grout . fixed) 1 $ text "canvas:"
     wDyn' <- (grout . fixed) 1 $ row $ do
       (grout . fixed) 8 $ text " width:"
@@ -656,7 +645,9 @@ holdParamsWidget ParamsWidgetConfig {..} = do
     -- show canvas params when nothing is selected
     mCanvasSizeInputDyn = ffor2 toolDyn selectionDyn (\t s -> if isParliament_null s then Just (isParliament_empty, Nothing, t) else Nothing)
 
-  (paramsOutputEv, captureEv, canvasSizeOutputEv, heightDyn) <- initManager_ $ do
+  -- TODO consider doing initManager_ within the widgets if you don't want to tab from one widget to the next
+  (paramsOutputEv, captureEv, canvasSizeOutputEv, heightDyn) <- initManager_ $ col $ do
+    repeatNavigation
     requestFocus $ (Refocus_Clear <$ _paramsWidgetConfig_loseFocusEv)
     textAlignmentWidget <- holdMaybeParamsWidget defaultParamsDyn mTextAlignInputDyn holdTextAlignmentWidget
     superStyleWidget2 <- holdMaybeParamsWidget defaultParamsDyn mSuperStyleInputDyn holdSuperStyleWidget
