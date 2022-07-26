@@ -370,8 +370,8 @@ holdLineStyleWidgetNew pdpDyn inputDyn = constDyn $ do
   -- TODO in the future, we'd like to be able to disable line ends more easily (without going into presets)
   -- i.e. [x] start | [x] end
   -- alternatively, consider combining with super sytyle
-  -- TODO should be way to select both start and end
-  endChoiceDyn <- (grout . fixed) 1 $ radioListSimple 0 ["start", "end", "both"]
+  --endChoiceDyn <- (grout . fixed) 1 $ radioListSimple 0 ["start", "end", "both"]
+  endChoiceDyn <- (grout . fixed) 1 $ radioListSimple 0 ["start"]
   typeChoiceDyn <- (grout . stretch) 1 $ radioListSimple 0 ["custom", "presets"]
 
   setStyleEvEv <- do
