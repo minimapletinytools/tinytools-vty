@@ -106,10 +106,33 @@ selectParamsFromSelection ps (SuperOwlParliament selection) = r where
 
 makeParamsInputDyn :: (Eq a) => ToolOverrideSelector -> ParamsSelector a -> DefaultParamsSelector a -> Tool -> Selection -> PotatoDefaultParameters -> Maybe (Selection, Maybe a, Tool)
 makeParamsInputDyn tooloverridef psf dpsf tool selection pdp = r where
-  nsel = isParliament_length selection
   r = if tooloverridef tool
     then Just (selection, Just (dpsf pdp), tool)
     else fmap (\(a,b) -> (a,b,tool)) $ selectParamsFromSelection psf selection
+
+-- similar to makeParamsInputDyn except specialized for LineStyle
+-- LineStyle is special because it is split between start/end and we L.allSame on each end individually
+makeLineStyleInputDyn :: Tool -> Selection -> PotatoDefaultParameters -> Maybe (Selection, Maybe (Maybe LineStyle, Maybe LineStyle), Tool)
+makeLineStyleInputDyn tool selection pdp = r where
+
+  selectLineStyleFromSelection :: Selection -> Maybe (Selection, Maybe (Maybe LineStyle, Maybe LineStyle))
+  selectLineStyleFromSelection (SuperOwlParliament selection) = r_d1 where
+    ps = (\x -> (getSEltLineStyle x, getSEltLineStyleEnd x)) . superOwl_toSElt_hack
+    rawparams = ffilter (\(_,(x,y)) -> isJust x || isJust y) . fmap (\sowl -> (sowl, ps sowl)) $ selection
+    startvalues = catMaybes . toList . fmap fst . fmap snd $ rawparams
+    endvalues = catMaybes . toList . fmap snd . fmap snd $ rawparams
+    subSelection = SuperOwlParliament $ fmap fst rawparams
+    r_d1 = case (startvalues, endvalues) of
+      ([],[]) -> Nothing
+      (x:_, y:_) -> Just (subSelection, Just
+        (if L.allSame startvalues then Just x else Nothing,
+        if L.allSame endvalues then Just y else Nothing))
+
+  -- NOTE the outer maybe in `Maybe (Maybe LineStyle, Maybe LineStyle)` is redundant
+  -- should be joined into the inner `Maybe`s when used
+  r = if toolOverrideLineStyle tool
+    then Just (selection, Just (Just $ _potatoDefaultParameters_lineStyle pdp, Just $ _potatoDefaultParameters_lineStyleEnd pdp), tool)
+    else fmap (\(a,b) -> (a,b,tool)) $ selectLineStyleFromSelection selection
 
 type MaybeParamsWidgetOutputDyn t m b = Dynamic t (Maybe (m (Dynamic t Int, Event t (), Event t b)))
 type ParamsWidgetOutputDyn t m b = Dynamic t (m (Dynamic t Int, Event t (), Event t b))
@@ -340,7 +363,7 @@ presetLineStyle_toText (l,r,u,d) = T.pack $ l <> " " <> r <> " " <> u <> " " <> 
 -- [x] start | [x] end    (the one being modified is highlighted)
 -- custom | preset
 -- ....
-holdLineStyleWidgetNew :: forall t m. (MonadLayoutWidget t m, HasPotato t m) => ParamsWidgetFn t m LineStyle (Either Llama SetPotatoDefaultParameters)
+holdLineStyleWidgetNew :: forall t m. (MonadLayoutWidget t m, HasPotato t m) => ParamsWidgetFn t m (Maybe LineStyle, Maybe LineStyle) (Either Llama SetPotatoDefaultParameters)
 holdLineStyleWidgetNew pdpDyn inputDyn = constDyn $ do
 
   (grout . fixed) 1 $ text "line end style:"
@@ -348,7 +371,7 @@ holdLineStyleWidgetNew pdpDyn inputDyn = constDyn $ do
   -- i.e. [x] start | [x] end
   -- alternatively, consider combining with super sytyle
   -- TODO should be way to select both start and end
-  --endChoiceDyn <- (grout . fixed) 1 $ radioListSimple 0 ["start", "end"]
+  endChoiceDyn <- (grout . fixed) 1 $ radioListSimple 0 ["start", "end", "both"]
   typeChoiceDyn <- (grout . stretch) 1 $ radioListSimple 0 ["custom", "presets"]
 
   setStyleEvEv <- do
@@ -363,7 +386,13 @@ holdLineStyleWidgetNew pdpDyn inputDyn = constDyn $ do
         return (5, never, setStyleEv')
       0 -> do
         let
-          lssDyn = fmap snd3 inputDyn
+          joinmaybetuple mx = case mx of
+            Nothing -> (Nothing, Nothing)
+            Just x -> x
+          lssDyn = ffor2 endChoiceDyn (fmap joinmaybetuple $ fmap snd3 inputDyn) $ \ec (start, end) -> case ec of
+            0 -> start
+            1 -> end
+            2 -> if start == end then start else Nothing
 
         (focusDyn,l,r,u,d) <- do
           --(tile . fixed) 1 $ text (fmap (T.pack . superStyle_toListFormat . Data.Maybe.fromJust) $ current mssDyn)
@@ -394,7 +423,7 @@ holdLineStyleWidgetNew pdpDyn inputDyn = constDyn $ do
           -- TODO if we do it on focus change, you don't want to set when escape is pressed... so maybe it's better just to do 🖕
           setStyleEv' = makeLineStyleEvent l r u d (void $ updated focusDynUnique)
           captureEv' = leftmost [void setStyleEv', captureEv'']
-        return (5, captureEv', setStyleEv')
+        return (6, captureEv', setStyleEv')
 
   setStyleEv <- switchHold never (fmap thd3 setStyleEvEv)
   captureEv <- switchHold never (fmap snd3 setStyleEvEv)
@@ -629,14 +658,14 @@ holdParamsWidget ParamsWidgetConfig {..} = do
       toolOverrideTextAlign
       ((fmap (\(TextStyle ta) -> ta)) . getSEltLabelBoxTextStyle . superOwl_toSEltLabel_hack)
       _potatoDefaultParameters_box_text_textAlign
+
     mSuperStyleInputDyn = ffor3 toolDyn selectionDyn defaultParamsDyn $ makeParamsInputDyn
       toolOverrideSuperStyle
       (getSEltLabelSuperStyle . superOwl_toSEltLabel_hack)
       _potatoDefaultParameters_superStyle
-    mLineStyleInputDyn = ffor3 toolDyn selectionDyn defaultParamsDyn $ makeParamsInputDyn
-      toolOverrideLineStyle
-      (getSEltLabelLineStyle . superOwl_toSEltLabel_hack)
-      _potatoDefaultParameters_lineStyle
+
+    mLineStyleInputDyn = ffor3 toolDyn selectionDyn defaultParamsDyn $ makeLineStyleInputDyn
+
     mSBoxTypeInputDyn = ffor3 toolDyn selectionDyn defaultParamsDyn $ makeParamsInputDyn
       toolOverrideSBoxType
       (getSEltLabelBoxType . superOwl_toSEltLabel_hack)
