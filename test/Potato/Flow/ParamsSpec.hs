@@ -71,8 +71,8 @@ test_params_set_canvas_size = TestLabel "set canvas size" $ TestCase $ runSpider
     fireQueuedEventsAndRead readCanvasSize >>= \a -> liftIO (checkNothing a)
 
     -- we have nothing selected so canvas size should be first thing in ParamsWidget
-    queueVtyEvent (V.EvMouseDown 10 0 V.BLeft []) >> fireQueuedEvents
-    queueVtyEvent (V.EvMouseUp 10 0 Nothing) >> fireQueuedEvents
+    queueVtyEvent (V.EvMouseDown 10 1 V.BLeft []) >> fireQueuedEvents
+    queueVtyEvent (V.EvMouseUp 10 1 Nothing) >> fireQueuedEvents
     queueVtyEvent (V.EvKey V.KBS []) >> fireQueuedEvents
     queueVtyEvent (V.EvKey V.KBS []) >> fireQueuedEvents
     queueVtyEvent (V.EvKey (V.KChar '2') []) >> fireQueuedEvents
