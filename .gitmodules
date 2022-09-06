@@ -1,3 +1,15 @@
 [submodule "potato_flow"]
 	path = potato_flow
 	url = git@github.com:pdlla/potato_flow.git
+[submodule "tinytools"]
+	path = tinytools
+	url = git@github.com:pdlla/tinytools.git
+[submodule "reflex-potatoes"]
+	path = reflex-potatoes
+	url = git@github.com:pdlla/reflex-potatoes.git
+[submodule "reflex-vty"]
+	path = reflex-vty
+	url = git@github.com:pdlla/reflex-vty.git
+[submodule "reflex-vty-test-host"]
+	path = reflex-vty-test-host
+	url = git@github.com:pdlla/reflex-vty-test-host.git
