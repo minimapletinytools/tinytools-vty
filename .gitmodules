@@ -10,6 +10,6 @@
 [submodule "reflex-vty"]
 	path = reflex-vty
 	url = git@github.com:pdlla/reflex-vty.git
-[submodule "reflex-vty-test-host"]
-	path = reflex-vty-test-host
-	url = git@github.com:pdlla/reflex-vty-test-host.git
+[submodule "reflex-test-host"]
+	path = reflex-test-host
+	url = git@github.com:pdlla/reflex-test-host.git
