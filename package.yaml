@@ -69,12 +69,12 @@ dependencies:
 - relude
 - reflex
 - reflex-vty
-- potato-flow
+- tinytools
+- reflex-potatoes
 - containers
 - text
 - vty
 - time
-- reflex-potatoes
 - dependent-sum
 - these
 - extra

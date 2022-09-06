@@ -61,10 +61,13 @@ extra-deps:
 
 
 # use submodules for convenience
-- ./tinytools
 - ./reflex-test-host
-- ./reflex-potatoes
 - ./reflex-vty 
+- ./tinytools
+- ./reflex-potatoes
+
+# manually added to src/ to avoid chained stack dependencies (can fix when switching over to nix)
+# - ./reflex-vty-test-host 
 
 # switch to remote repositories some day 
 # - github: pdlla/reflex-test-host
