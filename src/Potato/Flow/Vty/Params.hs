@@ -370,13 +370,12 @@ holdLineStyleWidgetNew pdpDyn inputDyn = constDyn $ do
   -- TODO in the future, we'd like to be able to disable line ends more easily (without going into presets)
   -- i.e. [x] start | [x] end
   -- alternatively, consider combining with super sytyle
-  --endChoiceDyn <- (grout . fixed) 1 $ radioListSimple 0 ["start", "end", "both"]
-  endChoiceDyn <- (grout . fixed) 1 $ radioListSimple 0 ["start"]
+  endChoiceDyn <- (grout . fixed) 1 $ radioListSimple 0 ["start", "end", "both"]
   typeChoiceDyn <- (grout . stretch) 1 $ radioListSimple 0 ["custom", "presets"]
 
   setStyleEvEv <- do
-    networkView $ ffor typeChoiceDyn $ \case
-      1 -> do
+    networkView $ ffor2 typeChoiceDyn endChoiceDyn $ \tc' ec' -> case (tc', ec') of
+      (1, _) -> do
         setStyleEv' <- do
           presetClicks <- listForMi presetLineStyles $ \(s, i) -> (grout . fixed) 1 $ row $ (grout . stretch) 1 $ do
             -- TODO highlight if style matches selection
@@ -384,12 +383,12 @@ holdLineStyleWidgetNew pdpDyn inputDyn = constDyn $ do
             fmap (fmap (\_ -> s)) (mouseDown V.BLeft)
           return $ fmap lineStyle_fromListFormat (leftmost presetClicks)
         return (5, never, setStyleEv')
-      0 -> do
+      (0, ec) -> do
         let
           joinmaybetuple mx = case mx of
             Nothing -> (Nothing, Nothing)
             Just x -> x
-          lssDyn = ffor2 endChoiceDyn (fmap joinmaybetuple $ fmap snd3 inputDyn) $ \ec (start, end) -> case ec of
+          lssDyn = ffor(fmap joinmaybetuple $ fmap snd3 inputDyn) $ \(start, end) -> case ec of
             0 -> start
             1 -> end
             2 -> if start == end then start else Nothing
@@ -434,19 +433,38 @@ holdLineStyleWidgetNew pdpDyn inputDyn = constDyn $ do
     pushLineStyleFn :: LineStyle -> PushM t (Maybe (Either Llama SetPotatoDefaultParameters))
     pushLineStyleFn ss = do
       pdp <- sample . current $ pdpDyn
-      --whichEnd' <- sample . current $ endChoiceDyn
+      whichEnd' <- sample . current $ endChoiceDyn
       (SuperOwlParliament selection, _, tool) <- sample . current $ inputDyn
       let
-        -- TODO match linestyle with whichEnd choice  (curernty just pulls from start)
-        fmapfn sowl = case getSEltLabelLineStyle (superOwl_toSEltLabel_hack sowl) of
-          Nothing -> Nothing
-          Just oldss -> if oldss == ss
-            then Nothing
-            else Just $ makeLlamaForLineStyle sowl SetLineStyleEnd_Both ss
+        whichEnd = case whichEnd' of
+          0 -> SetLineStyleEnd_Start
+          1 -> SetLineStyleEnd_End
+          2 -> SetLineStyleEnd_Both
+        (setstart, setend) = case whichEnd of
+          SetLineStyleEnd_Start -> (True, False)
+          SetLineStyleEnd_End -> (False, True)
+          SetLineStyleEnd_Both -> (True, True)
+        whichEndFn sowl = case whichEnd of
+          SetLineStyleEnd_Start -> startStyle
+          SetLineStyleEnd_End -> endStyle
+          SetLineStyleEnd_Both -> if startStyle == endStyle then startStyle else Nothing 
+          where
+            seltl = superOwl_toSEltLabel_hack sowl
+            startStyle = getSEltLabelLineStyle seltl
+            endStyle = getSEltLabelLineStyleEnd seltl
+        fmapfn sowl = case whichEndFn sowl of
+          Nothing -> llama
+          Just oldss -> if oldss == ss then Nothing else llama
+          where llama = Just $ makeLlamaForLineStyle sowl whichEnd ss
       return $ if toolOverrideLineStyle tool
         then if _potatoDefaultParameters_lineStyle pdp == ss
           then Nothing
-          else Just . Right $ def { _setPotatoDefaultParameters_lineStyle = Just ss }
+          else Just . Right $ 
+            -- is there a better syntax to do this LOL?
+            def { 
+                _setPotatoDefaultParameters_lineStyle = if setstart then Just ss else _setPotatoDefaultParameters_lineStyle def 
+                , _setPotatoDefaultParameters_lineStyleEnd = if setend then Just ss else _setPotatoDefaultParameters_lineStyleEnd def 
+              }
         else case Data.Maybe.mapMaybe fmapfn . toList $ selection of
           [] -> Nothing
           x  -> Just . Left . makeCompositionLlama $ x
