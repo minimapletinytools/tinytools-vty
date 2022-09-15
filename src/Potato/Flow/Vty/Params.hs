@@ -474,7 +474,7 @@ holdLineStyleWidgetNew pdpDyn inputDyn = constDyn $ do
 
 
 -- Text Alignment stuff
-holdTextAlignmentWidget :: forall t m. (MonadWidget t m) => ParamsWidgetFn t m TextAlign (Either Llama SetPotatoDefaultParameters)
+holdTextAlignmentWidget :: forall t m. (MonadLayoutWidget t m, HasPotato t m) => ParamsWidgetFn t m TextAlign (Either Llama SetPotatoDefaultParameters)
 holdTextAlignmentWidget _ inputDyn = constDyn $ do
   let
     mtaDyn = fmap snd3 inputDyn
@@ -488,9 +488,10 @@ holdTextAlignmentWidget _ inputDyn = constDyn $ do
       Just TextAlign_Center -> [1]
       Just TextAlign_Right  -> [2]
 
+  (grout . fixed) 1 $ text "text align:"
   -- I'm actually not sure why using alignDyn here isn't causing an infinite loop
   -- I guess the whole widget is getting recreated when alignment changes... but when I sampled alignDyn instead, it didn't update correctly 🤷🏼‍♀️
-  (setAlignmentEv', _) <- radioList (constDyn ["left","center","right"]) alignDyn Nothing
+  (setAlignmentEv', _) <- (grout . stretch) 1 $ radioList (constDyn ["left","center","right"]) alignDyn Nothing
 
   let
     setAlignmentEv = fmap (\case
@@ -514,7 +515,7 @@ holdTextAlignmentWidget _ inputDyn = constDyn $ do
           x  -> Just . Left . controllersWithId_to_llama $ IM.fromList x
     alignmentParamsEv = push pushAlignmentFn setAlignmentEv
 
-  return (1, never, alignmentParamsEv)
+  return (2, never, alignmentParamsEv)
 
 holdSBoxTypeWidget :: forall t m. (MonadLayoutWidget t m) => ParamsWidgetFn t m SBoxType (Either Llama SetPotatoDefaultParameters)
 holdSBoxTypeWidget _ inputDyn = constDyn $ do
