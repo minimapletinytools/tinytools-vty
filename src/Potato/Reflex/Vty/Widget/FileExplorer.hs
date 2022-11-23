@@ -50,10 +50,11 @@ fetchDirectory ev = let
   forM contents $ \d -> FP.doesDirectoryExist (FP.combine dir d) >>= return . (,FP.combine dir d)
 
 data FileExplorerWidgetConfig t = FileExplorerWidgetConfig {
-  -- TODO styling vars
+  _fileExplorerWidgetConfig_mainStyle :: Behavior t V.Attr
+  , _fileExplorerWidgetConfig_clickDownStyle :: Behavior t V.Attr
 
   -- TODO we don't need full filepath
-  _fileExplorerWidgetConfig_fileFilter :: FP.FilePath -> Bool
+  , _fileExplorerWidgetConfig_fileFilter :: FP.FilePath -> Bool
   , _fileExplorerWidgetConfig_initialFile :: FP.FilePath
 }
 
@@ -64,7 +65,7 @@ data FileExplorerWidget t = FileExplorerWidget {
   , _fileExplorerWidget_returnOnfilename :: Event t () -- fires when you hit the "return" key in file name input area
 }
 
--- TODO reduce constraints
+-- TODO reduce constraints, don't use HasPotato
 holdFileExplorerWidget :: forall t m. (MonadLayoutWidget t m, HasPotato t m)
   => FileExplorerWidgetConfig t
   -> m (FileExplorerWidget t)
@@ -77,6 +78,7 @@ holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
   kdown <- key V.KDown
   --inp <- input
   mscroll <- mouseScroll
+
   let
     requestedScroll :: Event t Int
     requestedScroll = leftmost
@@ -93,6 +95,7 @@ holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
         -- quick hack to reset scroll after changing folders
         , (updated dirContentsDyn $> (1,0))
       ]
+
   vScrollDyn :: Dynamic t Int <- foldDyn (\(maxN, delta) ix -> updateLine (maxN - 1) delta ix) 0 scrollEv
 
   -- select + click is one way to do choose file to save to but double click is prob better...
@@ -121,15 +124,18 @@ holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
       (grout . fixed) 1 $ do
         let
           clickable = _fileExplorerWidgetConfig_fileFilter path
-          style = if isFolder || clickable
-            -- TODO
-            then V.defAttr
-            else V.defAttr
-        -- TODO down click should highlight briefly
-        text (constant $ T.pack (FP.takeFileName path ))
-        -- TODO make it so you need to click on the name
+
+          -- TODO design proper styling... (maybe prefix folders with > instead of style differently?)
+
+        -- TODO make it so you need to click on the name???
         -- TODO double click
-        click' <- singleClick V.BLeft
+        (click', downDyn) <- singleClickWithDownState V.BLeft
+
+        let styleBeh = join $ ffor (current downDyn) $ \d -> if d then _fileExplorerWidgetConfig_clickDownStyle else _fileExplorerWidgetConfig_mainStyle
+
+        localTheme (const styleBeh) $ do
+          text (constant $ T.pack (FP.takeFileName path ))
+
         let click = ffilter (not . _singleClick_didDragOff) click'
         if isFolder
           then return $ (click $> Left path)
@@ -141,19 +147,24 @@ holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
   (clickEvents, setFolderRawEvent, filenameDyn, enterEv) <- col $ do
     -- TODO consider combining filename and directory into one...
     let
-      setFileEv = fmap T.pack $ leftmost [fmap snd initialDirFileEv, clickFileEvent]
+      setFileEv = fmap T.pack $ leftmost [fmap snd initialDirFileEv, fmap FP.takeFileName clickFileEvent]
+
     -- input for filename
     (filenameDyn', enterEv') <- (tile . fixed) 1 $ do
       (,)
       <$> filenameInput "" setFileEv
       <*> key V.KEnter
+
     -- input for directory
     setFolderRawEvent' <- (tile . fixed) 1 $ do
       let indirev = (updated (fmap T.pack dirDyn))
       dirdyn <- filenameInput "" indirev
       return $ difference (updated $ fmap T.unpack dirdyn) indirev
+
+    -- click in dir list event
     clickEvents' <- (grout . stretch) 5 $ box (constant singleBoxStyle) $ do
       networkView (ffor2 vScrollDyn dirContentsDyn dirWidget)
+
     return (clickEvents', setFolderRawEvent', filenameDyn', enterEv')
 
   -- perform the IO query to get the folder contents

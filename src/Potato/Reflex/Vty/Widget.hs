@@ -18,6 +18,7 @@ module Potato.Reflex.Vty.Widget
   SingleClick(..)
   , singleClick
   , singleClickNoDragOffSimple
+  , singleClickWithDownState
 
   , splitHDrag
   , DragState(..)
@@ -68,6 +69,23 @@ singleClickNoDragOffSimple :: (Reflex t, MonadHold t m, MonadFix m, HasInput t m
 singleClickNoDragOffSimple btn = do
   ev <- singleClick btn
   return $ fmapMaybe (\sc -> if _singleClick_didDragOff sc then Nothing else Just ()) ev
+
+
+singleClickWithDownState :: (Reflex t, MonadHold t m, MonadFix m, HasInput t m) => V.Button -> m (Event t SingleClick, Dynamic t Bool)
+singleClickWithDownState btn = do
+  let
+    -- TODO implement for pane2 instead
+    withinBounds (Drag2 (fromX, fromY) (toX, toY) _ _ _) = fromX == toX && fromY == toY
+  dragEv <- drag2 btn
+  downDyn <- foldDyn (\(Drag2 _ _ _ _ ds) _ -> ds /= DragEnd) False dragEv
+  didStayOnDyn <- foldDyn (const . withinBounds) False dragEv
+  let
+    scEv = flip push dragEv $ \d@(Drag2 (fromX, fromY) _ _ mods ds) -> do
+      didStayOn <- sample . current $ didStayOnDyn
+      return $ if ds == DragEnd && withinBounds d
+        then Just $ SingleClick btn (fromX, fromY) mods (not didStayOn)
+        else Nothing
+  return (scEv, downDyn)
 
 
 integralFractionalDivide :: (Integral a, Fractional b) => a -> a -> b

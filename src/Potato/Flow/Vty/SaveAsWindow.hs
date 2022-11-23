@@ -46,6 +46,10 @@ popupSaveAsWindow :: forall t m. (MonadWidget t m, HasPotato t m)
   => SaveAsWindowConfig t
   -> m (Event t FP.FilePath, Dynamic t Bool) -- ^ (file to save to, popup state)
 popupSaveAsWindow SaveAsWindowConfig {..} = do
+
+  potatostylebeh <- fmap _potatoConfig_style askPotato
+  
+
   -- TODO style everything
   let
     popupSaveAsEv = ffor _saveAsWindowConfig_saveAs $ \f0 -> mdo
@@ -54,6 +58,10 @@ popupSaveAsWindow SaveAsWindowConfig {..} = do
           fewidget <- (tile . stretch) 3 $ holdFileExplorerWidget $ FileExplorerWidgetConfig {
               _fileExplorerWidgetConfig_fileFilter = \fp -> FP.takeExtension fp == ".potato"
               , _fileExplorerWidgetConfig_initialFile = f0
+
+
+              , _fileExplorerWidgetConfig_mainStyle = fmap _potatoStyle_normal potatostylebeh
+              , _fileExplorerWidgetConfig_clickDownStyle = fmap _potatoStyle_softSelected potatostylebeh
             }
           (cancelEv, saveButtonEv) <- (tile . fixed) 3 $ row $ do
             cancelEv' <- (tile . stretch) 10 $ textButton def "cancel"
