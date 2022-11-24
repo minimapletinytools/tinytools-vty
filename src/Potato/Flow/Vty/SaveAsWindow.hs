@@ -66,8 +66,12 @@ popupSaveAsWindow SaveAsWindowConfig {..} = do
             }
           (cancelEv, saveButtonEv) <- (tile . fixed) 3 $ row $ do
             cancelEv' <- (tile . stretch) 10 $ textButton def "cancel"
+
+            -- TODO grey out if filename is empty
             saveEv' <- (tile . stretch) 10 $ textButton def "save"
+
             return (cancelEv', saveEv')
+            
           -- DELETE
           -- IO file validity checkin
           {-mSaveAsFileEv <- performEvent $ ffor (tag (_fileExplorerWidget_fullfilename fewidget) saveEv) $ \ffn -> liftIO $ do
@@ -75,8 +79,16 @@ popupSaveAsWindow SaveAsWindowConfig {..} = do
             return $ if exists
               then Just ffn else Nothing
           let saveAsFileEv = fmapMaybe id mSaveAsFileEv-}
+
+
           let
-            saveEv = leftmost [_fileExplorerWidget_returnOnfilename fewidget, saveButtonEv]
+            -- TODO 
+            saveEv' = leftmost [_fileExplorerWidget_returnOnfilename fewidget, saveButtonEv]
+
+            -- TODO test
+            -- only save if filename is non-empty
+            saveEv = gate (fmap (not . T.null) (_fileExplorerWidget_filename fewidget)) saveEv'
+
             saveAsFileEv' = tag (_fileExplorerWidget_fullfilename fewidget) saveEv
             saveAsFileEv = fmap modifyFileNameFn saveAsFileEv'
           return (cancelEv, saveAsFileEv)

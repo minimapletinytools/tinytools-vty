@@ -64,7 +64,10 @@ data FileExplorerWidgetConfig t = FileExplorerWidgetConfig {
 }
 
 data FileExplorerWidget t = FileExplorerWidget {
-  _fileExplorerWidget_fullfilename :: Behavior t FP.FilePath -- pretty sure this is just single click for now -__-
+  -- the filename in the entry area
+  _fileExplorerWidget_filename :: Behavior t Text
+  -- the directory <> filename in the entry area
+  , _fileExplorerWidget_fullfilename :: Behavior t FP.FilePath
   , _fileExplorerWidget_doubleClickFile :: Event t FP.FilePath -- pretty sure this is just single click for now -__-
   , _fileExplorerWidget_directory :: Dynamic t FP.FilePath
   , _fileExplorerWidget_returnOnfilename :: Event t () -- fires when you hit the "return" key in file name input area
@@ -163,10 +166,13 @@ holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
       setFileEv = fmap T.pack $ leftmost [fmap snd initialDirFileEv, fmap FP.takeFileName clickFileEvent]
 
     -- input for filename
-    (filenameDyn', enterEv') <- (tile . fixed) 1 $ do
+    (fninputfid, (filenameDyn', enterEv')) <- (tile' . fixed) 1 $ do
       (,)
       <$> filenameInput "" setFileEv
       <*> key V.KEnter
+
+    -- focus the filename input
+    requestFocus (pb $> Refocus_Id fninputfid)
 
     -- input for directory
     setFolderRawEvent' <- (tile . fixed) 1 $ do
@@ -200,7 +206,8 @@ holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
     fullfilenameDyn = ffor2 dirDyn filenameDyn $ \dir fn -> FP.combine dir (T.unpack fn)
 
   return $ FileExplorerWidget {
-      _fileExplorerWidget_fullfilename = current fullfilenameDyn
+      _fileExplorerWidget_filename  = current filenameDyn
+      , _fileExplorerWidget_fullfilename = current fullfilenameDyn
       , _fileExplorerWidget_doubleClickFile = clickFileEvent
       , _fileExplorerWidget_directory = dirDyn
       , _fileExplorerWidget_returnOnfilename = void enterEv
