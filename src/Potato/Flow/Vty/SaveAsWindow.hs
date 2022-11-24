@@ -48,19 +48,20 @@ popupSaveAsWindow :: forall t m. (MonadWidget t m, HasPotato t m)
 popupSaveAsWindow SaveAsWindowConfig {..} = do
 
   potatostylebeh <- fmap _potatoConfig_style askPotato
-  
 
-  -- TODO style everything
   let
+
+    extension = ".potato"
+    modifyFileNameFn fp = if FP.takeExtension fp == ""
+      then fp <> extension
+      else fp
+
     popupSaveAsEv = ffor _saveAsWindowConfig_saveAs $ \f0 -> mdo
       boxTitle (constant def) "Save As" $ do
         initManager_ $ col $ mdo
           fewidget <- (tile . stretch) 3 $ holdFileExplorerWidget $ FileExplorerWidgetConfig {
-              _fileExplorerWidgetConfig_fileFilter = \fp -> FP.takeExtension fp == ".potato"
+              _fileExplorerWidgetConfig_fileFilter = \fp -> FP.takeExtension fp == extension
               , _fileExplorerWidgetConfig_initialFile = f0
-
-
-              , _fileExplorerWidgetConfig_mainStyle = fmap _potatoStyle_normal potatostylebeh
               , _fileExplorerWidgetConfig_clickDownStyle = fmap _potatoStyle_softSelected potatostylebeh
             }
           (cancelEv, saveButtonEv) <- (tile . fixed) 3 $ row $ do
@@ -76,10 +77,13 @@ popupSaveAsWindow SaveAsWindowConfig {..} = do
           let saveAsFileEv = fmapMaybe id mSaveAsFileEv-}
           let
             saveEv = leftmost [_fileExplorerWidget_returnOnfilename fewidget, saveButtonEv]
-            saveAsFileEv = tag (_fileExplorerWidget_fullfilename fewidget) saveEv
+            saveAsFileEv' = tag (_fileExplorerWidget_fullfilename fewidget) saveEv
+            saveAsFileEv = fmap modifyFileNameFn saveAsFileEv'
           return (cancelEv, saveAsFileEv)
     fmapfn w = \escEv clickOutsideEv -> fmap (\(cancelEv, outputEv) -> (leftmost [escEv, cancelEv, void outputEv], outputEv)) w
-  popupPane def $ (fmap fmapfn popupSaveAsEv)
+
+  localTheme (const $ fmap _potatoStyle_normal potatostylebeh) $ do
+    popupPane def $ (fmap fmapfn popupSaveAsEv)
 
 
 data SaveBeforeExitConfig t = SaveBeforeExitConfig {

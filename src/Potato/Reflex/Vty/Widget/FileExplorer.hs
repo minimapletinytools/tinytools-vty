@@ -45,13 +45,18 @@ fetchDirectory ev = let
     catchfn :: SomeException -> IO [(Bool, FP.FilePath)]
     catchfn = const (return [])
   in performEvent $ ffor ev $ \dir -> liftIO $ (flip catch catchfn) $ do
-  --workingDir <- FP.getCurrentDirectory
-  contents <- FP.getDirectoryContents dir
-  forM contents $ \d -> FP.doesDirectoryExist (FP.combine dir d) >>= return . (,FP.combine dir d)
+    --workingDir <- FP.getCurrentDirectory
+    contents <- FP.getDirectoryContents dir
+    contentsWithFolder <- forM contents $ \d -> FP.doesDirectoryExist (FP.combine dir d) >>= return . (,FP.combine dir d)
+    let
+      sortfn (d1,_) (d2,_) = case (d1,d2) of
+        (True, False) -> LT
+        (False, True) -> GT
+        _ -> EQ
+    return $ (L.sortBy sortfn) contentsWithFolder
 
 data FileExplorerWidgetConfig t = FileExplorerWidgetConfig {
-  _fileExplorerWidgetConfig_mainStyle :: Behavior t V.Attr
-  , _fileExplorerWidgetConfig_clickDownStyle :: Behavior t V.Attr
+  _fileExplorerWidgetConfig_clickDownStyle :: Behavior t V.Attr
 
   -- TODO we don't need full filepath
   , _fileExplorerWidgetConfig_fileFilter :: FP.FilePath -> Bool
@@ -71,6 +76,7 @@ holdFileExplorerWidget :: forall t m. (MonadLayoutWidget t m, HasPotato t m)
   -> m (FileExplorerWidget t)
 holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
 
+  baseStyle <- theme
   isInitialFileDir <- liftIO (FP.doesDirectoryExist _fileExplorerWidgetConfig_initialFile)
 
   -- set up v scrolling stuff
@@ -131,10 +137,17 @@ holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
         -- TODO double click
         (click', downDyn) <- singleClickWithDownState V.BLeft
 
-        let styleBeh = join $ ffor (current downDyn) $ \d -> if d then _fileExplorerWidgetConfig_clickDownStyle else _fileExplorerWidgetConfig_mainStyle
+        let 
+          styleBeh = join $ ffor (current downDyn) $ \d -> if d then _fileExplorerWidgetConfig_clickDownStyle else baseStyle
+          pathtext' = T.pack (FP.takeFileName path)
+          pathtext = if isFolder
+            then "> " <> pathtext'
+            else if clickable
+              then " *" <> pathtext'
+              else "  " <> pathtext'
 
         localTheme (const styleBeh) $ do
-          text (constant $ T.pack (FP.takeFileName path ))
+          text (constant pathtext)
 
         let click = ffilter (not . _singleClick_didDragOff) click'
         if isFolder
