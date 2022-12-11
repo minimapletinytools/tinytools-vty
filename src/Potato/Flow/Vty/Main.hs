@@ -328,6 +328,8 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
         , _goatWidgetConfig_setPotatoDefaultParameters = _paramsWidget_setDefaultParamsEvent (_leftWidget_paramsW leftW)
         , _goatWidgetConfig_markSaved = void saveSuccessEv
 
+        , _goatWidgetConfig_setFocusedArea = _leftWidget_setFocusEvent leftW
+
         -- TODO
         --, _goatWidgetConfig_unicodeWidthFn =
 
