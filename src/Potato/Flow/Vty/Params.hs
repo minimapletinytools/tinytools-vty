@@ -370,7 +370,7 @@ holdLineStyleWidgetNew pdpDyn inputDyn = constDyn $ do
   -- TODO in the future, we'd like to be able to disable line ends more easily (without going into presets)
   -- i.e. [x] start | [x] end
   -- alternatively, consider combining with super sytyle
-  endChoiceDyn <- (grout . fixed) 1 $ radioListSimple 2 ["start", "end", "both"]
+  endChoiceDyn <- (grout . fixed) 1 $ radioListSimple 0 ["both", "start", "end"]
   typeChoiceDyn <- (grout . stretch) 1 $ radioListSimple 0 ["custom", "presets"]
 
   setStyleEvEv <- do
@@ -401,16 +401,13 @@ holdLineStyleWidgetNew pdpDyn inputDyn = constDyn $ do
           r_d1 <- (grout . fixed) 1 $ row $ do
             (grout . fixed) 8 $ text "right:"
             (tile . stretch) 1 $ makeLineStyleTextEntry LSC_R lssDyn
-          (u_d1, d_d1) <- (grout . fixed) 3 $ row $ (grout . stretch) 1 $ do
-            col $ (grout . fixed) 3 $ text "up:"
-            u_d2 <- col $ (tile . fixed) 1 $ makeLineStyleTextEntry LSC_U lssDyn
-            col $ (grout . fixed) 5 $ text "down:"
-            d_d2 <- col $ (tile . fixed) 1 $ makeLineStyleTextEntry LSC_D lssDyn
-            -- pad the end
-            (tile . stretch) 0 $ return ()
-            return (u_d2, d_d2)
-          -- pad the end
-          (tile . stretch) 0 $ return ()
+          u_d1 <- (grout . fixed) 1 $ row $ do
+            (grout . fixed) 8 $ text "up:"
+            (tile . stretch) 1 $ makeLineStyleTextEntry LSC_U lssDyn
+          d_d1 <- (grout . fixed) 1 $ row $ do
+            (grout . fixed) 8 $ text "down:"
+            (tile . stretch) 1 $ makeLineStyleTextEntry LSC_D lssDyn
+
           focusDyn' <- focusedId
           return (focusDyn',l_d1,r_d1,u_d1,d_d1)
 
@@ -422,7 +419,7 @@ holdLineStyleWidgetNew pdpDyn inputDyn = constDyn $ do
           -- TODO if we do it on focus change, you don't want to set when escape is pressed... so maybe it's better just to do 🖕
           setStyleEv' = makeLineStyleEvent l r u d (void $ updated focusDynUnique)
           captureEv' = leftmost [void setStyleEv', captureEv'']
-        return (6, captureEv', setStyleEv')
+        return (7, captureEv', setStyleEv')
 
   setStyleEv <- switchHold never (fmap thd3 setStyleEvEv)
   captureEv <- switchHold never (fmap snd3 setStyleEvEv)
@@ -437,9 +434,9 @@ holdLineStyleWidgetNew pdpDyn inputDyn = constDyn $ do
       (SuperOwlParliament selection, _, tool) <- sample . current $ inputDyn
       let
         whichEnd = case whichEnd' of
-          0 -> SetLineStyleEnd_Start
-          1 -> SetLineStyleEnd_End
-          2 -> SetLineStyleEnd_Both
+          0 -> SetLineStyleEnd_Both
+          1 -> SetLineStyleEnd_Start
+          2 -> SetLineStyleEnd_End
         (setstart, setend) = case whichEnd of
           SetLineStyleEnd_Start -> (True, False)
           SetLineStyleEnd_End -> (False, True)
