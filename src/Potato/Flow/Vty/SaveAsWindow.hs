@@ -62,7 +62,7 @@ popupSaveAsWindow SaveAsWindowConfig {..} = do
           fewidget <- (tile . stretch) 3 $ holdFileExplorerWidget $ FileExplorerWidgetConfig {
               _fileExplorerWidgetConfig_fileFilter = \fp -> FP.takeExtension fp == extension
               , _fileExplorerWidgetConfig_initialFile = f0
-              , _fileExplorerWidgetConfig_clickDownStyle = fmap _potatoStyle_softSelected potatostylebeh
+              , _fileExplorerWidgetConfig_clickDownStyle = fmap _potatoStyle_layers_softSelected potatostylebeh
             }
           (cancelEv, saveButtonEv) <- (tile . fixed) 3 $ row $ do
             cancelEv' <- (tile . stretch) 10 $ textButton def "cancel"

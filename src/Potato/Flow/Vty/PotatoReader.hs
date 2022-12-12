@@ -31,18 +31,31 @@ data PotatoStyle = PotatoStyle {
 
   , _potatoStyle_makeCanvasManipulator :: RenderHandleColor -> V.Attr
   , _potatoStyle_normal :: V.Attr
+
   , _potatoStyle_selected :: V.Attr
-  , _potatoStyle_softSelected :: V.Attr
+  , _potatoStyle_layers_softSelected :: V.Attr -- color of parent(s) when child is selected
+  , _potatoStyle_canvas_oob :: V.Attr
+
+  , _potatoStyle_textfield_normal :: V.Attr
+  , _potatoStyle_textfield_modifying :: V.Attr
+  , _potatoStyle_textfield_cursor :: V.Attr
 }
 
 
 instance Default PotatoStyle where
   def = PotatoStyle {
-      _potatoStyle_canvasCursor = lg_canvas_cursor
+      _potatoStyle_normal = lg_default
+
+      ,_potatoStyle_canvasCursor = lg_canvas_cursor
       , _potatoStyle_makeCanvasManipulator = lg_make_canvas_cursor
-      , _potatoStyle_normal = lg_default
+      , _potatoStyle_canvas_oob = lg_canvas_oob
+
       , _potatoStyle_selected = lg_layer_selected
-      , _potatoStyle_softSelected = lg_layer_inheritselect
+      , _potatoStyle_layers_softSelected = lg_layer_inheritselect
+
+      , _potatoStyle_textfield_normal = lg_textfield_normal
+      , _potatoStyle_textfield_modifying = lg_textfield_modifying
+      , _potatoStyle_textfield_cursor = lg_textfield_cursor
     }
 
 data PotatoConfig t = PotatoConfig {

@@ -128,8 +128,7 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
 
 
   -- 1. render out of bounds region
-  -- TODO use correct theme
-  localTheme (const (fmap _potatoStyle_softSelected potatostylebeh)) $ do
+  localTheme (const (fmap _potatoStyle_canvas_oob potatostylebeh)) $ do
     fill (constant ' ')
     simpleList oobRegions renderRegion
     return ()
@@ -138,7 +137,6 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
   renderRegion trueRegion
 
   -- 3. render the selection
-  -- TODO use correct theme
   localTheme (const (fmap _potatoStyle_selected potatostylebeh)) $ do
     textNoRenderSpaces . current . ffor3 _canvasWidgetConfig_pan screenRegion _canvasWidgetConfig_renderedSelection $ debugRenderRegionFn
     return ()

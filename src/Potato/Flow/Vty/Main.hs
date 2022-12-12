@@ -27,6 +27,7 @@ import qualified Potato.Reflex.Vty.Host
 import Potato.Flow.Vty.SaveAsWindow
 import Potato.Flow.Vty.Alert
 import Potato.Flow.Vty.AppKbCmd
+import Potato.Flow.Vty.Attrs
 
 import System.IO (hFlush)
 import System.Console.ANSI (hSetTitle)
@@ -79,13 +80,13 @@ potatoMainWidgetWithHandle vty child =
     let inp' = fforMaybe inp $ \case
           V.EvResize {} -> Nothing
           x -> Just x
-    (shutdown, imgs) <- runThemeReader (constant V.defAttr) $
+    (shutdown, imgs) <- runThemeReader (constant lg_default) $
       runFocusReader (pure True) $
         runDisplayRegion (fmap (\(w, h) -> Region 0 0 w h) size) $
           runImageWriter $
             runNodeIdT $
               runInput inp' $ do
-                tellImages . ffor (current size) $ \(w, h) -> [V.charFill V.defAttr ' ' w h]
+                tellImages . ffor (current size) $ \(w, h) -> [V.charFill lg_default ' ' w h]
                 child
     return $ Potato.Reflex.Vty.Host.VtyResult
       { _vtyResult_picture = fmap (V.picForLayers . reverse) imgs

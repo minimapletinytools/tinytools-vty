@@ -180,9 +180,9 @@ renderTextZipper offsetDyn dw tz = do
   -- (you could do this easily by using localTheme)
   potatostyle <- askPotato >>=  sample . _potatoConfig_style
   let
-    cursorAttributes = _potatoStyle_selected potatostyle
-    normalAttributes = _potatoStyle_softSelected potatostyle
-    nofocusAttributes = _potatoStyle_normal potatostyle
+    cursorAttributes = _potatoStyle_textfield_cursor potatostyle
+    normalAttributes = _potatoStyle_textfield_modifying potatostyle
+    nofocusAttributes = _potatoStyle_textfield_normal potatostyle
     attrsDyn = ffor f $ \x -> if x then (normalAttributes, cursorAttributes) else (nofocusAttributes, nofocusAttributes)
 
   -- TODO this will still render trailing cursor when we aren't focused... please fix

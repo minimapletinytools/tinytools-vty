@@ -112,11 +112,11 @@ layerContents LayerWidgetConfig {..} scrollDyn = do
         attr = case selected of
           LHRESS_Selected -> _potatoStyle_selected
           LHRESS_InheritSelected -> _potatoStyle_selected
-          LHRESS_ChildSelected -> _potatoStyle_softSelected
+          LHRESS_ChildSelected -> _potatoStyle_layers_softSelected
           _ -> _potatoStyle_normal
 
         -- TODO correct styles so they aren't confused with selected styles (you should add colors)
-        attrrenamingbg = _potatoStyle_softSelected
+        attrrenamingbg = _potatoStyle_layers_softSelected
         attrrenamingcur = _potatoStyle_selected
 
         identn = case mdots of
