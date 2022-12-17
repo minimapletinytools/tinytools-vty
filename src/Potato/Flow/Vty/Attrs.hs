@@ -19,20 +19,20 @@ lg_default = Attr {
 }
 
 lg_textfield_normal :: Attr
-lg_textfield_normal = lg_default `withForeColor` cyan
+lg_textfield_normal = lg_default `withBackColor` white
 
 lg_textfield_modifying :: Attr
 lg_textfield_modifying = lg_textfield_normal
 
 lg_textfield_cursor :: Attr
-lg_textfield_cursor = lg_default `withForeColor` brightWhite `withBackColor` cyan
+lg_textfield_cursor = lg_default `withBackColor` black `withForeColor` white 
 
 
 lg_layer_inheritselect :: Attr
 lg_layer_inheritselect = lg_default `withBackColor` white
 
 lg_layer_selected :: Attr
-lg_layer_selected = lg_default `withStyle` standout 
+lg_layer_selected = lg_default `withStyle` standout
 
 
 lg_manip :: Attr
