@@ -575,8 +575,9 @@ holdSBoxTypeWidget _ inputDyn = constDyn $ do
   -- TODO
   return (2, captureEv, sBoxTypeParamsEv)
 
+-- manually pass in 'Dynamic t SCanvas' because it's not a property of th selection
 holdCanvasSizeWidget :: forall t m. (MonadLayoutWidget t m, HasPotato t m) => Dynamic t SCanvas -> ParamsWidgetFn t m () XY
-holdCanvasSizeWidget canvasDyn _ nothingDyn = ffor nothingDyn $ \_ -> do
+holdCanvasSizeWidget canvasDyn _ _ = constDyn $ do
   let
     cSizeDyn = fmap (_lBox_size . _sCanvas_box) canvasDyn
     cWidthDyn = fmap (\(V2 x _) -> x) cSizeDyn
@@ -663,10 +664,10 @@ fstsndthd4 (a,b,c,_) = (a,b,c)
 holdParamsWidget :: forall t m. (MonadWidget t m, HasPotato t m)
   => ParamsWidgetConfig t
   -> m (ParamsWidget t)
-holdParamsWidget ParamsWidgetConfig {..} = do
+holdParamsWidget ParamsWidgetConfig {..} = mdo
   let
     selectionDyn = _paramsWidgetConfig_selectionDyn
-    canvasDyn = _paramsWidgetConfig_canvasDyn
+    canvasDyn = ffor2 _paramsWidgetConfig_canvasDyn canvasSizeChangeEventDummyDyn const
     defaultParamsDyn = _paramsWidgetConfig_defaultParamsDyn
     toolDyn = _paramsWidgetConfig_toolDyn
 
@@ -729,6 +730,8 @@ holdParamsWidget ParamsWidgetConfig {..} = do
     maybeLeft _ = Nothing
     maybeRight (Right a) = Just a
     maybeRight _ = Nothing
+
+  canvasSizeChangeEventDummyDyn <- holdDyn () (void canvasSizeOutputEv)
 
   return ParamsWidget {
     _paramsWidget_paramsEvent = fmapMaybe maybeLeft paramsOutputEv
