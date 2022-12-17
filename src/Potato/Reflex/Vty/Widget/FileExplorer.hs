@@ -140,7 +140,7 @@ holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
         -- TODO double click
         (click', downDyn) <- singleClickWithDownState V.BLeft
 
-        let 
+        let
           styleBeh = join $ ffor (current downDyn) $ \d -> if d then _fileExplorerWidgetConfig_clickDownStyle else baseStyle
           pathtext' = T.pack (FP.takeFileName path)
           pathtext = if isFolder
@@ -165,20 +165,22 @@ holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
     let
       setFileEv = fmap T.pack $ leftmost [fmap snd initialDirFileEv, fmap FP.takeFileName clickFileEvent]
 
+
     -- input for filename
-    (fninputfid, (filenameDyn', enterEv')) <- (tile' . fixed) 1 $ do
-      (,)
-      <$> filenameInput "" setFileEv
-      <*> key V.KEnter
+    (fninputfid, (filenameDyn', enterEv')) <- (tile . fixed) 1 $ row $ do
+      (grout . fixed) 10 $ text "filename"
+      (tile' . stretch) 1 $ (,) <$> filenameInput "" setFileEv <*> key V.KEnter
 
     -- focus the filename input
     requestFocus (pb $> Refocus_Id fninputfid)
 
     -- input for directory
-    setFolderRawEvent' <- (tile . fixed) 1 $ do
-      let indirev = (updated (fmap T.pack dirDyn))
-      dirdyn <- filenameInput "" indirev
-      return $ difference (updated $ fmap T.unpack dirdyn) indirev
+    setFolderRawEvent' <- (tile . fixed) 1 $ row $ do
+      (grout . fixed) 10 $ text "directory"
+      (tile . stretch) 1 $ do
+        let indirev = (updated (fmap T.pack dirDyn))
+        dirdyn <- filenameInput "" indirev
+        return $ difference (updated $ fmap T.unpack dirdyn) indirev
 
     -- click in dir list event
     clickEvents' <- (grout . stretch) 5 $ box (constant singleBoxStyle) $ do
