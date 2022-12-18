@@ -141,6 +141,8 @@ holdLeftWidget LeftWidgetConfig {..} = do
 
     hdivider
 
+    
+{-
     -- Info
     infoFocusEv <- (grout . fixed) 5 $ do
       holdInfoWidget $ InfoWidgetConfig {
@@ -149,6 +151,8 @@ holdLeftWidget LeftWidgetConfig {..} = do
       mouseFocus
 
     hdivider
+-}
+    let infoFocusEv = never
 
     -- Params
     (params, paramsFocusEv) <- (grout . fixed) (_paramsWidget_widgetHeight params) $ do
