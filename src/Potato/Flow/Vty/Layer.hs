@@ -123,6 +123,12 @@ layerContents LayerWidgetConfig {..} scrollDyn = do
           Nothing -> ident
           Just x -> x - 1
 
+        icon = case _owlItem_subItem (_superOwl_elt sowl) of 
+          OwlSubItemFolder _ -> "𐃛"
+          OwlSubItemBox _ -> "⧈"
+          OwlSubItemLine _ _ -> "⤡"
+          OwlSubItemTextArea _ -> "𐂂"
+
         t1 = V.text' attr . T.pack $
 
           -- render identation and possible drop depth
@@ -132,11 +138,11 @@ layerContents LayerWidgetConfig {..} scrollDyn = do
 
           -- render folder hide lock icons
           -- <> [moveChar]
-          <> if' (layerEntry_isFolder lentry) (if' _layerEntry_isCollapsed [expandChar] [closeChar]) []
+          <> if' (layerEntry_isFolder lentry) (if' _layerEntry_isCollapsed [expandChar] [closeChar]) [' ']
           <> if' (lockHiddenStateToBool _layerEntry_hideState) [hiddenChar] [visibleChar]
           <> if' (lockHiddenStateToBool _layerEntry_lockState) [lockedChar] [unlockedChar]
-          <> " "
-          <> show rid
+          <> " " 
+          <> icon
           <> " "
 
         t2 = case mrenaming of
