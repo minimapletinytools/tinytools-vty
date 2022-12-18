@@ -276,7 +276,7 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
     saveSuccessEv = snd (fanEither finishSaveEv)
   finishSaveEv <- performEvent $ ffor performSaveEv $ \(gs,fn) -> liftIO $ do
     let
-      spf = owlPFState_to_sPotatoFlow . _owlPFWorkspace_pFState . _goatState_workspace $ gs
+      spf = owlPFState_to_sPotatoFlow . _owlPFWorkspace_owlPFState . _goatState_workspace $ gs
       cm = ControllerMeta {
           _controllerMeta_pan      = _goatState_pan gs
           , _controllerMeta_layers = _layersState_meta . _goatState_layersState $ gs
