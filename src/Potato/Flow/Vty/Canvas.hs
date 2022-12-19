@@ -70,9 +70,6 @@ translate_dynRegion dpos dr = ffor2 dpos dr $ \(V2 x y) region -> region {
   }
 -}
 
-pan_lBox :: XY -> LBox -> LBox
-pan_lBox pan (LBox p s) = LBox (p+pan) s
-
 data CanvasWidgetConfig t = CanvasWidgetConfig {
   _canvasWidgetConfig_pan            :: Dynamic t XY
   -- TODO DELETE
@@ -108,18 +105,18 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
     canvasScreenRegion' = fmap _renderedCanvasRegion_box _canvasWidgetConfig_renderedCanvas
 
     -- true region is the canvas region cropped to the panned screen (i.e. the intersection of screen and canvas in canvas space)
-    maybeCropAndPan pan scanvas screen = maybe (LBox 0 0) (pan_lBox pan) $ intersect_lBox screen (_sCanvas_box scanvas)
+    maybeCropAndPan pan scanvas screen = maybe (LBox 0 0) (translate_lBox pan) $ intersect_lBox screen (_sCanvas_box scanvas)
     trueRegion' = ffor3 _canvasWidgetConfig_pan _canvasWidgetConfig_canvas canvasScreenRegion' maybeCropAndPan
     trueRegion = dynLBox_to_dynRegion trueRegion'
     oobRegions' = ffor2 screenRegion' trueRegion' $ \sc tr -> substract_lBox sc tr
     oobRegions = fmap (fmap lBox_to_region) oobRegions'
 
     -- reg is in screen space so we need to translate back to canvas space by undoing the pan
-    renderRegionFn pan reg rc = renderedCanvasRegionToText (pan_lBox (-pan) (region_to_lBox reg)) rc
+    renderRegionFn pan reg rc = renderedCanvasRegionToText (translate_lBox (-pan) (region_to_lBox reg)) rc
 
     -- same as renderRegionFn
     debugRenderRegionFn pan reg rc = r where
-      txt = renderedCanvasRegionToText (pan_lBox (-pan) (region_to_lBox reg)) rc
+      txt = renderedCanvasRegionToText (translate_lBox (-pan) (region_to_lBox reg)) rc
       --r = trace (T.unpack txt) txt
       r = txt
 
