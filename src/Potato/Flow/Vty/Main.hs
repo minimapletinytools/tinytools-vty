@@ -25,6 +25,7 @@ import           Potato.Reflex.Vty.Widget.Popup
 import           Potato.Reflex.Vty.Widget
 import qualified Potato.Reflex.Vty.Host
 import Potato.Flow.Vty.SaveAsWindow
+import Potato.Flow.Vty.OpenWindow
 import Potato.Flow.Vty.Alert
 import Potato.Flow.Vty.AppKbCmd
 import Potato.Flow.Vty.Attrs
@@ -258,7 +259,7 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
   let 
     -- load file on start
     -- TODO load file from open file dialog
-    tryOpenFileEv = leftmost [fforMaybe postBuildEv (const _mainPFWidgetConfig_initialFile)]
+    tryOpenFileEv = leftmost [fforMaybe postBuildEv (const _mainPFWidgetConfig_initialFile), openFileEv]
 
   -- load file on start
   mLoadFileEv <- performEvent $ ffor tryOpenFileEv
@@ -398,12 +399,13 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
   -- 2 save as popup
   (saveAsEv, popupStateDyn2) <- flip runPotatoReader potatoConfig $ popupSaveAsWindow $ SaveAsWindowConfig (tag (_potatoConfig_appCurrentDirectory potatoConfig) clickSaveAsEv)
 
+  -- TODO alert if mLoadFileEv fails (Nothing)
   -- 3 alert popup
   let
     saveFailAlertEv = fmapMaybe eitherMaybeLeft finishSaveEv
   popupStateDyn3 <- flip runPotatoReader potatoConfig $ popupAlert saveFailAlertEv
 
-  -- 4 unsaved changes on quit popup
+  -- 4 unsaved changes on action popup
   (SaveBeforeActionOutput {..}, popupStateDyn4) <- flip runPotatoReader potatoConfig $ popupSaveBeforeExit $
     SaveBeforeActionConfig {
         _saveBeforeActionConfig_unsavedChangesBeh = current $ _goatWidget_unsavedChanges everythingW
@@ -412,13 +414,16 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
         , _saveBeforeActionConfig_exit = leftmost [_appKbCmd_quit, _menuButtonsWidget_quitEv . _leftWidget_menuButtonsW $ leftW]
         
       }
+  
+  -- 5 open popup
+  (openFileEv, popupStateDyn5) <- flip runPotatoReader potatoConfig $ popupOpenWindow $ OpenWindowConfig (tag (_potatoConfig_appCurrentDirectory potatoConfig) _saveBeforeActionOutput_open)
 
 
 
   let
     -- TODO assert that we never have more than 1 popup open at once
     -- block input if any popup is currently open
-    inputCapturedByPopupBeh = current . fmap getAny . mconcat . fmap (fmap Any) $ [popupStateDyn1, popupStateDyn2, popupStateDyn3, popupStateDyn4]
+    inputCapturedByPopupBeh = current . fmap getAny . mconcat . fmap (fmap Any) $ [popupStateDyn1, popupStateDyn2, popupStateDyn3, popupStateDyn4, popupStateDyn5]
 
 
   -- handle escape event

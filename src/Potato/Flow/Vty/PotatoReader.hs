@@ -24,6 +24,19 @@ import           Reflex.Vty
 
 import Potato.Flow.Vty.Attrs
 
+
+-- TODO move elsewhere
+kTinyToolsFileExtension :: (IsString a) => a
+kTinyToolsFileExtension = ".potato"
+
+-- TODO move elsewhere
+addTinyToolsFileExtensionIfNecessary :: FP.FilePath -> FP.FilePath
+addTinyToolsFileExtensionIfNecessary fp = if FP.takeExtension fp == ""
+  then fp <> kTinyToolsFileExtension
+  else fp
+
+
+
 data PotatoStyle = PotatoStyle {
 
   -- TODO you can DELETE this now prob

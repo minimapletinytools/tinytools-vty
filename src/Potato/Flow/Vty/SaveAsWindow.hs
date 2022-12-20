@@ -1,4 +1,3 @@
--- TODO rename this file to PopupDialogs or something
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE RecursiveDo     #-}
 
@@ -50,17 +49,11 @@ popupSaveAsWindow SaveAsWindowConfig {..} = do
   potatostylebeh <- fmap _potatoConfig_style askPotato
 
   let
-
-    extension = ".potato"
-    modifyFileNameFn fp = if FP.takeExtension fp == ""
-      then fp <> extension
-      else fp
-
     popupSaveAsEv = ffor _saveAsWindowConfig_saveAs $ \f0 -> mdo
       boxTitle (constant def) "Save As" $ do
         initManager_ $ col $ mdo
           fewidget <- (tile . stretch) 3 $ holdFileExplorerWidget $ FileExplorerWidgetConfig {
-              _fileExplorerWidgetConfig_fileFilter = \fp -> FP.takeExtension fp == extension
+              _fileExplorerWidgetConfig_fileFilter = \fp -> FP.takeExtension fp == kTinyToolsFileExtension
               , _fileExplorerWidgetConfig_initialFile = f0
               , _fileExplorerWidgetConfig_clickDownStyle = fmap _potatoStyle_layers_softSelected potatostylebeh
             }
@@ -82,15 +75,14 @@ popupSaveAsWindow SaveAsWindowConfig {..} = do
 
 
           let
-            -- TODO
+            -- do we really want to allow save on pressing enter?
             saveEv' = leftmost [_fileExplorerWidget_returnOnfilename fewidget, saveButtonEv]
 
-            -- TODO test
             -- only save if filename is non-empty
             saveEv = gate (fmap (not . T.null) (_fileExplorerWidget_filename fewidget)) saveEv'
 
             saveAsFileEv' = tag (_fileExplorerWidget_fullfilename fewidget) saveEv
-            saveAsFileEv = fmap modifyFileNameFn saveAsFileEv'
+            saveAsFileEv = fmap addTinyToolsFileExtensionIfNecessary saveAsFileEv'
           return (cancelEv, saveAsFileEv)
     fmapfn w = \escEv clickOutsideEv -> fmap (\(cancelEv, outputEv) -> (leftmost [escEv, cancelEv, void outputEv], outputEv)) w
 
