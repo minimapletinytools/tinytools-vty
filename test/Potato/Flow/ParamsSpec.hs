@@ -84,7 +84,7 @@ test_params_set_canvas_size = TestLabel "set canvas size" $ TestCase $ runSpider
     queueVtyEvent (V.EvKey (V.KChar '3') []) >> fireQueuedEvents
     queueVtyEvent (V.EvKey (V.KChar '0') []) >> fireQueuedEvents
     queueVtyEvent (V.EvKey V.KEnter [])
-    fireQueuedEventsAndRead readCanvasSize >>= \a -> liftIO (checkSingleMaybe a (V2 (-30) (-20)))
+    fireQueuedEventsAndRead readCanvasSize >>= \a -> liftIO (checkSingleMaybe a (V2 0 (-20)))
 
     -- TODO test other stuff 😥
 
