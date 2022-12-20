@@ -378,8 +378,8 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
 
   let
     doesNeedSaveOnExitEv = tag (current $ _goatWidget_unsavedChanges everythingW) $ leftmost [_appKbCmd_quit, _menuButtonsWidget_quitEv . _leftWidget_menuButtonsW $ leftW]
-    (clickSaveEv, nothingClickSaveEv)  = fanMaybe $ tag (_potatoConfig_appCurrentOpenFile potatoConfig) $ leftmost [_menuButtonsWidget_saveEv . _leftWidget_menuButtonsW $ leftW, _appKbCmd_save, _saveBeforeExitOutput_save]
-    clickSaveAsEv = leftmost $ [_menuButtonsWidget_saveAsEv . _leftWidget_menuButtonsW $ leftW, nothingClickSaveEv, _saveBeforeExitOutput_saveAs]
+    (clickSaveEv, nothingClickSaveEv)  = fanMaybe $ tag (_potatoConfig_appCurrentOpenFile potatoConfig) $ leftmost [_menuButtonsWidget_saveEv . _leftWidget_menuButtonsW $ leftW, _appKbCmd_save, _saveBeforeActionOutput_save]
+    clickSaveAsEv = leftmost $ [_menuButtonsWidget_saveAsEv . _leftWidget_menuButtonsW $ leftW, nothingClickSaveEv, _saveBeforeActionOutput_saveAs]
 
   -- TODO probably have some sort of PopupManager -__-
   -- 1 welcome popup
@@ -395,7 +395,7 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
   popupStateDyn3 <- flip runPotatoReader potatoConfig $ popupAlert saveFailAlertEv
 
   -- 4 unsaved changes on quit popup
-  (SaveBeforeExitOutput {..}, popupStateDyn4) <- flip runPotatoReader potatoConfig $ popupSaveBeforeExit (SaveBeforeExitConfig (void $ ffilter id doesNeedSaveOnExitEv))
+  (SaveBeforeActionOutput {..}, popupStateDyn4) <- flip runPotatoReader potatoConfig $ popupSaveBeforeExit (SaveBeforeActionConfig (void $ ffilter id doesNeedSaveOnExitEv))
 
   let
     -- TODO assert that we never have more than 1 popup open at once
@@ -404,4 +404,4 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
 
 
   -- handle escape event
-  return $ leftmost [_appKbCmd_forceQuit, _saveBeforeExitOutput_quit, void $ ffilter not doesNeedSaveOnExitEv]
+  return $ leftmost [_appKbCmd_forceQuit, _saveBeforeActionOutput_quit, void $ ffilter not doesNeedSaveOnExitEv]

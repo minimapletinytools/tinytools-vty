@@ -71,7 +71,7 @@ popupSaveAsWindow SaveAsWindowConfig {..} = do
             saveEv' <- (tile . stretch) 10 $ textButton def "save"
 
             return (cancelEv', saveEv')
-            
+
           -- DELETE
           -- IO file validity checkin
           {-mSaveAsFileEv <- performEvent $ ffor (tag (_fileExplorerWidget_fullfilename fewidget) saveEv) $ \ffn -> liftIO $ do
@@ -82,7 +82,7 @@ popupSaveAsWindow SaveAsWindowConfig {..} = do
 
 
           let
-            -- TODO 
+            -- TODO
             saveEv' = leftmost [_fileExplorerWidget_returnOnfilename fewidget, saveButtonEv]
 
             -- TODO test
@@ -98,21 +98,21 @@ popupSaveAsWindow SaveAsWindowConfig {..} = do
     popupPane def $ (fmap fmapfn popupSaveAsEv)
 
 
-data SaveBeforeExitConfig t = SaveBeforeExitConfig {
-  _saveBeforeExitConfig_exitWithChanges :: Event t ()
+data SaveBeforeActionConfig t = SaveBeforeActionConfig {
+  _saveBeforeActionConfig_exitWithChanges :: Event t ()
 }
 
 -- TODO make this generic, via some PopupManager thingy or what not
 -- you want to use the same NeedSave for close and open when there are unsaved changes
 -- and after the save action, you want to redirect back to the open or quit operation
-data SaveBeforeExitOutput t = SaveBeforeExitOutput {
+data SaveBeforeActionOutput t = SaveBeforeActionOutput {
 
   -- TODO you should be able to get this to work...
-  --_saveBeforeExitOutput_save :: Event t FP.FilePath
-  _saveBeforeExitOutput_save :: Event t ()
+  --_saveBeforeActionOutput_save :: Event t FP.FilePath
+  _saveBeforeActionOutput_save :: Event t ()
 
-  , _saveBeforeExitOutput_saveAs :: Event t ()
-  , _saveBeforeExitOutput_quit :: Event t ()
+  , _saveBeforeActionOutput_saveAs :: Event t ()
+  , _saveBeforeActionOutput_quit :: Event t ()
 }
 
 hackAlign3 :: (Reflex t) => Event t a -> Event t b -> Event t c -> Event t (These a (These b c))
@@ -126,9 +126,9 @@ hackFanThese3 ev = r where
 
 -- TODO somehow allow auto save on exit
 popupSaveBeforeExit :: forall t m. (MonadWidget t m, HasPotato t m)
-  => SaveBeforeExitConfig t
-  -> m (SaveBeforeExitOutput t, Dynamic t Bool)
-popupSaveBeforeExit SaveBeforeExitConfig {..} = do
+  => SaveBeforeActionConfig t
+  -> m (SaveBeforeActionOutput t, Dynamic t Bool)
+popupSaveBeforeExit SaveBeforeActionConfig {..} = do
   mopenfilebeh <- fmap _potatoConfig_appCurrentOpenFile askPotato
 
   -- TODO unsure why this doesn't get resampled each time popup is created :(
@@ -136,7 +136,7 @@ popupSaveBeforeExit SaveBeforeExitConfig {..} = do
 
   -- TODO style everything
   let
-    popupSaveBeforeExitEv = ffor _saveBeforeExitConfig_exitWithChanges $ \f0 -> mdo
+    popupSaveBeforeExitEv = ffor _saveBeforeActionConfig_exitWithChanges $ \f0 -> mdo
       boxTitle (constant def) "You have unsaved changes. Would you like to save?" $ do
         initManager_ $ col $ mdo
           (quitEv, cancelEv, saveButtonEv, saveAsButtonEv) <- do
@@ -156,4 +156,4 @@ popupSaveBeforeExit SaveBeforeExitConfig {..} = do
           return (cancelEv, hackAlign3 saveButtonEv saveAsButtonEv quitEv)
     fmapfn w = \escEv clickOutsideEv -> fmap (\(cancelEv, outputEv) -> (leftmost [escEv, cancelEv, void outputEv], outputEv)) w
   (outputEv, stateDyn) <- popupPane def $ (fmap fmapfn popupSaveBeforeExitEv)
-  return (uncurry3 SaveBeforeExitOutput (hackFanThese3 outputEv), stateDyn)
+  return (uncurry3 SaveBeforeActionOutput (hackFanThese3 outputEv), stateDyn)
