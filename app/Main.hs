@@ -71,10 +71,10 @@ mainWithDebug = runCommand $ \(opts :: PotatoCLIOptions) args -> do
       _mainPFWidgetConfig_initialFile = minitfile
       , _mainPFWidgetConfig_homeDirectory = homeDir
       , _mainPFWidgetConfig_initialState = if _potatoCLIOptions_empty opts
-        then emptyOwlPFState
+        then owlpfstate_newProject
         -- TODO load tutorial here owlpfstate_tutorial
         --else owlpfstate_attachments1
-        else owlpfstate_zero
+        else owlpfstate_newProject
     }
 
   -- set the title

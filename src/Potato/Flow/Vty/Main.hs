@@ -255,13 +255,23 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
   -- need this to force redraw of handles in some cases
   tickOnEvent (updated . _goatWidget_selection $ everythingW)
 
+  let 
+    -- load file on start
+    -- TODO load file from open file dialog
+    tryOpenFileEv = leftmost [fforMaybe postBuildEv (const _mainPFWidgetConfig_initialFile)]
+
   -- load file on start
-  mLoadFileEv <- performEvent $ ffor
-    (fforMaybe postBuildEv (const _mainPFWidgetConfig_initialFile))
+  mLoadFileEv <- performEvent $ ffor tryOpenFileEv
     $ \fp -> do
       absfp <- liftIO $ FP.makeAbsolute fp
       mspf :: Maybe (SPotatoFlow, ControllerMeta) <- liftIO $ Aeson.decodeFileStrict absfp
       return (mspf, absfp)
+
+  -- empty project event
+  let
+      -- a little silly to route a new empty project through the load file event but it's easy whatever
+      newEmptyFileEv = fmap (const (owlPFState_to_sPotatoFlow owlpfstate_newProject, emptyControllerMeta)) _saveBeforeActionOutput_new
+      
 
   -- set the title
   let
@@ -314,7 +324,7 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
 
     goatWidgetConfig = GoatWidgetConfig {
         _goatWidgetConfig_initialState = (_mainPFWidgetConfig_initialState, emptyControllerMeta)
-        , _goatWidgetConfig_load = fmapMaybe fst mLoadFileEv
+        , _goatWidgetConfig_load = leftmost [fmapMaybe fst mLoadFileEv, newEmptyFileEv]
 
         -- canvas direct input
         , _goatWidgetConfig_mouse = leftmostWarn "mouse" [(_layerWidget_mouse (_leftWidget_layersW leftW)), (_canvasWidget_mouse canvasW)]
