@@ -377,7 +377,6 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
       return (kb, stuff)
 
   let
-    doesNeedSaveOnExitEv = tag (current $ _goatWidget_unsavedChanges everythingW) $ leftmost [_appKbCmd_quit, _menuButtonsWidget_quitEv . _leftWidget_menuButtonsW $ leftW]
     (clickSaveEv, nothingClickSaveEv)  = fanMaybe $ tag (_potatoConfig_appCurrentOpenFile potatoConfig) $ leftmost [_menuButtonsWidget_saveEv . _leftWidget_menuButtonsW $ leftW, _appKbCmd_save, _saveBeforeActionOutput_save]
     clickSaveAsEv = leftmost $ [_menuButtonsWidget_saveAsEv . _leftWidget_menuButtonsW $ leftW, nothingClickSaveEv, _saveBeforeActionOutput_saveAs]
 
@@ -395,7 +394,16 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
   popupStateDyn3 <- flip runPotatoReader potatoConfig $ popupAlert saveFailAlertEv
 
   -- 4 unsaved changes on quit popup
-  (SaveBeforeActionOutput {..}, popupStateDyn4) <- flip runPotatoReader potatoConfig $ popupSaveBeforeExit (SaveBeforeActionConfig (void $ ffilter id doesNeedSaveOnExitEv))
+  (SaveBeforeActionOutput {..}, popupStateDyn4) <- flip runPotatoReader potatoConfig $ popupSaveBeforeExit $
+    SaveBeforeActionConfig {
+        _saveBeforeActionConfig_unsavedChangesBeh = current $ _goatWidget_unsavedChanges everythingW
+        , _saveBeforeActionConfig_open = _appKbCmd_open
+        , _saveBeforeActionConfig_new = _appKbCmd_new
+        , _saveBeforeActionConfig_exit = leftmost [_appKbCmd_quit, _menuButtonsWidget_quitEv . _leftWidget_menuButtonsW $ leftW]
+        
+      }
+
+
 
   let
     -- TODO assert that we never have more than 1 popup open at once
@@ -404,4 +412,4 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
 
 
   -- handle escape event
-  return $ leftmost [_appKbCmd_forceQuit, _saveBeforeActionOutput_quit, void $ ffilter not doesNeedSaveOnExitEv]
+  return $ leftmost [_appKbCmd_forceQuit, _saveBeforeActionOutput_exit]
