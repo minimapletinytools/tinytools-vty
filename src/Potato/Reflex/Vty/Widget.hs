@@ -6,6 +6,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE RankNTypes                 #-}
+{-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE RecursiveDo                #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE StandaloneDeriving         #-}
@@ -13,12 +14,16 @@
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE UndecidableInstances       #-}
 
+
 module Potato.Reflex.Vty.Widget
   (
   SingleClick(..)
   , singleClick
   , singleClickNoDragOffSimple
   , singleClickWithDownState
+  , DoubleClickConfig(..)
+  , doubleClick
+  , doubleClickSimple
 
   , splitHDrag
   , DragState(..)
@@ -28,10 +33,10 @@ module Potato.Reflex.Vty.Widget
 
 import           Prelude
 
-import qualified Graphics.Vty         as V
+import qualified Graphics.Vty                  as V
 
 import           Reflex
-import           Reflex.Class         ()
+import           Reflex.Class                  ()
 import           Reflex.Vty.Widget
 import           Reflex.Vty.Widget.Input.Mouse
 
@@ -39,6 +44,7 @@ import           Reflex.Vty.Widget.Input.Mouse
 
 import           Control.Monad.NodeId
 import           Control.Monad.Reader
+import           System.Clock
 
 
 -- currently only works for a SINGLE POINT
@@ -86,6 +92,32 @@ singleClickWithDownState btn = do
         then Just $ SingleClick btn (fromX, fromY) mods (not didStayOn)
         else Nothing
   return (scEv, downDyn)
+
+data DoubleClickConfig = DoubleClickConfig  {
+    -- TODO lol...
+    --_doubleClickConfig_spaceTolerance :: (Int, Int) -- the (x,y) mouse travel tolerance
+    _doubleClickConfig_timeTolerance :: Integer -- the time (ms) between click tolerance
+    , _dobuleClickConfig_button      :: V.Button
+  }
+
+doubleClick :: (Reflex t, MonadHold t m, MonadFix m, PerformEvent t m, MonadIO (Performable m), HasInput t m) => DoubleClickConfig -> m (Event t ())
+doubleClick DoubleClickConfig {..} = do
+  singleClickEv <- singleClickNoDragOffSimple _dobuleClickConfig_button
+  singleClickTimeEv <- performEvent $ ffor singleClickEv $ \_ -> do
+    liftIO $ getTime Monotonic
+  lastClickTimeDyn <- holdDyn (-1) $ singleClickTimeEv
+  (fmap (fmapMaybe id)) $ performEvent $ ffor (tag (current lastClickTimeDyn) singleClickEv) $ \ns -> do
+    time <- liftIO $ getTime Monotonic
+    return $ if (toNanoSecs $ time - ns) `div` 1000000 < _doubleClickConfig_timeTolerance 
+      then Just () 
+      else Nothing
+  
+doubleClickSimple :: (Reflex t, MonadHold t m, MonadFix m, PerformEvent t m, MonadIO (Performable m), HasInput t m) => m (Event t ())
+doubleClickSimple = doubleClick DoubleClickConfig {
+    --_doubleClickConfig_spaceTolerance = (0,0)
+    _doubleClickConfig_timeTolerance = 300
+    , _dobuleClickConfig_button = V.BLeft
+  }
 
 
 integralFractionalDivide :: (Integral a, Fractional b) => a -> a -> b

@@ -76,7 +76,7 @@ popupSaveAsWindow SaveAsWindowConfig {..} = do
 
           let
             -- do we really want to allow save on pressing enter?
-            saveEv' = leftmost [_fileExplorerWidget_returnOnfilename fewidget, saveButtonEv]
+            saveEv' = leftmost [_fileExplorerWidget_returnOnfilename fewidget, _fileExplorerWidget_doubleClick fewidget, saveButtonEv]
 
             -- only save if filename is non-empty
             saveEv = gate (fmap (not . T.null) (_fileExplorerWidget_filename fewidget)) saveEv'

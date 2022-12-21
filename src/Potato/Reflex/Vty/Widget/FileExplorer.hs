@@ -73,8 +73,14 @@ data FileExplorerWidget t = FileExplorerWidget {
   , _fileExplorerWidget_doubleClickFile :: Event t FP.FilePath -- pretty sure this is just single click for now -__-
   , _fileExplorerWidget_directory :: Dynamic t FP.FilePath
   , _fileExplorerWidget_returnOnfilename :: Event t () -- fires when you hit the "return" key in file name input area
+  , _fileExplorerWidget_doubleClick :: Event t () -- fires when you double click on an existing valid file
 }
 
+data FileClick = FileClick {
+    _fileClick_isDouble :: Bool
+    , _fileClick_isFolder :: Bool
+    , _fileClick_file :: FP.FilePath
+  }
 -- TODO reduce constraints, don't use HasPotato
 holdFileExplorerWidget :: forall t m. (MonadLayoutWidget t m, HasPotato t m)
   => FileExplorerWidgetConfig t
@@ -106,7 +112,7 @@ holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
 
   let
     -- set up directory list widget
-    dirWidget xs = (grout . stretch) 1 $ row $ mdo
+    dirWidget filenameinentryfielddyn xs = (grout . stretch) 1 $ row $ mdo
       r <- (grout . stretch) 1 $ col $ do
         let 
           scrolledContents = ffor vScrollDyn $ \vscroll -> fmap leftmost $ forM (drop vscroll xs) $ \(isFolder, path) -> do
@@ -117,12 +123,14 @@ holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
                 -- TODO design proper styling... (maybe prefix folders with > instead of style differently?)
 
               -- TODO make it so you need to click on the name???
-              -- TODO double click
-              (click', downDyn) <- singleClickWithDownState V.BLeft
+              (singleClick', downDyn) <- singleClickWithDownState V.BLeft
+              doubleClick <- doubleClickSimple 
 
+              -- TODO highlight if matches the file entry box
               let
-                styleBeh = join $ ffor (current downDyn) $ \d -> if d then _fileExplorerWidgetConfig_clickDownStyle else baseStyle
-                pathtext' = T.pack (FP.takeFileName path)
+                styleBeh = join $ ffor2 (current filenameinentryfielddyn) (current downDyn) $ \fn d -> if d || T.unpack fn == filename then _fileExplorerWidgetConfig_clickDownStyle else baseStyle
+                filename = FP.takeFileName path
+                pathtext' = T.pack filename
                 pathtext = if isFolder
                   then "> " <> pathtext'
                   else if clickable
@@ -132,12 +140,22 @@ holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
               localTheme (const styleBeh) $ do
                 text (constant pathtext)
 
-              let click = ffilter (not . _singleClick_didDragOff) click'
-              if isFolder
-                then return $ (click $> Left path)
-                else if clickable
-                  then return $ (click $> Right path)
-                  else return never
+              let 
+                singleClick = ffilter (not . _singleClick_didDragOff) singleClick'
+                makefileclick isdouble = FileClick {
+                    _fileClick_isDouble = isdouble
+                    , _fileClick_isFolder = isFolder
+                    , _fileClick_file = path
+                  }
+                alignWithFn th = case th of
+                  This _ -> makefileclick False
+                  That _ -> makefileclick True
+                  These _ _ -> makefileclick True
+                fileclickev = alignWith alignWithFn singleClick (traceEvent "double" doubleClick)
+
+              if isFolder || clickable
+                then return fileclickev
+                else return never
         join . fmap (switchHold never) . networkView $ scrolledContents
       vScrollDyn <- (grout . fixed) 1 $ col $ do
         vScrollBar (constDyn (length xs))
@@ -167,8 +185,8 @@ holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
         return $ difference (updated $ fmap T.unpack dirdyn) indirev
 
     -- click in dir list event
-    clickEvent' <- (grout . stretch) 5 $ box (constant singleBoxStyle) $ do
-      join . fmap (switchHold never) $ networkView (ffor dirContentsDyn dirWidget)
+    (clickEvent') <- (grout . stretch) 5 $ box (constant singleBoxStyle) $ do
+      join . fmap (switchHold never) $ networkView (ffor dirContentsDyn (dirWidget filenameDyn'))
 
     return (clickEvent', setFolderRawEvent', filenameDyn', enterEv')
 
@@ -180,12 +198,14 @@ holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
     setFolderEvent = fmapMaybe id mSetFolderEvent
 
   let
-    maybeLeft (Left a) = Just a
-    maybeLeft _ = Nothing
-    maybeRight (Right a) = Just a
-    maybeRight _ = Nothing
-    clickFolderEvent = fmapMaybe maybeLeft clickEvent
-    clickFileEvent = fmapMaybe maybeRight clickEvent
+    -- TODO consider using doubleClickEvent (you might want to implement highlight selection in this case)
+    maybeClickFolder fc = if _fileClick_isFolder fc && not (_fileClick_isDouble fc) then Just (_fileClick_file fc) else Nothing
+    maybeClickFile fc = if not (_fileClick_isFolder fc) && not (_fileClick_isDouble fc) then Just (_fileClick_file fc) else Nothing 
+    maybeDoubleClickFile fc = if not (_fileClick_isFolder fc) && _fileClick_isDouble fc then Just (_fileClick_file fc) else Nothing
+
+    clickFolderEvent = fmapMaybe maybeClickFolder clickEvent
+    clickFileEvent = fmapMaybe maybeClickFile clickEvent
+    doubleClickFileEvent = fmapMaybe maybeDoubleClickFile clickEvent
 
     fullfilenameDyn = ffor2 dirDyn filenameDyn $ \dir fn -> FP.combine dir (T.unpack fn)
 
@@ -195,4 +215,5 @@ holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
       , _fileExplorerWidget_doubleClickFile = clickFileEvent
       , _fileExplorerWidget_directory = dirDyn
       , _fileExplorerWidget_returnOnfilename = void enterEv
+      , _fileExplorerWidget_doubleClick = void doubleClickFileEvent
     }

@@ -98,6 +98,7 @@ dependencies:
 - filepath
 - ansi-terminal
 - options
+- clock
 
 library:
   source-dirs: src
