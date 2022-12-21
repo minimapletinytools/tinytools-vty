@@ -17,6 +17,8 @@ import           Potato.Reflex.Vty.Helpers
 import           Potato.Reflex.Vty.Widget
 import Potato.Flow.Vty.PotatoReader
 import Potato.Reflex.Vty.Widget.TextInputHelpers
+import           Potato.Reflex.Vty.Widget.ScrollBar
+
 
 
 import Control.Exception (catch)
@@ -82,38 +84,6 @@ holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
   baseStyle <- theme
   isInitialFileDir <- liftIO (FP.doesDirectoryExist _fileExplorerWidgetConfig_initialFile)
 
-  -- set up v scrolling stuff
-  kup <- key V.KUp
-  kdown <- key V.KDown
-  kpgup <- key V.KPageUp
-  kpgdown <- key V.KPageDown
-  --inp <- input
-  mscroll <- mouseScroll
-
-  let
-    requestedScroll :: Event t Int
-    requestedScroll = leftmost
-      [ 1 <$ kdown
-      , (-1) <$ kup
-
-      -- maybe scale this to screen size
-      , 8 <$ kpgdown
-      , (-8) <$ kpgup
-
-      , ffor mscroll $ \case
-          ScrollDirection_Up -> (-1)
-          ScrollDirection_Down -> 1
-      --, 0 <$ traceEvent "inp" inp
-      ]
-    updateLine maxN delta ix = min (max 0 (ix + delta)) maxN
-    scrollEv = leftmost [
-        attach (length <$> (current dirContentsDyn)) requestedScroll
-        -- quick hack to reset scroll after changing folders
-        , (updated dirContentsDyn $> (1,0))
-      ]
-
-  vScrollDyn :: Dynamic t Int <- foldDyn (\(maxN, delta) ix -> updateLine (maxN - 1) delta ix) 0 scrollEv
-
   -- select + click is one way to do choose file to save to but double click is prob better...
   --selectedDyn :: Dynamic t (Maybe Int)
   --selectedDyn <- holdDyn Nothing $ leftmost [selectEv, ]
@@ -136,38 +106,45 @@ holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
 
   let
     -- set up directory list widget
-    dirWidget vscroll xs = forM (drop vscroll xs) $ \(isFolder, path) -> do
-      (grout . fixed) 1 $ do
-        let
-          clickable = _fileExplorerWidgetConfig_fileFilter path
+    dirWidget xs = (grout . stretch) 1 $ row $ mdo
+      r <- (grout . stretch) 1 $ col $ do
+        let 
+          scrolledContents = ffor vScrollDyn $ \vscroll -> fmap leftmost $ forM (drop vscroll xs) $ \(isFolder, path) -> do
+            (grout . fixed) 1 $ row $ do
+              let
+                clickable = _fileExplorerWidgetConfig_fileFilter path
 
-          -- TODO design proper styling... (maybe prefix folders with > instead of style differently?)
+                -- TODO design proper styling... (maybe prefix folders with > instead of style differently?)
 
-        -- TODO make it so you need to click on the name???
-        -- TODO double click
-        (click', downDyn) <- singleClickWithDownState V.BLeft
+              -- TODO make it so you need to click on the name???
+              -- TODO double click
+              (click', downDyn) <- singleClickWithDownState V.BLeft
 
-        let
-          styleBeh = join $ ffor (current downDyn) $ \d -> if d then _fileExplorerWidgetConfig_clickDownStyle else baseStyle
-          pathtext' = T.pack (FP.takeFileName path)
-          pathtext = if isFolder
-            then "> " <> pathtext'
-            else if clickable
-              then " *" <> pathtext'
-              else "  " <> pathtext'
+              let
+                styleBeh = join $ ffor (current downDyn) $ \d -> if d then _fileExplorerWidgetConfig_clickDownStyle else baseStyle
+                pathtext' = T.pack (FP.takeFileName path)
+                pathtext = if isFolder
+                  then "> " <> pathtext'
+                  else if clickable
+                    then " *" <> pathtext'
+                    else "  " <> pathtext'
 
-        localTheme (const styleBeh) $ do
-          text (constant pathtext)
+              localTheme (const styleBeh) $ do
+                text (constant pathtext)
 
-        let click = ffilter (not . _singleClick_didDragOff) click'
-        if isFolder
-          then return $ (click $> Left path)
-          else if clickable
-            then return $ (click $> Right path)
-            else return never
+              let click = ffilter (not . _singleClick_didDragOff) click'
+              if isFolder
+                then return $ (click $> Left path)
+                else if clickable
+                  then return $ (click $> Right path)
+                  else return never
+        join . fmap (switchHold never) . networkView $ scrolledContents
+      vScrollDyn <- (grout . fixed) 1 $ col $ do
+        vScrollBar (constDyn (length xs))
+      return r
 
   -- put it all together
-  (clickEvents, setFolderRawEvent, filenameDyn, enterEv) <- col $ do
+  (clickEvent, setFolderRawEvent, filenameDyn, enterEv) <- col $ do
     -- TODO consider combining filename and directory into one...
     let
       setFileEv = fmap T.pack $ leftmost [fmap snd initialDirFileEv, fmap FP.takeFileName clickFileEvent]
@@ -190,10 +167,10 @@ holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
         return $ difference (updated $ fmap T.unpack dirdyn) indirev
 
     -- click in dir list event
-    clickEvents' <- (grout . stretch) 5 $ box (constant singleBoxStyle) $ do
-      networkView (ffor2 vScrollDyn dirContentsDyn dirWidget)
+    clickEvent' <- (grout . stretch) 5 $ box (constant singleBoxStyle) $ do
+      join . fmap (switchHold never) $ networkView (ffor dirContentsDyn dirWidget)
 
-    return (clickEvents', setFolderRawEvent', filenameDyn', enterEv')
+    return (clickEvent', setFolderRawEvent', filenameDyn', enterEv')
 
   -- perform the IO query to get the folder contents
   mSetFolderEvent <- performEvent $ ffor setFolderRawEvent $ \dir -> liftIO $ do
@@ -201,8 +178,6 @@ holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
     if exists then return $ Just dir else return Nothing
   let
     setFolderEvent = fmapMaybe id mSetFolderEvent
-
-  clickEvent :: Event t (Either FP.FilePath FP.FilePath) <- switchHold never $ (fmap leftmost clickEvents)
 
   let
     maybeLeft (Left a) = Just a

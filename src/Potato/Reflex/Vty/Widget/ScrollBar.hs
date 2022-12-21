@@ -10,11 +10,13 @@ import           Relude
 import           Potato.Reflex.Vty.Helpers
 import           Potato.Reflex.Vty.Widget
 
+
 import qualified Graphics.Vty as V
 import           Reflex
 import           Reflex.Network
 import           Reflex.Potato.Helpers
 import           Reflex.Vty
+
 
 import           Data.Default
 import qualified Data.Sequence as Seq
@@ -41,14 +43,12 @@ onlyIfSimultaneous eva evb = fforMaybe (align eva evb) $ \case
   These a _ -> Just a
   _ -> Nothing
 
-
 -- TODO write UTs
 -- TODO reduce constraints
 vScrollBar :: forall t m a. (MonadWidget t m)
-  => Behavior t V.Attr -- ^ scroll bar style
-  -> Dynamic t Int -- ^ content height
+  => Dynamic t Int -- ^ content height
   -> m (Dynamic t Int) -- ^ offset
-vScrollBar handleStyleBeh contentSizeDyn = mdo
+vScrollBar contentSizeDyn = mdo
   maxSizeDyn <- displayHeight
   let
     screen_over_content_dyn :: Dynamic t Float = liftA2 (\a b -> fromIntegral a / fromIntegral b ) maxSizeDyn contentSizeDyn
@@ -87,12 +87,19 @@ vScrollBar handleStyleBeh contentSizeDyn = mdo
   -- keyboard/scroll movement
   kup <- key V.KUp
   kdown <- key V.KDown
+  kpgup <- key V.KPageUp
+  kpgdown <- key V.KPageDown
   mscroll <- mouseScroll
   let
     requestedScroll :: Event t Float
     requestedScroll = leftmost
       [ 1 <$ kdown
       , (-1) <$ kup
+
+      -- maybe scale to height of scroll bar?
+      , 8 <$ kpgdown
+      , (-8) <$ kpgup
+
       , ffor mscroll $ \case
           ScrollDirection_Up -> (-1)
           ScrollDirection_Down -> 1
