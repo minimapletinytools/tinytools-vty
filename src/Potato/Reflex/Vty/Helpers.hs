@@ -25,12 +25,14 @@ module Potato.Reflex.Vty.Helpers (
   , countEv
   , vLayoutPad
   , drag2AttachOnStart
+  , waitForSecondAfterFirst
 ) where
 
 
 import           Relude
 
 import           Potato.Reflex.Vty.Widget
+import Reflex.Potato.Helpers (simultaneous)
 
 import           Control.Monad.Fix
 import           Control.Monad.NodeId
@@ -150,3 +152,22 @@ drag2AttachOnStart btn beh = do
       return $ Just (anew, d)
   dragBeh <- foldDynM foldfn Nothing dragEv
   return $ fmapMaybe id $ updated dragBeh
+
+
+-- TODO move to reflex-potatoes and add unit test
+-- | produces an event that will fire when the following sequence of conditions happens or happens simultaneously
+-- evA fires
+-- evB fires
+-- 
+-- the state is reset after this event fires and the sequence must occur again for the event to fire again
+waitForSecondAfterFirst :: (Reflex t, MonadFix m, MonadHold t m) => Event t a -> Event t b -> m (Event t (a, b))
+waitForSecondAfterFirst eva evb = mdo
+  -- reset state of a firing each time b fires after a fires or at the same time
+  aDyn <- holdDyn Nothing $ leftmost [evabsimul $> Nothing, fmap Just eva, evb $> Nothing]
+  let 
+    -- always fire if both events fire at the same time
+    evabsimul = simultaneous eva evb 
+    -- only fire when b fires if a fired before
+    evbaftera = fmapMaybe (\(ma,b) -> maybe Nothing (Just . (,b)) ma) (attach (current aDyn) evb)
+  return $ leftmost [evabsimul, evbaftera]
+

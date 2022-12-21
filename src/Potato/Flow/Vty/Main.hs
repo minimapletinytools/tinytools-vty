@@ -412,7 +412,7 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
         , _saveBeforeActionConfig_open = _appKbCmd_open
         , _saveBeforeActionConfig_new = _appKbCmd_new
         , _saveBeforeActionConfig_exit = leftmost [_appKbCmd_quit, _menuButtonsWidget_quitEv . _leftWidget_menuButtonsW $ leftW]
-        
+        , _saveBeforeActionConfig_saveOutcomeEv = finishSaveEv
       }
   
   -- 5 open popup

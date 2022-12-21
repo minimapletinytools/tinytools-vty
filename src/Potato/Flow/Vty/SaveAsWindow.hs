@@ -96,6 +96,7 @@ data SaveBeforeActionConfig t = SaveBeforeActionConfig {
   , _saveBeforeActionConfig_open :: Event t ()
   , _saveBeforeActionConfig_new :: Event t ()
   , _saveBeforeActionConfig_exit :: Event t ()
+  , _saveBeforeActionConfig_saveOutcomeEv :: Event t (Either Text FilePath) -- Left is error Right is success, open/new/exit events only fire if it was a success 
 }
 
 data SaveBeforeActionType = SaveBeforeActionType_Open | SaveBeforeActionType_New | SaveBeforeActionType_Exit | SaveBeforeActionType_None deriving (Show, Eq)
@@ -134,20 +135,23 @@ popupSaveBeforeExit SaveBeforeActionConfig {..} = do
   -- TODO unsure why this doesn't get resampled each time popup is created :(
   --mopenfile <- sample mopenfilebeh
 
+  potatostylebeh <- fmap _potatoConfig_style askPotato
+
   let
     
-    combined = leftmost [SaveBeforeActionType_Open <$_saveBeforeActionConfig_open, SaveBeforeActionType_New <$_saveBeforeActionConfig_new, SaveBeforeActionType_Exit <$_saveBeforeActionConfig_exit]
-    filteredEv = gate _saveBeforeActionConfig_unsavedChangesBeh combined
-    skipEv = gate (fmap not _saveBeforeActionConfig_unsavedChangesBeh) combined
+    combinedEv = leftmost [SaveBeforeActionType_Open <$_saveBeforeActionConfig_open, SaveBeforeActionType_New <$_saveBeforeActionConfig_new, SaveBeforeActionType_Exit <$_saveBeforeActionConfig_exit]
+    filteredEv = gate _saveBeforeActionConfig_unsavedChangesBeh combinedEv
+    skipNoUnsavedChangesEv = gate (fmap not _saveBeforeActionConfig_unsavedChangesBeh) combinedEv
 
 
-  potatostylebeh <- fmap _potatoConfig_style askPotato
+  
+  combinedDyn <- holdDyn SaveBeforeActionType_None  combinedEv
 
   let
     popupSaveBeforeExitEv = ffor filteredEv $ \iev -> mdo
       boxTitle (constant def) "You have unsaved changes. Would you like to save?" $ do
         initManager_ $ col $ mdo
-          (outEv, cancelEv, saveButtonEv, saveAsButtonEv) <- do
+          (ignoreEv, cancelEv, saveButtonEv, saveAsButtonEv) <- do
             (tile . stretch) 0 $ col $ return ()
             (tile . fixed) 3 $ row $ do
               cancelEv' <- (tile . stretch) 9 $ textButton def "cancel"
@@ -159,23 +163,32 @@ popupSaveBeforeExit SaveBeforeActionConfig {..} = do
               saveEv' <- (tile . stretch) 9 $ textButton def "save"
 
               saveAsEv' <- (tile . stretch) 9 $ textButton def "save as"
-              outEv' <- (tile . stretch) 9 $ textButton def "ignore"
-              return (outEv' $> iev, cancelEv', saveEv', saveAsEv')
-          return (cancelEv, hackAlign3 saveButtonEv saveAsButtonEv outEv)
+              ignoreEv' <- (tile . stretch) 9 $ textButton def "ignore"
+              return (ignoreEv' $> iev, cancelEv', saveEv', saveAsEv')
+          return (cancelEv, hackAlign3 saveButtonEv saveAsButtonEv ignoreEv)
     fmapfn w = \escEv clickOutsideEv -> fmap (\(cancelEv, outputEv) -> (leftmost [escEv, cancelEv, void outputEv], outputEv)) w
   (outputEv, stateDyn) <- localTheme (const $ fmap _potatoStyle_normal potatostylebeh) $ do
     popupPane def $ (fmap fmapfn popupSaveBeforeExitEv)
-  let 
-    (saveEv, saveAsEv, doneEv) = hackFanThese3 outputEv
 
-    bothEv = leftmost [skipEv, doneEv]
+  let 
+    (saveEv, saveAsEv, ignoreEv) = hackFanThese3 outputEv
+  saveFinalized <- waitForSecondAfterFirst (tag (current combinedDyn) $ align saveEv saveAsEv) _saveBeforeActionConfig_saveOutcomeEv
+  let 
+    saveFinalizedSuccess = fmap fst . ffilter (isRight . snd) $ saveFinalized
+
+
+    -- only do the action if
+    --  there were no unsaved changes
+    --  the user hit the "ignore" button
+    --  the user successfuly saved after save/saveas operation
+    doActionEv = leftmost [skipNoUnsavedChangesEv, ignoreEv,  saveFinalizedSuccess]
 
     sbao = SaveBeforeActionOutput {
         _saveBeforeActionOutput_save = saveEv
         , _saveBeforeActionOutput_saveAs = saveAsEv
-        , _saveBeforeActionOutput_new = void $ ffilter (== SaveBeforeActionType_New) bothEv
-        , _saveBeforeActionOutput_open = void $ ffilter (== SaveBeforeActionType_Open) bothEv
-        , _saveBeforeActionOutput_exit = void $ ffilter (== SaveBeforeActionType_Exit) bothEv
+        , _saveBeforeActionOutput_new = void $ ffilter (== SaveBeforeActionType_New) doActionEv
+        , _saveBeforeActionOutput_open = void $ ffilter (== SaveBeforeActionType_Open) doActionEv
+        , _saveBeforeActionOutput_exit = void $ ffilter (== SaveBeforeActionType_Exit) doActionEv
       }
 
 
