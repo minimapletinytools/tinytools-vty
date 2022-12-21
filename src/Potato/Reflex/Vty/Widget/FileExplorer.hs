@@ -85,6 +85,8 @@ holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
   -- set up v scrolling stuff
   kup <- key V.KUp
   kdown <- key V.KDown
+  kpgup <- key V.KPageUp
+  kpgdown <- key V.KPageDown
   --inp <- input
   mscroll <- mouseScroll
 
@@ -93,6 +95,11 @@ holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
     requestedScroll = leftmost
       [ 1 <$ kdown
       , (-1) <$ kup
+
+      -- maybe scale this to screen size
+      , 8 <$ kpgdown
+      , (-8) <$ kpgup
+
       , ffor mscroll $ \case
           ScrollDirection_Up -> (-1)
           ScrollDirection_Down -> 1
