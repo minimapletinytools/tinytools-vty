@@ -633,23 +633,6 @@ data ParamsWidget t = ParamsWidget {
 
 }
 
--- TODO move to potato reflex
-switchHoldPair :: (Reflex t, MonadHold t m) => Event t a -> Event t b -> Event t (Event t a, Event t b) -> m (Event t a, Event t b)
-switchHoldPair eva evb evin = fmap fanThese $ switchHold (align eva evb) $ fmap (uncurry align) evin
-
--- TODO move to potato reflex
-switchHoldTriple :: forall t m a b c. (Reflex t, MonadHold t m) => Event t a -> Event t b -> Event t c -> Event t (Event t a, Event t b, Event t c) -> m (Event t a, Event t b, Event t c)
-switchHoldTriple eva evb evc evin = r where
-  evinAligned :: Event t (Event t (These a (These b c)))
-  evinAligned = fmap (\(eva', evb', evc') -> align eva' (align evb' evc')) evin
-  evabc = align eva (align evb evc)
-  switched :: m (Event t (These a (These b c)))
-  switched = switchHold evabc evinAligned
-  fanned1 :: m (Event t a, Event t (These b c))
-  fanned1 = fmap fanThese switched
-  fanned2 = fmap (\(a,bc) -> (a, fanThese bc)) fanned1
-  r = fmap (\(a, (b,c)) -> (a,b,c)) fanned2
-
 joinHold :: (Reflex t, MonadHold t m) => Event t (Dynamic t a) -> Dynamic t a -> m (Dynamic t a)
 joinHold ev d0 = do
   dyndyn <- holdDyn d0 ev
@@ -726,6 +709,7 @@ holdParamsWidget ParamsWidgetConfig {..} = mdo
     return (paramsOutputEv', captureEv', canvasSizeOutputEv', heightDyn')
 
   let
+    -- TODO move to Data.Either.Extra
     maybeLeft (Left a) = Just a
     maybeLeft _ = Nothing
     maybeRight (Right a) = Just a

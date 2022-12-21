@@ -135,9 +135,10 @@ fanMaybe ev = (fmapMaybe id ev, fmapMaybe fmapfn ev) where
     Nothing -> Just ()
     _ -> Nothing
 
-eitherMaybeLeft :: Either a b -> Maybe a
-eitherMaybeLeft (Left a) = Just a
-eitherMaybeLeft _ = Nothing
+-- TODO move to Data.Either.Extra
+maybeLeft :: Either a b -> Maybe a
+maybeLeft (Left a) = Just a
+maybeLeft _ = Nothing
 
 somedefaultpfcfg :: MainPFWidgetConfig
 somedefaultpfcfg = def {
@@ -402,7 +403,7 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
   -- TODO alert if mLoadFileEv fails (Nothing)
   -- 3 alert popup
   let
-    saveFailAlertEv = fmapMaybe eitherMaybeLeft finishSaveEv
+    saveFailAlertEv = fmapMaybe maybeLeft finishSaveEv
   popupStateDyn3 <- flip runPotatoReader potatoConfig $ popupAlert saveFailAlertEv
 
   -- 4 unsaved changes on action popup
