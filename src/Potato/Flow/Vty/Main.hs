@@ -409,8 +409,8 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
   (SaveBeforeActionOutput {..}, popupStateDyn4) <- flip runPotatoReader potatoConfig $ popupSaveBeforeExit $
     SaveBeforeActionConfig {
         _saveBeforeActionConfig_unsavedChangesBeh = current $ _goatWidget_unsavedChanges everythingW
-        , _saveBeforeActionConfig_open = _appKbCmd_open
-        , _saveBeforeActionConfig_new = _appKbCmd_new
+        , _saveBeforeActionConfig_open = leftmost [_appKbCmd_open, _menuButtonsWidget_openEv . _leftWidget_menuButtonsW $ leftW]
+        , _saveBeforeActionConfig_new = leftmost [_appKbCmd_new, _menuButtonsWidget_newEv . _leftWidget_menuButtonsW $ leftW]
         , _saveBeforeActionConfig_exit = leftmost [_appKbCmd_quit, _menuButtonsWidget_quitEv . _leftWidget_menuButtonsW $ leftW]
         , _saveBeforeActionConfig_saveOutcomeEv = finishSaveEv
       }

@@ -30,7 +30,9 @@ import qualified Graphics.Vty as V
 
 -- could put into a different file but whatever
 data MenuButtonsWidget t = MenuButtonsWidget {
-  _menuButtonsWidget_saveEv :: Event t ()
+  _menuButtonsWidget_newEv :: Event t ()
+  , _menuButtonsWidget_openEv :: Event t ()
+  , _menuButtonsWidget_saveEv :: Event t ()
   , _menuButtonsWidget_saveAsEv :: Event t ()
   , _menuButtonsWidget_exportEv :: Event t ()
   , _menuButtonsWidget_quitEv :: Event t ()
@@ -86,14 +88,16 @@ holdLeftWidget LeftWidgetConfig {..} = do
     -- TODO height should be dynamic but not sure if there's away to do this dynamically because width (from which buttonsHeightDyn) is derived depends on `grout . fixed`. You need to pull width from outside of the `grout . fixed` call to make this work right...
     (menuButtons, menuFocusEv, buttonsHeightDyn) <- (grout . fixed) buttonsHeightDyn $ row $ do
 
-      (buttonsEv, heightDyn) <- buttonList (constDyn ["save", "save as", "export to \"potato.txt\"", "quit"]) (Just widthDyn)
+      (buttonsEv, heightDyn) <- buttonList (constDyn ["new", "open", "save", "save as", "export to \"potato.txt\"", "quit"]) (Just widthDyn)
       let
-        exportEv = ffilterButtonIndex 2 buttonsEv
+        exportEv = ffilterButtonIndex 4 buttonsEv
         menuButtons' = MenuButtonsWidget {
-            _menuButtonsWidget_saveEv = ffilterButtonIndex 0 buttonsEv
-            , _menuButtonsWidget_saveAsEv = ffilterButtonIndex 1 buttonsEv
+            _menuButtonsWidget_newEv = ffilterButtonIndex 0 buttonsEv
+            , _menuButtonsWidget_openEv = ffilterButtonIndex 1 buttonsEv
+            , _menuButtonsWidget_saveEv = ffilterButtonIndex 2 buttonsEv
+            , _menuButtonsWidget_saveAsEv = ffilterButtonIndex 3 buttonsEv
             , _menuButtonsWidget_exportEv = exportEv
-            , _menuButtonsWidget_quitEv = ffilterButtonIndex 3 buttonsEv
+            , _menuButtonsWidget_quitEv = ffilterButtonIndex 5 buttonsEv
           }
         clickPrintEv = tag (current $ _goatWidget_renderedCanvas _layersWidgetConfig_goatW) (void exportEv)
       -- TODO don't do this here cmon...
