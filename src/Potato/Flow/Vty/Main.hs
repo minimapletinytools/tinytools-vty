@@ -143,7 +143,7 @@ maybeLeft _ = Nothing
 somedefaultpfcfg :: MainPFWidgetConfig
 somedefaultpfcfg = def {
     --_mainPFWidgetConfig_initialFile = Just "potato.flow"
-    _mainPFWidgetConfig_initialState = owlpfstate_basic2
+    _mainPFWidgetConfig_initialState = (owlpfstate_newProject, emptyControllerMeta)
   }
 
 {-
@@ -222,7 +222,8 @@ captureInputEvents capture child = do
 data MainPFWidgetConfig = MainPFWidgetConfig {
   _mainPFWidgetConfig_initialFile :: Maybe FP.FilePath
   , _mainPFWidgetConfig_homeDirectory :: FP.FilePath
-  , _mainPFWidgetConfig_initialState :: OwlPFState -- ^ will be overriden by initialFile if set
+  -- should this include controller meta too?
+  , _mainPFWidgetConfig_initialState :: (OwlPFState, ControllerMeta) -- ^ will be overriden by initialFile if set
 }
 
 instance Default MainPFWidgetConfig where
@@ -230,7 +231,7 @@ instance Default MainPFWidgetConfig where
       _mainPFWidgetConfig_initialFile = Nothing
       --, _mainPFWidgetConfig_homeDirectory = "/"
       , _mainPFWidgetConfig_homeDirectory = "/home/minimaple/kitchen/faucet/potato-flow-vty"
-      , _mainPFWidgetConfig_initialState = emptyOwlPFState
+      , _mainPFWidgetConfig_initialState = (emptyOwlPFState, emptyControllerMeta)
     }
 
 mainPFWidget :: forall t m. (MonadWidget t m)
@@ -297,6 +298,7 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
       --liftIO $ Aeson.encodeFile "potato.flow" spf
       --print $ "wrote to file: " <> fn
       LBS.writeFile fn $ PrettyAeson.encodePretty (spf, cm)
+      --LBS.writeFile fn $ Aeson.encode (spf, cm)
       return $ Right fn
 
   -- debug stuff (temp)
@@ -325,7 +327,7 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
       }
 
     goatWidgetConfig = GoatWidgetConfig {
-        _goatWidgetConfig_initialState = (_mainPFWidgetConfig_initialState, emptyControllerMeta)
+        _goatWidgetConfig_initialState = _mainPFWidgetConfig_initialState
         , _goatWidgetConfig_load = leftmost [fmapMaybe fst mLoadFileEv, newEmptyFileEv]
 
         -- canvas direct input

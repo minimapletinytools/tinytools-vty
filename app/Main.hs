@@ -10,6 +10,8 @@ import           Relude
 import           Potato.Flow.Vty.Main
 import           Potato.Flow
 import           Potato.Flow.TestStates
+import           Potato.Flow.TutorialState
+
 
 import           GHC.IO.Handle
 import           GHC.IO.Handle.FD
@@ -71,10 +73,10 @@ mainWithDebug = runCommand $ \(opts :: PotatoCLIOptions) args -> do
       _mainPFWidgetConfig_initialFile = minitfile
       , _mainPFWidgetConfig_homeDirectory = homeDir
       , _mainPFWidgetConfig_initialState = if _potatoCLIOptions_empty opts
-        then owlpfstate_newProject
+        then (owlpfstate_newProject, emptyControllerMeta)
         -- TODO load tutorial here owlpfstate_tutorial
         --else owlpfstate_attachments1
-        else owlpfstate_newProject
+        else tutorialState
     }
 
   -- set the title

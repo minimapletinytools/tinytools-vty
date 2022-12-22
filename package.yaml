@@ -99,6 +99,7 @@ dependencies:
 - ansi-terminal
 - options
 - clock
+- file-embed
 
 library:
   source-dirs: src
