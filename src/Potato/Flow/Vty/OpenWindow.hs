@@ -68,7 +68,7 @@ popupOpenWindow OpenWindowConfig {..} = do
 
           let
             -- do we really want to allow open on pressing enter?
-            openEv'' = leftmost [_fileExplorerWidget_returnOnfilename fewidget, openButtonEv]
+            openEv'' = leftmost [_fileExplorerWidget_returnOnfilename fewidget, _fileExplorerWidget_doubleClick fewidget, openButtonEv]
             openEv' = tag (_fileExplorerWidget_fullfilename fewidget) openEv''
             openEv = fmap addTinyToolsFileExtensionIfNecessary openEv'
 
