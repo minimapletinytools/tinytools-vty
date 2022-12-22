@@ -66,7 +66,7 @@ $(declareStuff "PotatoNetwork"
         exitEv <- mainPFWidgetWithBypass
           (MainPFWidgetConfig {
               _mainPFWidgetConfig_initialFile = Nothing
-              , _mainPFWidgetConfig_initialState = emptyOwlPFState
+              , _mainPFWidgetConfig_initialState = (emptyOwlPFState, emptyControllerMeta)
               , _mainPFWidgetConfig_homeDirectory = ""
             })
           $(tinput "PotatoNetwork" "bypassEvent")
