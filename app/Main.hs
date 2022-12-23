@@ -17,15 +17,28 @@ import           GHC.IO.Handle
 import           GHC.IO.Handle.FD
 import           System.IO
 import System.Directory
-import Options
+import           Options.Applicative
+
 
 
 data PotatoCLIOptions = PotatoCLIOptions {
-  _potatoCLIOptions_empty :: Bool
+  _potatoCLIOptions_args :: [String]
+  , _potatoCLIOptions_empty :: Bool
 }
 
-instance Options PotatoCLIOptions where
-    defineOptions = pure PotatoCLIOptions <*> simpleOption "empty" False "open an empty document"
+data Sample = Sample
+  { hello      :: String
+  , quiet      :: Bool
+  , enthusiasm :: Int }
+
+sample :: Parser PotatoCLIOptions
+sample = PotatoCLIOptions
+  <$> many (argument str (metavar "FILE"))
+  <*> switch
+    ( long "empty"
+    <> short 'e'
+    <> help "open an empty document" )
+
 
 main :: IO ()
 main = mainWithDebug
@@ -40,9 +53,17 @@ pushTitleStack = "\ESC[22;0t"
 popTitleStack :: String
 popTitleStack = "\ESC[23;0t"
 
-mainWithDebug :: IO ()
-mainWithDebug = runCommand $ \(opts :: PotatoCLIOptions) args -> do
 
+mainWithDebug :: IO ()
+mainWithDebug = do
+  let 
+    optsparser = info (sample <**> helper)
+      ( fullDesc
+      <> progDesc "optionally enter the filename you'd like to open"
+      <> header "tinytools-vty: an ASCII diagram editor" )
+
+
+  opts <- execParser optsparser
 
   -- vty takes over stdout so this only will work with stderr
   fd <- openFile "stderr.txt" WriteMode
@@ -60,7 +81,7 @@ mainWithDebug = runCommand $ \(opts :: PotatoCLIOptions) args -> do
   minitfile <- if _potatoCLIOptions_empty opts
     then
       return Nothing
-    else case nonEmpty args of
+    else case nonEmpty (_potatoCLIOptions_args opts) of
       Nothing -> return Nothing
       Just (x:|_) -> do
         exists <- doesFileExist x

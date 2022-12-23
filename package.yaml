@@ -97,7 +97,7 @@ dependencies:
 - bimap
 - filepath
 - ansi-terminal
-- options
+- optparse-applicative
 - clock
 - file-embed
 
