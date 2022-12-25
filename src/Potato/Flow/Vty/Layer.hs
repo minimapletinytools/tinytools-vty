@@ -126,7 +126,7 @@ layerContents LayerWidgetConfig {..} scrollDyn = do
         icon = case _owlItem_subItem (_superOwl_elt sowl) of 
           OwlSubItemFolder _ -> "𐃛"
           OwlSubItemBox _ -> "⧈"
-          OwlSubItemLine _ _ -> "⤡"
+          OwlSubItemLine _ -> "⤡"
           OwlSubItemTextArea _ -> "𐂂"
 
         t1 = V.text' attr . T.pack $
