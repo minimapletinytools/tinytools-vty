@@ -4,32 +4,37 @@ module Main (
   main
 ) where
 
-import           Prelude
 import           Relude
 
-import           Potato.Flow.Vty.Main
 import           Potato.Flow
 import           Potato.Flow.TestStates
 import           Potato.Flow.TutorialState
+import           Potato.Flow.Vty.Main
 
 
+import           Control.Exception                    (try)
+import           Data.Maybe                           (fromJust)
 import           GHC.IO.Handle
 import           GHC.IO.Handle.FD
-import           System.IO
-import System.Directory
 import           Options.Applicative
+import           System.Directory
+import           System.FilePath
+import           System.IO                            hiding (putStrLn)
+
+import qualified Graphics.Vty                         as V
+import qualified Graphics.Vty.Config                  as V
+import qualified Graphics.Vty.UnicodeWidthTable.IO    as V
+import qualified Graphics.Vty.UnicodeWidthTable.Query as V
+
 
 
 
 data PotatoCLIOptions = PotatoCLIOptions {
-  _potatoCLIOptions_args :: [String]
-  , _potatoCLIOptions_empty :: Bool
+  _potatoCLIOptions_args                        :: [String]
+  , _potatoCLIOptions_empty                     :: Bool
+  , _potatoCLIOptions_generateUnicodeWidthTable :: Bool
 }
 
-data Sample = Sample
-  { hello      :: String
-  , quiet      :: Bool
-  , enthusiasm :: Int }
 
 sample :: Parser PotatoCLIOptions
 sample = PotatoCLIOptions
@@ -38,6 +43,10 @@ sample = PotatoCLIOptions
     ( long "empty"
     <> short 'e'
     <> help "open an empty document" )
+  <*> switch
+    ( long "widthtable"
+    <> help "generate unicode width table for your terminal using vty" )
+
 
 
 main :: IO ()
@@ -54,9 +63,11 @@ popTitleStack :: String
 popTitleStack = "\ESC[23;0t"
 
 
+
+
 mainWithDebug :: IO ()
 mainWithDebug = do
-  let 
+  let
     optsparser = info (sample <**> helper)
       ( fullDesc
       <> progDesc "optionally enter the filename you'd like to open"
@@ -87,8 +98,32 @@ mainWithDebug = do
         exists <- doesFileExist x
         return $ if exists then Just x else Nothing
 
-  homeDir <- getHomeDirectory
+  if _potatoCLIOptions_generateUnicodeWidthTable opts
+    then do
+      mTermName <- V.currentTerminalName
+      case mTermName of
+        Just termName -> do
+          configdir <- tinytoolsConfigDir
+          let 
+            fn = configdir </> (termName <> "_termwidthfile")
+          rslt <- try $ do
+            wt <- V.buildUnicodeWidthTable V.defaultUnicodeTableUpperBound
+            createDirectoryIfMissing False configdir
+            V.writeUnicodeWidthTable fn wt
+          case rslt of
+            Right _ -> do
+              putStrLn "\n"
+              putStrLn $ "successfully wrote " <> fn
+              exitSuccess
+            Left (SomeException e) -> do
+              putStrLn "\n"
+              die $ "failed to generate or write unicode width table " <> fn <> " with exception " <> show e
+        Nothing -> do
+          die "failed to generate unicode width table because could not obtain terminal name"
 
+    else return ()
+
+  homeDir <- getHomeDirectory
   let
     config = MainPFWidgetConfig {
       _mainPFWidgetConfig_initialFile = minitfile

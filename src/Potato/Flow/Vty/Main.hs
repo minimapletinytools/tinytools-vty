@@ -7,6 +7,7 @@ module Potato.Flow.Vty.Main (
   , mainPFWidgetWithBypass
   , MainPFWidgetConfig(..)
   , somedefaultpfcfg
+  , tinytoolsConfigDir
 ) where
 import           Relude
 
@@ -95,6 +96,12 @@ potatoMainWidgetWithHandle vty child =
       }
 
 
+tinytoolsConfigDir :: IO FP.FilePath
+tinytoolsConfigDir = do
+  homedir <- FP.getHomeDirectory
+  return $ (homedir FP.</> ".tinytools/")
+
+
 -- | run a VtyWidget using term width map written to disk with write-term-width for the current terminal
 -- uses default if the file does not exist
 potatoMainWidget
@@ -108,18 +115,24 @@ potatoMainWidget
   -> IO ()
 potatoMainWidget child = do
   cfg'' <- V.standardIOConfig
+  configDir <- tinytoolsConfigDir
   let
     mTermName = V.termName cfg''
-    widthMapFile = fromJust mTermName <> "_termwidthfile"
-  putStrLn $ "setting up vty for term: " <> show mTermName
+    widthMapFile = case mTermName of
+      Nothing -> ""
+      Just termName -> configDir FP.</> (termName <> "_termwidthfile")
+  doesWidthMapFileExist <- FP.doesFileExist widthMapFile
+  if doesWidthMapFileExist
+    then putStrLn $ "attempting to load unicode width table file " <> widthMapFile
+    else putStrLn $ "could not find unicode width table file " <> widthMapFile <> " please run --widthtable to generate unicode width table file"
   let
     cfg' = cfg'' { V.mouseMode = Just True }
-    cfg = case mTermName of
-      Nothing -> cfg'
-      Just termName -> cfg' {
+    cfg = if doesWidthMapFileExist 
+      then cfg' {
           V.allowCustomUnicodeWidthTables = Just True
           , V.termWidthMaps = [(fromJust mTermName, widthMapFile)]
         }
+      else cfg'
   vty <- V.mkVty cfg
   potatoMainWidgetWithHandle vty child
 

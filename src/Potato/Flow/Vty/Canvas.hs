@@ -24,6 +24,7 @@ import           Reflex
 import           Reflex.Vty
 
 
+-- TODO handle emojis
 -- alternative text rendering methods that don't show spaces
 textNoRenderSpaces
   :: (HasDisplayRegion t m, HasImageWriter t m, HasTheme t m)
