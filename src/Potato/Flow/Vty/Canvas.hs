@@ -24,7 +24,7 @@ import           Reflex
 import           Reflex.Vty
 
 
--- TODO handle emojis
+-- TODO why does this not handle wide chars correctly?
 -- alternative text rendering methods that don't show spaces
 textNoRenderSpaces
   :: (HasDisplayRegion t m, HasImageWriter t m, HasTheme t m)
@@ -38,7 +38,7 @@ textNoRenderSpaces t = do
   tellImages (fmap join img)
   where
     -- revout is of type [(Text, Int)] where the int is offset from BoL
-    foldlinefn (offset, spaces, revout) c = (offset+1, newspaces, newrevout) where
+    foldlinefn (offset, spaces, revout) c = (offset+ (fromIntegral (getPCharWidth c)), newspaces, newrevout) where
       (newspaces, newrevout) = if c == ' '
         then (spaces+1, revout)
         else if spaces /= 0
@@ -136,6 +136,7 @@ holdCanvasWidget CanvasWidgetConfig {..} = mdo
 
   -- 3. render the selection
   localTheme (const (fmap _potatoStyle_selected potatostylebeh)) $ do
+    -- this version does not handle wide chars correctly
     textNoRenderSpaces . current . ffor3 _canvasWidgetConfig_pan screenRegion _canvasWidgetConfig_renderedSelection $ debugRenderRegionFn
     return ()
 
