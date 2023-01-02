@@ -149,7 +149,7 @@ popupSaveBeforeExit SaveBeforeActionConfig {..} = do
 
   let
     popupSaveBeforeExitEv = ffor filteredEv $ \iev -> mdo
-      boxTitle (constant def) "You have unsaved changes. Would you like to save?" $ do
+      boxTitle (constant def) "😱😱 You have unsaved changes. Would you like to save? 😱😱" $ do
         initManager_ $ col $ mdo
           (ignoreEv, cancelEv, saveButtonEv, saveAsButtonEv) <- do
             (tile . stretch) 0 $ col $ return ()
