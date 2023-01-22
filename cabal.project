@@ -1,0 +1,14 @@
+packages: . tinytools reflex-potatoes
+
+-- uncomment this (and updated hashes) to depend on remote for final release, but for local development we rely on git submodules
+
+-- packages: .
+-- source-repository-package
+--  type: git
+--  location: https://github.com/pdlla/reflex-potatoes
+--  tag: 157c08726aec4381c6e1ec34037c39eaf980ee12
+--
+-- source-repository-package
+--   type: git
+--   location: https://github.com/pdlla/tinytools
+--   tag: 1ed481379761cab9db9d10c1ab7848ff5c34b3e4
