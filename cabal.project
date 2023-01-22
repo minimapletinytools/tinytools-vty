@@ -6,9 +6,9 @@ packages: . tinytools reflex-potatoes
 -- source-repository-package
 --  type: git
 --  location: https://github.com/pdlla/reflex-potatoes
---  tag: 157c08726aec4381c6e1ec34037c39eaf980ee12
+--  tag: 4df6f79a7957e701f8f38df8c1f6d63b0d17147e
 --
 -- source-repository-package
 --   type: git
 --   location: https://github.com/pdlla/tinytools
---   tag: 1ed481379761cab9db9d10c1ab7848ff5c34b3e4
+--   tag: bd8b6e5f4164229ce598507bb2c873ed3dd3ff7c

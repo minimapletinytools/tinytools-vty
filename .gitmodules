@@ -10,6 +10,3 @@
 	path = reflex-vty
 	url = git@github.com:pdlla/reflex-vty.git
 	branch = POTATO
-[submodule "reflex-test-host"]
-	path = reflex-test-host
-	url = git@github.com:pdlla/reflex-test-host.git
