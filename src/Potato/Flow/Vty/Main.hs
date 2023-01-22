@@ -31,7 +31,6 @@ import Potato.Flow.Vty.Alert
 import Potato.Flow.Vty.AppKbCmd
 import Potato.Flow.Vty.Attrs
 
-import System.IO (hFlush)
 import System.Console.ANSI (hSetTitle)
 import qualified System.FilePath as FP
 import qualified System.Directory as FP
@@ -127,7 +126,7 @@ potatoMainWidget child = do
     else putStrLn $ "could not find unicode width table file " <> widthMapFile <> " please run --widthtable to generate unicode width table file"
   let
     cfg' = cfg'' { V.mouseMode = Just True }
-    cfg = if doesWidthMapFileExist 
+    cfg = if doesWidthMapFileExist
       then cfg' {
           V.allowCustomUnicodeWidthTables = Just True
           , V.termWidthMaps = [(fromJust mTermName, widthMapFile)]
@@ -271,7 +270,7 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
   -- need this to force redraw of handles in some cases
   tickOnEvent (updated . _goatWidget_selection $ everythingW)
 
-  let 
+  let
     -- load file on start
     -- TODO load file from open file dialog
     tryOpenFileEv = leftmost [fforMaybe postBuildEv (const _mainPFWidgetConfig_initialFile), openFileEv]
@@ -287,7 +286,7 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
   let
       -- a little silly to route a new empty project through the load file event but it's easy whatever
       newEmptyFileEv = fmap (const (owlPFState_to_sPotatoFlow owlpfstate_newProject, emptyControllerMeta)) _saveBeforeActionOutput_new
-      
+
 
   -- set the title
   let
@@ -430,7 +429,7 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
         , _saveBeforeActionConfig_exit = leftmost [_appKbCmd_quit, _menuButtonsWidget_quitEv . _leftWidget_menuButtonsW $ leftW]
         , _saveBeforeActionConfig_saveOutcomeEv = finishSaveEv
       }
-  
+
   -- 5 open popup
   (openFileEv, popupStateDyn5) <- flip runPotatoReader potatoConfig $ popupOpenWindow $ OpenWindowConfig (tag (_potatoConfig_appCurrentDirectory potatoConfig) _saveBeforeActionOutput_open)
 
