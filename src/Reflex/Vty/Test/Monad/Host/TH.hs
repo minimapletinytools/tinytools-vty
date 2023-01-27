@@ -1,11 +1,7 @@
 {-# LANGUAGE TemplateHaskell          #-}
 
-module Reflex.Vty.Test.Monad.Host.TH (
-  declareStuff
-  , tinput
-  , toutputcon
-  , tv
-) where
+
+module Reflex.Vty.Test.Monad.Host.TH where
 
 import Prelude (foldl)
 import           Relude                   hiding (getFirst, Type)
@@ -56,7 +52,7 @@ declareNetworkData name = do
   tv_t <- newName "t"
   tv_m <- newName "m"
   -- not sure if KindedTV is necessary
-  return $ [DataD [] name [PlainTV tv_t, KindedTV tv_m k_m] Nothing [] []]
+  return $ [DataD [] name [PlainTV tv_t (), KindedTV tv_m () k_m] Nothing [] []]
 
 declareNetworkInstance :: Name -> [(String, Q Type)] -> [(String, Q Type)] -> Q Exp -> Q [Dec]
 declareNetworkInstance name inputEventTypes outputTypes body = do
@@ -147,7 +143,7 @@ declareMakeInputs name inputEventTypes = do
     returnstmtssnd = foldl AppE (ConE $ convertNameToPrefixedNameType name "InputTriggerRefs") (fmap (VarE . snd) varnames)
   returnstmts <- [|return ($(return returnstmtsfst),$(return returnstmtssnd))|]
   let
-    b = NormalB $ DoE (refstmts <> [NoBindS returnstmts])
+    b = NormalB $ DoE Nothing (refstmts <> [NoBindS returnstmts])
     c = Clause [] b []
   return $ FunD (mkName "makeInputs") [c]
 

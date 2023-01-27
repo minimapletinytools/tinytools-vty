@@ -1,6 +1,5 @@
 .stack-work/
 *~
-*.cabal
 .DS_Store
 dist-newstyle
 cabal.project.local
