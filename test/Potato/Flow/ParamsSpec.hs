@@ -51,7 +51,7 @@ $(declareStuff "ParamsNetwork"
 
 test_params_set_canvas_size :: Test
 test_params_set_canvas_size = TestLabel "set canvas size" $ TestCase $ runSpiderHost $
-  runReflexVtyTestApp @ (ParamsNetwork (SpiderTimeline Global) (SpiderHost Global)) (100,100) $ do
+  runReflexVtyTestApp @(ParamsNetwork (SpiderTimeline Global) (SpiderHost Global)) (100,100) $ do
 
     -- get our app's input triggers
     ParamsNetwork_InputTriggerRefs {..} <- userInputTriggerRefs
@@ -114,7 +114,7 @@ $(declareStuff "SuperStyleWidgetNetwork"
 
 test_superStyleWidget_basic :: Test
 test_superStyleWidget_basic = TestLabel "set canvas size" $ TestCase $ runSpiderHost $
-  runReflexVtyTestApp @ (SuperStyleWidgetNetwork (SpiderTimeline Global) (SpiderHost Global)) (100,100) $ do
+  runReflexVtyTestApp @(SuperStyleWidgetNetwork (SpiderTimeline Global) (SpiderHost Global)) (100,100) $ do
 
     --let queueVtyEventAndFire x = queueVtyEvent x >> fireQueuedEvents
 

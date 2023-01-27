@@ -5,7 +5,6 @@ import           Relude
 import           Data.Maybe
 
 import qualified Graphics.Vty                         as V
-import qualified Graphics.Vty.Config                  as V
 import qualified Graphics.Vty.UnicodeWidthTable.IO    as V
 import qualified Graphics.Vty.UnicodeWidthTable.Query as V
 

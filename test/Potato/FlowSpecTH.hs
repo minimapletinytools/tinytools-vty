@@ -89,7 +89,7 @@ $(declareStuff "PotatoNetwork"
 
 test_basic :: Test
 test_basic = TestLabel "open and quit" $ TestCase $ runSpiderHost $
-  runReflexVtyTestApp @ (PotatoNetwork (SpiderTimeline Global) (SpiderHost Global)) (100,100) $ do
+  runReflexVtyTestApp @(PotatoNetwork (SpiderTimeline Global) (SpiderHost Global)) (100,100) $ do
 
     -- get our app's input triggers
     PotatoNetwork_InputTriggerRefs {..} <- userInputTriggerRefs

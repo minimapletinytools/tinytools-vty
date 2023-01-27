@@ -13,16 +13,13 @@ import           Potato.Flow.Vty.Main
 
 
 import           Control.Exception                    (try)
-import           Data.Maybe                           (fromJust)
 import           GHC.IO.Handle
-import           GHC.IO.Handle.FD
 import           Options.Applicative
 import           System.Directory
 import           System.FilePath
 import           System.IO                            hiding (putStrLn)
 
 import qualified Graphics.Vty                         as V
-import qualified Graphics.Vty.Config                  as V
 import qualified Graphics.Vty.UnicodeWidthTable.IO    as V
 import qualified Graphics.Vty.UnicodeWidthTable.Query as V
 

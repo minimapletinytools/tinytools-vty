@@ -44,7 +44,7 @@ $(declareStuff "BasicNetworkTest1"
 -- | TODO add splicing to get network input/output var names
 test_basic :: Test
 test_basic = TestLabel "basic" $ TestCase $ runSpiderHost $
-  runReflexVtyTestApp @ (BasicNetworkTest1 (SpiderTimeline Global) (SpiderHost Global)) (100,100) $ do
+  runReflexVtyTestApp @(BasicNetworkTest1 (SpiderTimeline Global) (SpiderHost Global)) (100,100) $ do
 
     -- get our app's input triggers
     BasicNetworkTest1_InputTriggerRefs {..} <- userInputTriggerRefs

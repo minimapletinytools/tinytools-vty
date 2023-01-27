@@ -39,7 +39,7 @@ instance (MonadVtyApp t (TestGuestT t m), TestGuestConstraints t m) => ReflexVty
 
 test_basic :: Test
 test_basic = TestLabel "basic" $ TestCase $ runSpiderHost $
-  runReflexVtyTestApp @ (BasicPotatoTest1 (SpiderTimeline Global) (SpiderHost Global)) (500,500) $ do
+  runReflexVtyTestApp @(BasicPotatoTest1 (SpiderTimeline Global) (SpiderHost Global)) (500,500) $ do
     -- get our app's output events and subscribe to them
     BasicPotatoTest1_Output <- userOutputs
     vtyImages <- vtyOutputs

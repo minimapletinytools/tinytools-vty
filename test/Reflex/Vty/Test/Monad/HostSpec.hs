@@ -46,7 +46,7 @@ instance (MonadVtyApp t (TestGuestT t m), TestGuestConstraints t m) => ReflexVty
 
 test_basic :: Test
 test_basic = TestLabel "basic" $ TestCase $ runSpiderHost $
-  runReflexVtyTestApp @ (BasicNetworkTest1 (SpiderTimeline Global) (SpiderHost Global)) (5,5) $ do
+  runReflexVtyTestApp @(BasicNetworkTest1 (SpiderTimeline Global) (SpiderHost Global)) (5,5) $ do
     -- get our app's output events and subscribe to them
     BasicNetworkTest1_Output {..} <- userOutputs
     vtyImages <- vtyOutputs
