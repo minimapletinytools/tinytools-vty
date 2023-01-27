@@ -15,11 +15,6 @@ extra-source-files:
     README.md
     ChangeLog.md
 
--- is this suppose to go in cabal.project file instead?
-extra-lib-dirs:
-  - /usr/local/opt/icu4c/lib
-extra-include-dirs:
-  - /usr/local/opt/icu4c/include
 
 source-repository head
   type: git

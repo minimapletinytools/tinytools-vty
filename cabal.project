@@ -12,3 +12,10 @@ packages: . tinytools reflex-potatoes
 --   type: git
 --   location: https://github.com/pdlla/tinytools
 --   tag: bd8b6e5f4164229ce598507bb2c873ed3dd3ff7c
+
+
+-- do I need this for icu?
+-- extra-lib-dirs:
+--   - /usr/local/opt/icu4c/lib
+-- extra-include-dirs:
+--   - /usr/local/opt/icu4c/include
