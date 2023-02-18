@@ -198,5 +198,5 @@ holdLeftWidget LeftWidgetConfig {..} = do
         , _leftWidget_toolsW = tools
         , _leftWidget_paramsW = params
         , _leftWidget_menuButtonsW = menuButtons
-        , _leftWidget_setFocusEvent = traceEvent "meow meow" $ fmapMaybe id (updated setFocusDyn)
+        , _leftWidget_setFocusEvent = fmapMaybe id (updated setFocusDyn)
       }

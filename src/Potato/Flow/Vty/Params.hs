@@ -341,7 +341,7 @@ makeLineStyleEvent l r u d trig = pushAlways pushfn trig where
       }
 
 -- TODO someday do backwards expanding text entry boxes for LSC_R and LSC_D
-makeLineStyleTextEntry :: (MonadWidget t m, HasPotato t m) => LineStyleCell -> Dynamic t (Maybe LineStyle) -> m (Behavior t Text)
+makeLineStyleTextEntry :: (MonadWidget t m, HasPotato t m) => LineStyleCell -> Dynamic t (Maybe LineStyle) -> m (Dynamic t Text)
 makeLineStyleTextEntry lsc mlsDyn = do
   mls0 <- sample . current $ mlsDyn
   let modifyEv = (fmap (maybe id (\ss -> const (updateFromLineStyle lsc ss))) (updated mlsDyn))
@@ -349,7 +349,7 @@ makeLineStyleTextEntry lsc mlsDyn = do
   ti <- singleCellTextInput modifyEv $ case mls0 of
     Nothing  -> ""
     Just ls0 -> updateFromLineStyle lsc ls0
-  return . current $ ti
+  return ti
 
 
 -- TODO move to SELts.hs
@@ -359,6 +359,10 @@ presetLineStyles = [("","","",""), ("<",">","^","v"), ("⇦","⇨","⇧","⇩")]
 presetLineStyle_toText :: ([Char], [Char], [Char], [Char]) -> Text
 presetLineStyle_toText (l,r,u,d) = T.pack $ l <> " " <> r <> " " <> u <> " " <> d
 
+
+leftmostEither :: (Reflex t) => Event t a -> Event t b -> Event t (Either a b)
+leftmostEither eva evb = leftmost [(fmap Left eva), (fmap Right evb)]
+
 -- TODO lineystel widget should be like this
 -- [x] start | [x] end    (the one being modified is highlighted)
 -- custom | preset
@@ -366,11 +370,18 @@ presetLineStyle_toText (l,r,u,d) = T.pack $ l <> " " <> r <> " " <> u <> " " <> 
 holdLineStyleWidgetNew :: forall t m. (MonadLayoutWidget t m, HasPotato t m) => ParamsWidgetFn t m (Maybe LineStyle, Maybe LineStyle) (Either Llama SetPotatoDefaultParameters)
 holdLineStyleWidgetNew pdpDyn inputDyn = constDyn $ do
 
+  potatostylebeh <- fmap _potatoConfig_style askPotato
+
+  let buttonAttrBeh = ffor potatostylebeh (\ps -> (_potatoStyle_normal ps, _potatoStyle_selected ps))
+
   (grout . fixed) 1 $ text "line end style:"
   -- TODO in the future, we'd like to be able to disable line ends more easily (without going into presets)
   -- i.e. [x] start | [x] end
   -- alternatively, consider combining with super sytyle
-  endChoiceDyn <- (grout . fixed) 1 $ radioListSimple 0 ["both", "start", "end"]
+  (endChoiceDyn, flipButtonEv) <- (grout . fixed) 1 $ row $ do
+    endChoiceDyn' <- col $ (grout . fixed) 17 $ radioListSimple 0 ["both", "start", "end"]
+    flipButtonEv' <- col $ (grout . stretch) 1 $ oneLineButton buttonAttrBeh "flip"
+    return (endChoiceDyn', flipButtonEv')
   typeChoiceDyn <- (grout . stretch) 1 $ radioListSimple 0 ["custom", "presets"]
 
   setStyleEvEv <- do
@@ -384,16 +395,17 @@ holdLineStyleWidgetNew pdpDyn inputDyn = constDyn $ do
           return $ fmap lineStyle_fromListFormat (leftmost presetClicks)
         return (5, never, setStyleEv')
       (0, ec) -> do
+
         let
           joinmaybetuple mx = case mx of
             Nothing -> (Nothing, Nothing)
             Just x -> x
           lssDyn = ffor(fmap joinmaybetuple $ fmap snd3 inputDyn) $ \(start, end) -> case ec of
-            0 -> start
-            1 -> end
-            2 -> if start == end then start else Nothing
+            0 -> if start == end then start else Nothing
+            1 -> start
+            2 -> end
 
-        (focusDyn,l,r,u,d) <- do
+        (focusDyn,wasChangeDyn,l,r,u,d) <- do
           --(tile . fixed) 1 $ text (fmap (T.pack . superStyle_toListFormat . Data.Maybe.fromJust) $ current mssDyn)
           l_d1 <- (grout . fixed) 1 $ row $ do
             (grout . fixed) 8 $ text " left:"
@@ -407,17 +419,17 @@ holdLineStyleWidgetNew pdpDyn inputDyn = constDyn $ do
           d_d1 <- (grout . fixed) 1 $ row $ do
             (grout . fixed) 8 $ text "down:"
             (tile . stretch) 1 $ makeLineStyleTextEntry LSC_D lssDyn
-
           focusDyn' <- focusedId
-          return (focusDyn',l_d1,r_d1,u_d1,d_d1)
+          -- track if there were changes made in the cell and reset each time we change cells
+          let trueInputChangeEv = difference (leftmost [updated l_d1 $> True, updated r_d1 $> True, updated u_d1 $> True, updated d_d1 $> True]) (updated lssDyn)
+          wasChangeDyn' <- holdDyn False $ leftmost [updated focusDyn' $> False, trueInputChangeEv]
+          return (focusDyn',wasChangeDyn',l_d1,r_d1,u_d1,d_d1)
 
         captureEv'' <- makeCaptureFromUpdateTextZipperMethod updateTextZipperForSingleCharacter
         focusDynUnique <- holdUniqDyn focusDyn
 
         let
-          -- TODO maybe just do it when any of the cell dynamics are updated rather than when focus changes...
-          -- TODO if we do it on focus change, you don't want to set when escape is pressed... so maybe it's better just to do 🖕
-          setStyleEv' = makeLineStyleEvent l r u d (void $ updated focusDynUnique)
+          setStyleEv' = makeLineStyleEvent (current l) (current r) (current u) (current d) (void $ gate (current wasChangeDyn) (updated focusDynUnique))
           captureEv' = leftmost [void setStyleEv', captureEv'']
         return (7, captureEv', setStyleEv')
 
@@ -427,8 +439,8 @@ holdLineStyleWidgetNew pdpDyn inputDyn = constDyn $ do
 
   let
     selectionDyn = fmap fst3 inputDyn
-    pushLineStyleFn :: LineStyle -> PushM t (Maybe (Either Llama SetPotatoDefaultParameters))
-    pushLineStyleFn ss = do
+    pushLineStyleFn :: Either () LineStyle -> PushM t (Maybe (Either Llama SetPotatoDefaultParameters))
+    pushLineStyleFn eflipss = do
       pdp <- sample . current $ pdpDyn
       whichEnd' <- sample . current $ endChoiceDyn
       (SuperOwlParliament selection, _, tool) <- sample . current $ inputDyn
@@ -444,28 +456,35 @@ holdLineStyleWidgetNew pdpDyn inputDyn = constDyn $ do
         whichEndFn sowl = case whichEnd of
           SetLineStyleEnd_Start -> startStyle
           SetLineStyleEnd_End -> endStyle
-          SetLineStyleEnd_Both -> if startStyle == endStyle then startStyle else Nothing 
+          SetLineStyleEnd_Both -> if startStyle == endStyle then startStyle else Nothing
           where
             seltl = superOwl_toSEltLabel_hack sowl
             startStyle = getSEltLabelLineStyle seltl
             endStyle = getSEltLabelLineStyleEnd seltl
-        fmapfn sowl = case whichEndFn sowl of
-          Nothing -> llama
-          Just oldss -> if oldss == ss then Nothing else llama
-          where llama = Just $ makeLlamaForLineStyle sowl whichEnd ss
-      return $ if toolOverrideLineStyle tool
-        then if _potatoDefaultParameters_lineStyle pdp == ss
-          then Nothing
-          else Just . Right $ 
-            -- is there a better syntax to do this LOL?
-            def { 
-                _setPotatoDefaultParameters_lineStyle = if setstart then Just ss else _setPotatoDefaultParameters_lineStyle def 
-                , _setPotatoDefaultParameters_lineStyleEnd = if setend then Just ss else _setPotatoDefaultParameters_lineStyleEnd def 
-              }
-        else case Data.Maybe.mapMaybe fmapfn . toList $ selection of
-          [] -> Nothing
-          x  -> Just . Left . makeCompositionLlama $ x
-    ssparamsEv = push pushLineStyleFn setStyleEv
+      return $ case eflipss of
+        Left () -> case Data.Maybe.mapMaybe fmapleftfn . toList $ selection of
+            [] -> Nothing
+            x  -> Just . Left . makeCompositionLlama $ x
+          where
+            fmapleftfn sowl = makeLlamaForFlipLineStyle sowl
+        Right ss -> if toolOverrideLineStyle tool
+          then if _potatoDefaultParameters_lineStyle pdp == ss
+            then Nothing
+            else Just . Right $
+              -- is there a better syntax to do this LOL?
+              def {
+                  _setPotatoDefaultParameters_lineStyle = if setstart then Just ss else _setPotatoDefaultParameters_lineStyle def
+                  , _setPotatoDefaultParameters_lineStyleEnd = if setend then Just ss else _setPotatoDefaultParameters_lineStyleEnd def
+                }
+          else case Data.Maybe.mapMaybe fmaprightfn . toList $ selection of
+            [] -> Nothing
+            x  -> Just . Left . makeCompositionLlama $ x
+          where
+            fmaprightfn sowl = case whichEndFn sowl of
+              Nothing -> llama
+              Just oldss -> if oldss == ss then Nothing else llama
+              where llama = Just $ makeLlamaForLineStyle sowl whichEnd ss
+    ssparamsEv = push pushLineStyleFn (leftmostEither flipButtonEv setStyleEv)
 
   return (heightDyn, captureEv, ssparamsEv)
 
@@ -700,8 +719,8 @@ holdParamsWidget ParamsWidgetConfig {..} = mdo
           return (cssz', cssev', csCaptureEv')
       let
         heightDyn'' = liftA2 (+) cssz $ foldr (liftA2 (+)) 0 $ fmap fst3 outputs
-      -- multiple capture events will fire at once due to the way makeCaptureFromUpdateTextZipperMethod is scoped
-      return $ (leftmostWarn "paramsLayout" (fmap snd3 outputs), leftmostWarn "paramsCapture" (captureEv2 : fmap thd3 outputs), cssev, heightDyn'')
+      -- NOTE multiple capture events will fire at once due to the way makeCaptureFromUpdateTextZipperMethod is scoped
+      return $ (leftmostWarn "paramsLayout" (fmap snd3 outputs), leftmost (captureEv2 : fmap thd3 outputs), cssev, heightDyn'')
 
     heightDyn' <- joinHold (fmap fth4 paramsNetwork) 0
     (paramsOutputEv', captureEv', canvasSizeOutputEv') <- switchHoldTriple never never never $ fmap fstsndthd4 paramsNetwork
@@ -718,7 +737,7 @@ holdParamsWidget ParamsWidgetConfig {..} = mdo
   canvasSizeChangeEventDummyDyn <- holdDyn () (void canvasSizeOutputEv)
 
   return ParamsWidget {
-    _paramsWidget_paramsEvent = fmapMaybe maybeLeft paramsOutputEv
+    _paramsWidget_paramsEvent = (fmapMaybe maybeLeft paramsOutputEv)
     , _paramsWidget_canvasSizeEvent = canvasSizeOutputEv
     , _paramsWidget_setDefaultParamsEvent = fmapMaybe maybeRight paramsOutputEv
     , _paramsWidget_captureInputEv = captureEv
