@@ -4,6 +4,7 @@
 
 module Potato.Flow.Vty.Common (
   ffilterButtonIndex
+  , oneLineButton
   , buttonList
   , radioList
   , radioListSimple
@@ -44,7 +45,38 @@ simpleDrag btn = do
       then Just $ ((fromX, fromY), (toX, toY))
       else Nothing
 
+makeOneLineButtonImage :: V.Attr -> V.Attr -> ((Int,Int,Int), Text, Bool) -> V.Image
+makeOneLineButtonImage defAttr downAttr ((x,y,_), t, downclickTODO) = V.translate x y $ V.text' attr ("["<>t<>"]") where
+  attr = if downclickTODO then downAttr else defAttr
 
+
+oneLineButton :: forall t m. (MonadFix m, MonadHold t m, HasDisplayRegion t m, HasImageWriter t m, HasInput t m)
+  => Behavior t (V.Attr, V.Attr)
+  -> Dynamic t Text -- ^ button content
+  -> m (Event t ()) -- ^ event when button is clicked
+oneLineButton attrBeh buttonDyn = do
+  dw <- displayWidth
+  clickEv <- simpleDrag V.BLeft
+  let
+    selectEv = flip push clickEv $ \((px,py),(ex,ey)) -> do
+      t <- sample . current $ buttonDyn
+      let l = T.length t + 2
+      return $ if py == 0 && ey == 0 && px >= 0 && ex >= 0 && px < l && ex < l
+        then Just ()
+        else Nothing
+
+  (defAttr, downAttr) <- sample attrBeh
+
+  let
+    -- ((x,y,length), contents, downClickTODO)
+    buttonDyn' :: Dynamic t ((Int,Int,Int), Text, Bool)
+    buttonDyn' = ffor2 dw buttonDyn $ \w t -> ((0,0, T.length t + 2), t, False)
+
+  -- TODO pass correct theme based on style
+  tellImages $ fmap (\b -> [makeOneLineButtonImage defAttr downAttr b]) $ current buttonDyn'
+  return $ selectEv
+
+-- TODO pass in sel and default attrs
 -- | option to pass in height is a hack to work around circular dependency issues as when using Layout, displayWidth may be dependent on returned dynamic height
 buttonList :: forall t m. (MonadFix m, MonadHold t m, HasDisplayRegion t m, HasImageWriter t m, HasInput t m, HasTheme t m)
   => Dynamic t [Text] -- ^ list of button contents
@@ -61,7 +93,7 @@ buttonList buttonsDyn mWidthDyn = do
   --isDraggingDyn
 
   let
-    -- ((x,y,length), contents)
+    -- ((x,y,length), contents, downclickTODO)
     buttons :: Dynamic t [((Int,Int,Int), Text, Bool)]
     buttons = ffor2 dw buttonsDyn $ fn where
       fn w bs = r where
@@ -70,6 +102,8 @@ buttonList buttonsDyn mWidthDyn = do
           nextx' = x + buttonl
           (nx,ny,nextx) = if nextx' > w then (0,y+1, buttonl) else (x,y, nextx')
         (_,r) = mapAccumL mapaccumfn (0, 0) bs
+
+    -- TODO replace with makeOneLineButtonImage
     makeImage :: ((Int,Int,Int), Text, Bool) -> V.Image
     makeImage ((x,y,_), t, downclickTODO) = V.translate x y $ V.text' attr ("["<>t<>"]") where
       attr = if downclickTODO then lg_layer_selected else lg_default
@@ -79,6 +113,8 @@ buttonList buttonsDyn mWidthDyn = do
       return $ L.ifindIndex (\_ ((x,y,l),_,_) -> py == y && ey == y && px >= x && ex >= x && px < x+l && ex < x+l) bs
   tellImages $ fmap (fmap makeImage) $ current buttons
   return $ (selectEv, heightDyn)
+
+-- TODO pass in sel and default attrs
 
 -- | option to pass in height is a hack to work around circular dependency issues as when using Layout, displayWidth may be dependent on returned dynamic height
 -- override style: does not modify state internally, instead state must be passed back in
@@ -122,6 +158,8 @@ radioList buttonsDyn activeDyn mWidthDyn = do
       return $ L.ifindIndex (\_ ((x,y,l),_,_) -> py == y && px >= x && px < x+l) bs
   tellImages $ fmap (fmap makeImage) $ current buttons
   return $ (selectEv, heightDyn)
+
+-- TODO pass in sel and default attrs
 
 radioListSimple :: forall t m. (Reflex t, MonadFix m, MonadHold t m, MonadNodeId m, HasDisplayRegion t m, HasImageWriter t m, HasInput t m, HasTheme t m)
   => Int -- ^ initial choice
