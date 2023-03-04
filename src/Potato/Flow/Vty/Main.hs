@@ -172,7 +172,7 @@ verifyInput ev = do
 
 fetchMOTD :: IO Text
 fetchMOTD = do
-  resp <- httpLBS "https://raw.githubusercontent.com/pdlla/potato-flow-vty/potato/MOTD.txt"
+  resp <- httpLBS "https://raw.githubusercontent.com/pdlla/tinytools-vty/potato/MOTD.txt"
   return $ LT.toStrict $ LT.decodeUtf8 (getResponseBody resp)
 
 fetchMOTDAsync :: forall t m. (MonadWidget t m) => Event t () -> m (Event t Text)
