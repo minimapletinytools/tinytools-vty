@@ -1,4 +1,4 @@
-packages: . tinytools reflex-potatoes reflex-vty
+packages: . tinytools
 
 -- uncomment this (and updated hashes) to depend on remote for final release, but for local development we rely on git submodules
 
