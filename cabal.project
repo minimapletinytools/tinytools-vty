@@ -1,18 +1,4 @@
-packages: . tinytools
-
--- uncomment this (and updated hashes) to depend on remote for final release, but for local development we rely on git submodules
-
--- packages: .
--- source-repository-package
---  type: git
---  location: https://github.com/pdlla/reflex-potatoes
---  tag: 4df6f79a7957e701f8f38df8c1f6d63b0d17147e
---
--- source-repository-package
---   type: git
---   location: https://github.com/pdlla/tinytools
---   tag: bd8b6e5f4164229ce598507bb2c873ed3dd3ff7c
-
+packages: .
 
 -- do I need this for icu?
 -- extra-lib-dirs:
