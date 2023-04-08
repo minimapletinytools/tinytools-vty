@@ -101,7 +101,7 @@ mainWithDebug = do
       case mTermName of
         Just termName -> do
           configdir <- tinytoolsConfigDir
-          let 
+          let
             fn = configdir </> (termName <> "_termwidthfile")
           rslt <- try $ do
             wt <- V.buildUnicodeWidthTable V.defaultUnicodeTableUpperBound
@@ -130,6 +130,7 @@ mainWithDebug = do
         -- TODO load tutorial here owlpfstate_tutorial
         --else owlpfstate_attachments1
         else tutorialState
+      , _mainPFWidgetConfig_showWelcome = True
     }
 
   -- set the title

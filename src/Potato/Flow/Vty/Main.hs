@@ -190,7 +190,7 @@ welcomeWidget = do
   postBuildEv <- getPostBuild
   welcomeMessageEv <- fetchMOTDAsync postBuildEv
   welcomeMessageDyn <- holdDyn "loading..." welcomeMessageEv
-  boxTitle (constant def) "😱😱😱" $ do
+  boxTitle (constant def) "😱 tinytools-vty (beta) 😱" $ do
     initLayout $ col $ do
       (grout . stretch) 1 $ text (current welcomeMessageDyn)
       (grout . fixed) 3 $ textButton def (constant "bye")
@@ -237,6 +237,7 @@ data MainPFWidgetConfig = MainPFWidgetConfig {
   , _mainPFWidgetConfig_homeDirectory :: FP.FilePath
   -- should this include controller meta too?
   , _mainPFWidgetConfig_initialState :: (OwlPFState, ControllerMeta) -- ^ will be overriden by initialFile if set
+  , _mainPFWidgetConfig_showWelcome :: Bool
 }
 
 instance Default MainPFWidgetConfig where
@@ -245,6 +246,7 @@ instance Default MainPFWidgetConfig where
       --, _mainPFWidgetConfig_homeDirectory = "/"
       , _mainPFWidgetConfig_homeDirectory = "/home/minimaple/kitchen/faucet/potato-flow-vty"
       , _mainPFWidgetConfig_initialState = (emptyOwlPFState, emptyControllerMeta)
+      , _mainPFWidgetConfig_showWelcome = False
     }
 
 mainPFWidget :: forall t m. (MonadWidget t m)
@@ -406,10 +408,10 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
     (clickSaveEv, nothingClickSaveEv)  = fanMaybe $ tag (_potatoConfig_appCurrentOpenFile potatoConfig) $ leftmost [_menuButtonsWidget_saveEv . _leftWidget_menuButtonsW $ leftW, _appKbCmd_save, _saveBeforeActionOutput_save]
     clickSaveAsEv = leftmost $ [_menuButtonsWidget_saveAsEv . _leftWidget_menuButtonsW $ leftW, nothingClickSaveEv, _saveBeforeActionOutput_saveAs]
 
-  -- TODO probably have some sort of PopupManager -__-
   -- 1 welcome popup
-  --(_, popupStateDyn1) <- popupPaneSimple def (postBuildEv $> welcomeWidget)
-  (_, popupStateDyn1) <- popupPaneSimple def (never $> welcomeWidget)
+  let
+    showWelcomeEv = if _mainPFWidgetConfig_showWelcome then postBuildEv else never
+  (_, popupStateDyn1) <- popupPaneSimple def (showWelcomeEv $> welcomeWidget)
 
   -- 2 save as popup
   (saveAsEv, popupStateDyn2) <- flip runPotatoReader potatoConfig $ popupSaveAsWindow $ SaveAsWindowConfig (tag (_potatoConfig_appCurrentDirectory potatoConfig) clickSaveAsEv)
