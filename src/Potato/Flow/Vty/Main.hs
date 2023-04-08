@@ -13,6 +13,7 @@ import           Relude
 
 
 import           Potato.Flow
+import qualified Potato.Flow.Serialization.Snake as Snake
 import           Potato.Flow.TestStates
 import           Potato.Flow.Vty.Canvas
 import           Potato.Flow.Vty.Input
@@ -31,6 +32,7 @@ import Potato.Flow.Vty.Alert
 import Potato.Flow.Vty.AppKbCmd
 import Potato.Flow.Vty.Attrs
 
+
 import System.Console.ANSI (hSetTitle)
 import qualified System.FilePath as FP
 import qualified System.Directory as FP
@@ -38,10 +40,9 @@ import qualified System.Directory as FP
 import           Control.Concurrent
 import           Control.Monad.NodeId
 import Control.Exception (handle)
-import qualified Data.Aeson                        as Aeson
-import qualified Data.Aeson.Encode.Pretty as PrettyAeson
 import           Data.Maybe
 import           Data.Default
+import qualified Data.Text as T
 import qualified Data.Text.Encoding                as T
 import qualified Data.Text.Lazy                    as LT
 import qualified Data.Text.Lazy.Encoding           as LT
@@ -276,14 +277,16 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
     tryOpenFileEv = leftmost [fforMaybe postBuildEv (const _mainPFWidgetConfig_initialFile), openFileEv]
 
   -- load file on start
-  mLoadFileEv <- performEvent $ ffor tryOpenFileEv
+  eLoadFileEv <- performEvent $ ffor tryOpenFileEv
     $ \fp -> do
       absfp <- liftIO $ FP.makeAbsolute fp
-      mspf :: Maybe (SPotatoFlow, ControllerMeta) <- liftIO $ Aeson.decodeFileStrict absfp
-      return (mspf, absfp)
+      espf <- liftIO $ Snake.decodeFile absfp
+      return (espf, absfp)
 
   -- empty project event
   let
+      loadFileFailAlertEv = fmap T.pack $ fmapMaybe (leftToMaybe . fst) eLoadFileEv
+      loadFileEv = fmapMaybe (rightToMaybe . fst) eLoadFileEv
       -- a little silly to route a new empty project through the load file event but it's easy whatever
       newEmptyFileEv = fmap (const (owlPFState_to_sPotatoFlow owlpfstate_newProject, emptyControllerMeta)) _saveBeforeActionOutput_new
 
@@ -307,10 +310,7 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
           , _controllerMeta_layers = _layersState_meta . _goatState_layersState $ gs
         }
     handle (\(SomeException e) -> return . Left $ "ERROR, Could not save to file " <> show fn <> " got exception \"" <> show e <> "\"") $ do
-      --liftIO $ Aeson.encodeFile "potato.flow" spf
-      --print $ "wrote to file: " <> fn
-      LBS.writeFile fn $ PrettyAeson.encodePretty (spf, cm)
-      --LBS.writeFile fn $ Aeson.encode (spf, cm)
+      LBS.writeFile fn $ Snake.serialize Snake.SF_Json (spf, cm)
       return $ Right fn
 
   -- debug stuff (temp)
@@ -328,7 +328,7 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
   AppKbCmd {..} <- captureInputEvents (That inputCapturedByPopupBeh) holdAppKbCmd
 
   -- setup PotatoConfig
-  currentOpenFileDyn <- holdDyn Nothing $ fmap Just $ leftmost [saveSuccessEv, fmap snd mLoadFileEv]
+  currentOpenFileDyn <- holdDyn Nothing $ fmap Just $ leftmost [saveSuccessEv, fmap snd eLoadFileEv]
   let
     potatoConfig = PotatoConfig {
         _potatoConfig_style = constant def
@@ -340,7 +340,7 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
 
     goatWidgetConfig = GoatWidgetConfig {
         _goatWidgetConfig_initialState = _mainPFWidgetConfig_initialState
-        , _goatWidgetConfig_load = leftmost [fmapMaybe fst mLoadFileEv, newEmptyFileEv]
+        , _goatWidgetConfig_load = leftmost [loadFileEv, newEmptyFileEv]
 
         -- canvas direct input
         , _goatWidgetConfig_mouse = leftmostWarn "mouse" [(_layerWidget_mouse (_leftWidget_layersW leftW)), (_canvasWidget_mouse canvasW)]
@@ -414,11 +414,9 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
   -- 2 save as popup
   (saveAsEv, popupStateDyn2) <- flip runPotatoReader potatoConfig $ popupSaveAsWindow $ SaveAsWindowConfig (tag (_potatoConfig_appCurrentDirectory potatoConfig) clickSaveAsEv)
 
-  -- TODO alert if mLoadFileEv fails (Nothing)
-  -- 3 alert popup
   let
     saveFailAlertEv = fmapMaybe maybeLeft finishSaveEv
-  popupStateDyn3 <- flip runPotatoReader potatoConfig $ popupAlert saveFailAlertEv
+  popupStateDyn3 <- flip runPotatoReader potatoConfig $ popupAlert (leftmost [saveFailAlertEv, loadFileFailAlertEv])
 
   -- 4 unsaved changes on action popup
   (SaveBeforeActionOutput {..}, popupStateDyn4) <- flip runPotatoReader potatoConfig $ popupSaveBeforeExit $

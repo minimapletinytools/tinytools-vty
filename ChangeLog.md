@@ -1,10 +1,9 @@
 # Changelog for tinytools-vty
 
-## [Unreleased]
-
-## [0.1.0.1]
+## [0.1.0.2]
 ### Added
 - minor stuff to fix build
+- Snake
 
 ## [0.1.0.0] - alpha
 ### Added

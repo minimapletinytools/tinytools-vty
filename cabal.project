@@ -1,7 +1,2 @@
-packages: .
-
--- do I need this for icu?
--- extra-lib-dirs:
---   - /usr/local/opt/icu4c/lib
--- extra-include-dirs:
---   - /usr/local/opt/icu4c/include
+-- packages: .
+packages: . tinytools

@@ -1,7 +1,7 @@
 cabal-version: 1.12
 
 name:           tinytools-vty
-version:        0.1.0.1
+version:        0.1.0.2
 description:    Please see the README on GitHub at <https://github.com/pdlla/tinytools-vty#readme>
 homepage:       https://github.com/pdlla/tinytools-vty#readme
 bug-reports:    https://github.com/pdlla/tinytools-vty/issues
@@ -129,7 +129,7 @@ library
     , text
     , these
     , time
-    , tinytools
+    , tinytools >= 0.1.0.2
     , vty
   default-language: Haskell2010
 
@@ -203,7 +203,7 @@ executable tinytools-vty
     , reflex >= 0.8 && <1
     , reflex-potatoes >=0.1
     , reflex-test-host >=0.1.2.2
-    , tinytools >= 0.1
+    , tinytools >= 0.1.0.2
     , relude
     , semialign
     , template-haskell
@@ -278,20 +278,17 @@ executable write-term-width
     , lens
     , mtl
     , optparse-applicative
-    , tinytools-vty
     , primitive
     , ref-tf
     , reflex >= 0.8 && <1
     , reflex-potatoes >=0.1
     , reflex-test-host >=0.1.2.2
-    , tinytools >= 0.1
     , relude
     , semialign
     , template-haskell
     , text
     , these
     , time
-    , tinytools
     , vty
   default-language: Haskell2010
 
@@ -383,6 +380,6 @@ test-suite tinytools-vty-test
     , text
     , these
     , time
-    , tinytools
+    , tinytools >= 0.1.0.2
     , vty
   default-language: Haskell2010
