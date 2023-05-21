@@ -35,19 +35,27 @@ data ToolWidget t = ToolWidget {
 --onlyIfBeh ev beh = fmapMaybe (\(b,e) -> if b then Just e else Nothing) $ attach beh ev
 
 
+toolWidgetToIndex :: Tool -> Int
+toolWidgetToIndex = \case
+  Tool_Select -> 0
+  Tool_Pan -> 1
+  Tool_Box -> 2
+  Tool_Line -> 3
+  Tool_TextArea -> 4
+  _ -> 0
+
 holdToolsWidget :: forall t m. (PostBuild t m, MonadWidget t m)
   => ToolWidgetConfig t
   -> m (ToolWidget t)
 holdToolsWidget ToolWidgetConfig {..} = mdo
 
-  (radioEvs, heightDyn) <- radioList (constDyn ["(v)select","(p)an","(b)ox","(l)ine","(t)extbox","pai(n)t"]) (fmap ((:[]) . fromEnum) _toolWidgetConfig_tool) (Just _toolWidgetConfig_widthDyn)
+  (radioEvs, heightDyn) <- radioList (constDyn ["(v)select","(p)an","(b)ox","(l)ine","pai(n)t"]) (fmap ((:[]) . toolWidgetToIndex) _toolWidgetConfig_tool) (Just _toolWidgetConfig_widthDyn)
   let
     selectB = void $ ffilter (==0) radioEvs
     panB = void $ ffilter (==1) radioEvs
     boxB = void $ ffilter (==2) radioEvs
     lineB = void $ ffilter (==3) radioEvs
-    textB = void $ ffilter (==4) radioEvs
-    textareaB = void $ ffilter (==5) radioEvs
+    textareaB = void $ ffilter (==4) radioEvs
 
   let
     setTool = leftmost
@@ -55,7 +63,6 @@ holdToolsWidget ToolWidgetConfig {..} = mdo
       , Tool_Pan <$ leftmost [panB]
       , Tool_Box <$ leftmost [boxB]
       , Tool_Line <$ leftmost [lineB]
-      , Tool_Text <$ leftmost [textB]
       , Tool_TextArea <$ leftmost [textareaB]]
 {-
   vLayoutPad 4 $ debugStream [
