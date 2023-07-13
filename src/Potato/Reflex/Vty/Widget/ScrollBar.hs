@@ -43,12 +43,14 @@ onlyIfSimultaneous eva evb = fforMaybe (align eva evb) $ \case
   These a _ -> Just a
   _ -> Nothing
 
+
 -- TODO write UTs
 -- TODO reduce constraints
 vScrollBar :: forall t m a. (MonadWidget t m)
-  => Dynamic t Int -- ^ content height
+  => Int -- ^ width
+  -> Dynamic t Int -- ^ content height
   -> m (Dynamic t Int) -- ^ offset
-vScrollBar contentSizeDyn = mdo
+vScrollBar scrollBarWidth contentSizeDyn = mdo
   maxSizeDyn <- displayHeight
   let
     screen_over_content_dyn :: Dynamic t Float = liftA2 (\a b -> fromIntegral a / fromIntegral b ) maxSizeDyn contentSizeDyn
@@ -57,7 +59,7 @@ vScrollBar contentSizeDyn = mdo
     maxContentSizeDiffDyn = fromIntegral . max 0 <$> liftA2 (-) contentSizeDyn maxSizeDyn
 
     boxHeightDyn = fmap ceiling $ liftA2 (*) screen_over_content_dyn (fromIntegral <$> maxSizeDyn)
-    boxRegionDyn = Region <$> 0 <*> offsetScreenUnitDyn <*> 1 <*> boxHeightDyn
+    boxRegionDyn = Region <$> 0 <*> offsetScreenUnitDyn <*> constDyn scrollBarWidth <*> boxHeightDyn
 
   --innerDragEv will only fire on drag events that started on the scroll bar handle portion
   innerDragEv <- pane boxRegionDyn (constDyn True) $ do

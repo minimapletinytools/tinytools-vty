@@ -190,7 +190,7 @@ holdLayerWidget lwc@LayerWidgetConfig {..} = do
       vScrollDyn <- (grout . fixed) 1 $ col $ do
         let
           contentSizeDyn = fmap ((+1) . Seq.length . _layersViewHandlerRenderOutput_entries) _layerWidgetConfig_layersView
-        vScrollBar contentSizeDyn
+        vScrollBar 1 contentSizeDyn
 
       return layerInpEv_d2
 

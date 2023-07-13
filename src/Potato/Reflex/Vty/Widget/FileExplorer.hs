@@ -157,8 +157,10 @@ holdFileExplorerWidget FileExplorerWidgetConfig {..} = mdo
                 then return fileclickev
                 else return never
         join . fmap (switchHold never) . networkView $ scrolledContents
-      vScrollDyn <- (grout . fixed) 1 $ col $ do
-        vScrollBar (constDyn (length xs))
+      let 
+        vScrollWidth = 2
+      vScrollDyn <- (grout . fixed) (constDyn vScrollWidth) $ col $ do
+        vScrollBar vScrollWidth (constDyn (length xs))
       return r
 
   -- put it all together
