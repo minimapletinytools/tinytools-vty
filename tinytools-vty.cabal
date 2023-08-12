@@ -1,7 +1,7 @@
 cabal-version: 1.12
 
 name:           tinytools-vty
-version:        0.1.0.3
+version:        0.1.0.4
 description:    tinytools-vty is a terminal based monospace unicode diagram editing tool
 homepage:       https://github.com/minimapletinytools/tinytools-vty#readme
 bug-reports:    https://github.com/minimapletinytools/tinytools-vty/issues
@@ -9,7 +9,7 @@ author:         minimaple
 maintainer:     minimapletinytools@gmail.com
 category:       tinytools
 synopsis:       tinytools-vty is a terminal based monospace unicode diagram editing tool
-copyright:      2020 Peter Lu
+copyright:      2023 minimaple (Peter Lu)
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
@@ -121,7 +121,7 @@ library
     , reflex
     , reflex-potatoes
     , reflex-test-host >=0.1.2.2
-    , reflex-vty
+    , reflex-vty >= 0.5.1
     , relude
     , semialign
     -- TODO set latest version
@@ -199,7 +199,7 @@ executable tinytools
     , tinytools-vty
     , primitive
     , ref-tf
-    , reflex-vty
+    , reflex-vty >= 0.5.1
     , reflex >= 0.8 && <1
     , reflex-potatoes >=0.1
     , reflex-test-host >=0.1.2.2
@@ -373,7 +373,7 @@ test-suite tinytools-vty-test
     , reflex
     , reflex-potatoes
     , reflex-test-host >=0.1.2.2
-    , reflex-vty
+    , reflex-vty >= 0.5.1
     , relude
     , semialign
     , template-haskell

@@ -80,10 +80,10 @@ toolOverrideTextAlign :: ToolOverrideSelector
 toolOverrideTextAlign = (== Tool_Text)
 
 toolOverrideSuperStyle :: ToolOverrideSelector
-toolOverrideSuperStyle = (\t -> t == Tool_Box || t == Tool_Text || t == Tool_Line || t == Tool_CartLine)
+toolOverrideSuperStyle = (\t -> t == Tool_Box || t == Tool_Text || t == Tool_Line)
 
 toolOverrideLineStyle :: ToolOverrideSelector
-toolOverrideLineStyle = (\t -> t == Tool_Line || t == Tool_CartLine)
+toolOverrideLineStyle = (\t -> t == Tool_Line)
 
 toolOverrideSBoxType :: ToolOverrideSelector
 toolOverrideSBoxType = (const False) -- NOTE default variant here does nothing as this is always overriden based on tool

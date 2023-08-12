@@ -11,6 +11,8 @@ To install tiny tools run `cabal install exe:tinytools` and then run `tinytools`
 
 Or if you are building locally then `cabal run tinytools`
 
+NOTE that `tinytools` is also the name of the base model library for `tinytools-vty` which is why the `exe` is necessary. If you just `cabal install tinytools` you will install the library!
+
 # usage
 
 When you first run `tinytools` a tutorial file will open which contains information on how to use `tinytools-vty`. This same tutorial is copied at the bottom of this README file. `tinytools-vty` has a very intuitive interface and most operations should be clear.
