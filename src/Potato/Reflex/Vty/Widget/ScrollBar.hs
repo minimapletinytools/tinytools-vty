@@ -44,8 +44,16 @@ onlyIfSimultaneous eva evb = fforMaybe (align eva evb) $ \case
   _ -> Nothing
 
 
+-- TODO you can use reflex.vty.widget.scroll for this
+--makeVScrollBarWidget :: forall t m a. (MonadWidget t m, MonadLayoutWidget t m')
+--  => m a -- ^ contents
+--  -> Dynamic t Int -- ^ content height
+--  -> m' a 
+
+
 -- TODO write UTs
 -- TODO reduce constraints
+-- dynamically scaling vertical scroll bar
 vScrollBar :: forall t m a. (MonadWidget t m)
   => Int -- ^ width
   -> Dynamic t Int -- ^ content height

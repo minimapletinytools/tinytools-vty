@@ -10,6 +10,8 @@ import           Potato.Flow
 import           Potato.Flow.TestStates
 import           Potato.Flow.TutorialState
 import           Potato.Flow.Vty.Main
+import qualified Paths_tinytools_vty (version)
+
 
 
 import           Control.Exception                    (try)
@@ -18,6 +20,8 @@ import           Options.Applicative
 import           System.Directory
 import           System.FilePath
 import           System.IO                            hiding (putStrLn)
+import Data.Version (showVersion)
+import qualified Data.Text as T
 
 import qualified Graphics.Vty                         as V
 import qualified Graphics.Vty.UnicodeWidthTable.IO    as V
@@ -131,6 +135,7 @@ mainWithDebug = do
         --else owlpfstate_attachments1
         else tutorialState
       , _mainPFWidgetConfig_showWelcome = True
+      , _mainPFWidgetConfig_version_tinytools_vty = T.pack $ showVersion Paths_tinytools_vty.version
     }
 
   -- set the title

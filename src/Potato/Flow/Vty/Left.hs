@@ -36,6 +36,7 @@ data MenuButtonsWidget t = MenuButtonsWidget {
   , _menuButtonsWidget_saveAsEv :: Event t ()
   , _menuButtonsWidget_exportEv :: Event t ()
   , _menuButtonsWidget_quitEv :: Event t ()
+  , _menuButtonsWidget_aboutEv :: Event t ()
 }
 
 data LeftWidgetConfig t = LeftWidgetConfig {
@@ -88,16 +89,17 @@ holdLeftWidget LeftWidgetConfig {..} = do
     -- TODO height should be dynamic but not sure if there's away to do this dynamically because width (from which buttonsHeightDyn) is derived depends on `grout . fixed`. You need to pull width from outside of the `grout . fixed` call to make this work right...
     (menuButtons, menuFocusEv, buttonsHeightDyn) <- (grout . fixed) buttonsHeightDyn $ row $ do
 
-      (buttonsEv, heightDyn) <- buttonList (constDyn ["new", "open", "save", "save as", "export to \"potato.txt\"", "quit"]) (Just widthDyn)
+      (buttonsEv, heightDyn) <- buttonList (constDyn ["about", "new", "open", "save", "save as", "export to \"potato.txt\"", "quit"]) (Just widthDyn)
       let
-        exportEv = ffilterButtonIndex 4 buttonsEv
+        exportEv = ffilterButtonIndex 5 buttonsEv
         menuButtons' = MenuButtonsWidget {
-            _menuButtonsWidget_newEv = ffilterButtonIndex 0 buttonsEv
-            , _menuButtonsWidget_openEv = ffilterButtonIndex 1 buttonsEv
-            , _menuButtonsWidget_saveEv = ffilterButtonIndex 2 buttonsEv
-            , _menuButtonsWidget_saveAsEv = ffilterButtonIndex 3 buttonsEv
+            _menuButtonsWidget_aboutEv = ffilterButtonIndex 0 buttonsEv
+            , _menuButtonsWidget_newEv = ffilterButtonIndex 1 buttonsEv
+            , _menuButtonsWidget_openEv = ffilterButtonIndex 2 buttonsEv
+            , _menuButtonsWidget_saveEv = ffilterButtonIndex 3 buttonsEv
+            , _menuButtonsWidget_saveAsEv = ffilterButtonIndex 4 buttonsEv
             , _menuButtonsWidget_exportEv = exportEv
-            , _menuButtonsWidget_quitEv = ffilterButtonIndex 5 buttonsEv
+            , _menuButtonsWidget_quitEv = ffilterButtonIndex 6 buttonsEv
           }
         clickPrintEv = tag (current $ _goatWidget_renderedCanvas _layersWidgetConfig_goatW) (void exportEv)
       -- TODO don't do this here cmon...

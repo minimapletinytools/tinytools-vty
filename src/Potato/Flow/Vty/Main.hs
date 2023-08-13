@@ -185,14 +185,22 @@ fetchMOTDAsync ev = performEventAsync $ ffor ev $ const $ \f -> liftIO $ do
 
 -- NOTE, this will query welcome message each time you recreate this
 welcomeWidget :: forall t m. (MonadWidget t m)
-  => m (Event t ())
-welcomeWidget = do
+  => Text
+  -> m (Event t ())
+welcomeWidget version = do
   postBuildEv <- getPostBuild
   welcomeMessageEv <- fetchMOTDAsync postBuildEv
   welcomeMessageDyn <- holdDyn "loading..." welcomeMessageEv
-  boxTitle (constant def) "😱 tinytools-vty (beta) 😱" $ do
+  let
+    scrollcfg = ScrollableConfig {
+        _scrollableConfig_scrollBy = never
+        , _scrollableConfig_scrollTo = never
+        , _scrollableConfig_startingPosition = ScrollPos_Top
+        , _scrollableConfig_scrollToBottom = constant Nothing
+      }
+  boxTitle (constant def) (constant $ "😱 tinytools-vty (beta v." <> version <> ") 😱") $ do
     initLayout $ col $ do
-      (grout . stretch) 1 $ text (current welcomeMessageDyn)
+      (grout . stretch) 1 $ scrollableText scrollcfg welcomeMessageDyn
       (grout . fixed) 3 $ textButton def (constant "bye")
 
 
@@ -238,6 +246,7 @@ data MainPFWidgetConfig = MainPFWidgetConfig {
   -- should this include controller meta too?
   , _mainPFWidgetConfig_initialState :: (OwlPFState, ControllerMeta) -- ^ will be overriden by initialFile if set
   , _mainPFWidgetConfig_showWelcome :: Bool
+  , _mainPFWidgetConfig_version_tinytools_vty :: Text
 }
 
 instance Default MainPFWidgetConfig where
@@ -247,6 +256,7 @@ instance Default MainPFWidgetConfig where
       , _mainPFWidgetConfig_homeDirectory = "/home/minimaple/kitchen/faucet/potato-flow-vty"
       , _mainPFWidgetConfig_initialState = (emptyOwlPFState, emptyControllerMeta)
       , _mainPFWidgetConfig_showWelcome = False
+      , _mainPFWidgetConfig_version_tinytools_vty = "0.0.0.0"
     }
 
 mainPFWidget :: forall t m. (MonadWidget t m)
@@ -408,10 +418,10 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
     (clickSaveEv, nothingClickSaveEv)  = fanMaybe $ tag (_potatoConfig_appCurrentOpenFile potatoConfig) $ leftmost [_menuButtonsWidget_saveEv . _leftWidget_menuButtonsW $ leftW, _appKbCmd_save, _saveBeforeActionOutput_save]
     clickSaveAsEv = leftmost $ [_menuButtonsWidget_saveAsEv . _leftWidget_menuButtonsW $ leftW, nothingClickSaveEv, _saveBeforeActionOutput_saveAs]
 
-  -- 1 welcome popup
+  -- 1 welcome/about popup
   let
-    showWelcomeEv = if _mainPFWidgetConfig_showWelcome then postBuildEv else never
-  (_, popupStateDyn1) <- popupPaneSimple def (showWelcomeEv $> welcomeWidget)
+    showWelcomeEv = leftmost $ [_menuButtonsWidget_aboutEv . _leftWidget_menuButtonsW $ leftW, if _mainPFWidgetConfig_showWelcome then postBuildEv else never]
+  (_, popupStateDyn1) <- popupPaneSimple def (showWelcomeEv $> welcomeWidget _mainPFWidgetConfig_version_tinytools_vty)
 
   -- 2 save as popup
   (saveAsEv, popupStateDyn2) <- flip runPotatoReader potatoConfig $ popupSaveAsWindow $ SaveAsWindowConfig (tag (_potatoConfig_appCurrentDirectory potatoConfig) clickSaveAsEv)

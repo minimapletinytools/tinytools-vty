@@ -1,5 +1,9 @@
 # Changelog for tinytools-vty
 
+## [Unreleased]
+- add version string to welcome popup title
+- add about button that brings up the welcome popup
+- make the welcome popup contents scrollable
 
 ## [0.1.0.4]
 - update to use 0.1.0.4 of tinytools

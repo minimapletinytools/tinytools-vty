@@ -135,6 +135,8 @@ library
 
 executable tinytools
   main-is: Main.hs
+  other-modules:
+      Paths_tinytools_vty
   hs-source-dirs:
       app
   default-extensions:
