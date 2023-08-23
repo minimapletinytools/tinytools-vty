@@ -6,7 +6,7 @@ module Potato.Flow.TutorialState (tutorialState) where
 import           Relude
 
 import           Potato.Flow
-import qualified Potato.Flow.Serialization.Snake as Snake
+import qualified Potato.Flow.Serialization.SnakeWrangler as Snake
 
 import           Data.ByteString
 import qualified Data.ByteString.Lazy as LBS

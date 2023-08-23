@@ -13,7 +13,7 @@ import           Relude
 
 
 import           Potato.Flow
-import qualified Potato.Flow.Serialization.Snake as Snake
+import qualified Potato.Flow.Serialization.SnakeWrangler as Snake
 import           Potato.Flow.TestStates
 import           Potato.Flow.Vty.Canvas
 import           Potato.Flow.Vty.Input

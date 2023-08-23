@@ -5,19 +5,34 @@
 This repository contains the [reflex-vty](https://hackage.haskell.org/package/reflex-vty) based view/controller implementation built on top of the [tinytools](https://github.com/minimapletinytools/tinytools) model.
 
 
-# running
 
-To install tiny tools run `cabal install exe:tinytools` and then run `tinytools`
 
+
+
+# prerequesities
+[text-icu](https://github.com/haskell/text-icu) is required as a prerequisite. On mac
+
+```
+brew install icu4c
+brew link icu4c --force
+export PKG_CONFIG_PATH="$(brew --prefix)/opt/icu4c/lib/pkgconfig"
+```
+
+You will also need the haskell build tool cabal. The best way to do this is using [ghcup](https://www.haskell.org/ghcup/)
+
+# installation 
+
+To install tiny tools run `cabal install tinytools-vty` and then you can run `tinytools` 
 Or if you are building locally then `cabal run tinytools`
 
-NOTE that `tinytools` is also the name of the base model library for `tinytools-vty` which is why the `exe` is necessary. If you just `cabal install tinytools` you will install the library!
+NOTE that `tinytools` is also the name of the base model library for `tinytools-vty`. If you just `cabal install tinytools` you will install the library!
 
 # usage
 
 When you first run `tinytools` a tutorial file will open which contains information on how to use `tinytools-vty`. This same tutorial is copied at the bottom of this README file. `tinytools-vty` has a very intuitive interface and most operations should be clear.
 
-hotkeys are supported, unfortunately they seem to sometimes they get captured by the OS or the terminal and never get forwarded to the app :(.
+- To open an empty document do `tinytools --empty` (or `cabal run tinytools -- --empty`) 
+- In order to support unicode wide chars (optional), you must first generate the term width file for your terminal `tinytools --widthtable`
 
 # tutorial
 
