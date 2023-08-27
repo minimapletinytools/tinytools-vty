@@ -101,7 +101,10 @@ layerContents LayerWidgetConfig {..} scrollDyn = do
     makeLayerImage width lhrentry = case lhrentry of
       LayersHandlerRenderEntryDummy ident -> r where
         r = V.text' lg_layer_selected . T.pack . L.take width
-          $ replicate ident ' '
+          $ 
+          (if ident > 0 then "└" else "")
+          <> replicate (max 0 (ident-1)) ' '
+          <> " "
           <> replicate 10 '*'
       LayersHandlerRenderEntryNormal selected mdots mrenaming lentry@LayerEntry{..} -> r where
         ident = layerEntry_depth lentry
