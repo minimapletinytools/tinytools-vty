@@ -102,8 +102,8 @@ layerContents LayerWidgetConfig {..} scrollDyn = do
       LayersHandlerRenderEntryDummy ident -> r where
         r = V.text' lg_layer_selected . T.pack . L.take width
           $ 
-          (if ident > 0 then "└" else "")
-          <> replicate (max 0 (ident-1)) ' '
+          replicate (max 0 (ident-1)) ' '
+          <> (if ident > 0 then "└" else "")
           <> " "
           <> replicate 10 '*'
       LayersHandlerRenderEntryNormal selected mdots mrenaming lentry@LayerEntry{..} -> r where
