@@ -117,14 +117,18 @@ potatoMainWidget child = do
   cfg'' <- V.standardIOConfig
   configDir <- tinytoolsConfigDir
   let
+    -- using the xterm-256 one by default since it's better than nothing
+    defaultWidthMapFile = "xterm-256color_termwidthfile"
     mTermName = V.termName cfg''
     widthMapFile = case mTermName of
+      -- use the xterm one by default, should be fine lol
       Nothing -> ""
       Just termName -> configDir FP.</> (termName <> "_termwidthfile")
   doesWidthMapFileExist <- FP.doesFileExist widthMapFile
+  doesDefaultWidthMapFileExist <- FP.doesFileExist defaultWidthMapFile
   if doesWidthMapFileExist
     then putStrLn $ "attempting to load unicode width table file " <> widthMapFile
-    else putStrLn $ "could not find unicode width table file " <> widthMapFile <> " please run --widthtable to generate unicode width table file"
+    else putStrLn $ "could not find unicode width table file " <> widthMapFile <> " using the xterm-256 one by default instead. Please run --widthtable to generate unicode width table file"
   let
     cfg' = cfg'' { V.mouseMode = Just True }
     cfg = if doesWidthMapFileExist
@@ -132,7 +136,12 @@ potatoMainWidget child = do
           V.allowCustomUnicodeWidthTables = Just True
           , V.termWidthMaps = [(fromJust mTermName, widthMapFile)]
         }
-      else cfg'
+      else if doesDefaultWidthMapFileExist
+        then cfg' {
+            V.allowCustomUnicodeWidthTables = Just True
+            , V.termWidthMaps = [(fromJust mTermName, defaultWidthMapFile)]
+          }
+        else cfg'
   vty <- V.mkVty cfg
   potatoMainWidgetWithHandle vty child
 

@@ -18,6 +18,7 @@ extra-source-files:
     tutorial.md
     ChangeLog.md
     tutorial.tt
+    xterm-256color_termwidthfile
 
 
 source-repository head

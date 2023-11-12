@@ -25,4 +25,4 @@ tutorialState = fromMaybe (owlpfstate_newProject, emptyControllerMeta)  . fmap (
   Right j -> Just j
 
 tutorialjson :: ByteString
-tutorialjson = $(embedFile "tutorial.potato")
+tutorialjson = $(embedFile "tutorial.tt")
