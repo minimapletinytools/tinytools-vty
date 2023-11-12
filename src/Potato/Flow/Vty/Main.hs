@@ -155,7 +155,7 @@ maybeLeft _ = Nothing
 
 somedefaultpfcfg :: MainPFWidgetConfig
 somedefaultpfcfg = def {
-    --_mainPFWidgetConfig_initialFile = Just "potato.flow"
+    --_mainPFWidgetConfig_initialFile = Just ""
     _mainPFWidgetConfig_initialState = (owlpfstate_newProject, emptyControllerMeta)
   }
 

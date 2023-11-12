@@ -15,8 +15,9 @@ license-file:   LICENSE
 build-type:     Simple
 extra-source-files:
     README.md
+    tutorial.md
     ChangeLog.md
-    tutorial.potato
+    tutorial.tt
 
 
 source-repository head

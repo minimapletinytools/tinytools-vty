@@ -27,7 +27,7 @@ import Potato.Flow.Vty.Attrs
 
 -- TODO move elsewhere
 kTinyToolsFileExtension :: (IsString a) => a
-kTinyToolsFileExtension = ".potato"
+kTinyToolsFileExtension = ".tt"
 
 -- TODO move elsewhere
 addTinyToolsFileExtensionIfNecessary :: FP.FilePath -> FP.FilePath

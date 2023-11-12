@@ -89,7 +89,7 @@ holdLeftWidget LeftWidgetConfig {..} = do
     -- TODO height should be dynamic but not sure if there's away to do this dynamically because width (from which buttonsHeightDyn) is derived depends on `grout . fixed`. You need to pull width from outside of the `grout . fixed` call to make this work right...
     (menuButtons, menuFocusEv, buttonsHeightDyn) <- (grout . fixed) buttonsHeightDyn $ row $ do
 
-      (buttonsEv, heightDyn) <- buttonList (constDyn ["about", "new", "open", "save", "save as", "export to \"potato.txt\"", "quit"]) (Just widthDyn)
+      (buttonsEv, heightDyn) <- buttonList (constDyn ["about", "new", "open", "save", "save as", "write to \"tt.txt\"", "quit"]) (Just widthDyn)
       let
         exportEv = ffilterButtonIndex 5 buttonsEv
         menuButtons' = MenuButtonsWidget {
@@ -106,7 +106,7 @@ holdLeftWidget LeftWidgetConfig {..} = do
       performEvent_ $ ffor clickPrintEv $ \rc -> do
          let t = renderedCanvasToText rc
          -- TODO at least use filename...
-         liftIO $ T.writeFile "potato.txt" t
+         liftIO $ T.writeFile "tt.txt" t
       menuFocusEv' <- mouseFocus
       return (menuButtons', menuFocusEv', heightDyn)
 
