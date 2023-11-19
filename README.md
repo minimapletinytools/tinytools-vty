@@ -4,6 +4,7 @@
 
 This repository contains the [reflex-vty](https://hackage.haskell.org/package/reflex-vty) based view/controller implementation built on top of the [tinytools](https://github.com/minimapletinytools/tinytools) model.
 
+![](screenshot.png)
 
 # installation 
 
