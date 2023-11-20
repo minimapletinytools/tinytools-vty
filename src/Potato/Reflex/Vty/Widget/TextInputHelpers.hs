@@ -172,6 +172,19 @@ dropSpan :: Int -> [TZ.Span V.Attr] -> [TZ.Span V.Attr]
 dropSpan _ [] = []
 dropSpan n ((TZ.Span tag text):xs) = TZ.Span tag (T.drop n text) : dropSpan (max 0 (n - T.length text)) xs
 
+addCursorSpace' :: [TZ.Span V.Attr] -> [TZ.Span V.Attr]
+addCursorSpace' spans = case reverse spans of
+  [] -> []
+  (TZ.Span tag ""):xs -> reverse $ (TZ.Span tag " "):xs
+  _ -> spans
+
+--the EoL cursor is reported as a span with no text so convert it to a space
+addCursorSpace :: [[TZ.Span V.Attr]] -> [[TZ.Span V.Attr]]
+addCursorSpace spanss = case reverse spanss of
+  [] -> []
+  spans:xs -> reverse $ (addCursorSpace' spans):xs
+
+
 renderTextZipper :: (MonadWidget t m, HasPotato t m) => Dynamic t Int -> Dynamic t Int -> Dynamic t TZ.TextZipper -> m (Dynamic t (TZ.DisplayLines V.Attr))
 renderTextZipper offsetDyn dw tz = do
   f <- focus
@@ -190,7 +203,7 @@ renderTextZipper offsetDyn dw tz = do
         <$> dw
         <*> tz
         <*> attrsDyn
-      img = ffor2 rows offsetDyn $ \rows' ox -> images . fmap (dropSpan ox) . TZ._displayLines_spans $ rows'
+      img = ffor2 rows offsetDyn $ \rows' ox -> images . fmap (dropSpan ox) . addCursorSpace . TZ._displayLines_spans $ rows'
   tellImages $ (\imgs -> (:[]) . V.vertCat $ imgs) <$> current img
   return rows
 
