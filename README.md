@@ -6,6 +6,8 @@ This repository contains the [reflex-vty](https://hackage.haskell.org/package/re
 
 ![](screenshot.png)
 
+tinytools is still in BETA and may be quite unstable. Save often!!!
+
 # installation 
 
 ### pre-requisites
@@ -18,7 +20,6 @@ export PKG_CONFIG_PATH="$(brew --prefix)/opt/icu4c/lib/pkgconfig"
 ```
 
 You will also need the haskell build tool cabal. The best way to do this is using [ghcup](https://www.haskell.org/ghcup/)
-
 
 To install tiny tools run `cabal install tinytools-vty` and then you can run `tinytools` 
 Or if you are building locally then `cabal run tinytools`
@@ -90,11 +91,10 @@ On the left hand side is a very sophisticated layering system. All elements will
 - [quit]: quit the app, prompts to save if there are unsaved changes
 
 
-# enabling unicode widechar support
+# unicode widechar and grapheme cluster support
 
-## NOT WORKING, WILL CRASH RANDOMLY IF YOU USE UNICODE WIDE CHARS 😨 (this is due to bugs in TextZipper module that I still need to fix)
+Unicode character display width seems to vary by terminal. `tinytools-vty` uses the xterm-256 (mac default terminal) terminal width mappings by default. You can run `tinytools-vty` with the `--widthtable` arg to generate the table to your local config directory for the current terminal. Generating the table samples each unicode character inside the terminal and takes a few seconds to run. Please see the `Graphics.Vty.UnicodeWidthTable` module of the [vty](https://hackage.haskell.org/package/vty) for more info. Grapheme clusters are not really supported by terminals so they are currently disabled 😭.
 
-Unicode character display width seems to vary by terminal so you will need to generate a unicode width table file in order to enable support for unicode wide characters.
-You can run `tinytools-vty` with the `--widthtable` arg to generate the table to your local config directory for the current terminal. Generating the table samples each unicode character inside the terminal and takes a few seconds to run. Please see the `Graphics.Vty.UnicodeWidthTable` module of the [vty](https://hackage.haskell.org/package/vty) for more info.
+Also note that many mono-space text displays do not display unicode widechars at a width consistent with its mono-spacing 😕. 
 
 
