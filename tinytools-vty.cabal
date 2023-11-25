@@ -1,7 +1,7 @@
 cabal-version: 1.12
 
 name:           tinytools-vty
-version:        0.1.0.4
+version:        0.1.0.5
 description:    tinytools-vty is a terminal based monospace unicode diagram editing tool
 homepage:       https://github.com/minimapletinytools/tinytools-vty#readme
 bug-reports:    https://github.com/minimapletinytools/tinytools-vty/issues
@@ -120,18 +120,18 @@ library
     , optparse-applicative
     , primitive
     , ref-tf
-    , reflex
+    , reflex >= 0.9.2 && < 1
     , reflex-potatoes
-    , reflex-test-host >=0.1.2.2
+    , reflex-test-host >=0.1.2.3
     , reflex-vty >= 0.5.1
     , relude
     , semialign
-    -- TODO set latest version
+
     , template-haskell >=2.18
     , text
     , these
     , time
-    , tinytools >= 0.1.0.3
+    , tinytools == 0.1.0.5
     , vty
   default-language: Haskell2010
 
@@ -204,18 +204,19 @@ executable tinytools
     , primitive
     , ref-tf
     , reflex-vty >= 0.5.1
-    , reflex >= 0.8 && <1
+    , reflex >= 0.9.2 && < 1
     , reflex-potatoes >=0.1
-    , reflex-test-host >=0.1.2.2
-    , tinytools >= 0.1.0.3
+    , reflex-test-host >=0.1.2.3
+    , tinytools == 0.1.0.5
     , relude
     , semialign
-    , template-haskell
+    , template-haskell >=2.18
     , text
     , these
     , time
     , vty
   default-language: Haskell2010
+  allow-newer: template-haskell, primitive
 
 test-suite tinytools-vty-test
   type: exitcode-stdio-1.0
@@ -295,16 +296,16 @@ test-suite tinytools-vty-test
     , tinytools-vty
     , primitive
     , ref-tf
-    , reflex
+    , reflex >= 0.9.2 && < 1
     , reflex-potatoes
-    , reflex-test-host >=0.1.2.2
+    , reflex-test-host >=0.1.2.3
     , reflex-vty >= 0.5.1
     , relude
     , semialign
-    , template-haskell
+    , template-haskell >=2.18
     , text
     , these
     , time
-    , tinytools >= 0.1.0.3
+    , tinytools == 0.1.0.5
     , vty
   default-language: Haskell2010

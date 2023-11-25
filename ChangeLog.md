@@ -1,11 +1,15 @@
 # Changelog for tinytools-vty
 
-## [Unreleased]
+## [unreleased]
+
+## [0.1.0.5]
 - add version string to welcome popup title
 - add about button that brings up the welcome popup
 - make the welcome popup contents scrollable
 - clean up readme
 - delete the old termwidth generation exe
+- fix an issue where cursor doesn't show up at end of line in text input boxes
+- - update to use 0.1.0.5 of tinytools
 
 ## [0.1.0.4]
 - update to use 0.1.0.4 of tinytools

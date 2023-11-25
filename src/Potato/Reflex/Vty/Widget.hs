@@ -42,6 +42,7 @@ import           Reflex.Vty.Widget.Input.Mouse
 
 
 
+import Control.Monad.Fix
 import           Control.Monad.NodeId
 import           Control.Monad.Reader
 import           System.Clock

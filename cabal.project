@@ -1,2 +1,5 @@
+-- use this when releasing
 -- packages: .
+
+-- use this when developing locally 
 packages: . tinytools 

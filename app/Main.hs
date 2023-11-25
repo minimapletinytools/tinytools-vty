@@ -34,6 +34,7 @@ data PotatoCLIOptions = PotatoCLIOptions {
   _potatoCLIOptions_args                        :: [String]
   , _potatoCLIOptions_empty                     :: Bool
   , _potatoCLIOptions_generateUnicodeWidthTable :: Bool
+  , _potatoCLIOptions_version                   :: Bool
 }
 
 
@@ -47,6 +48,10 @@ sample = PotatoCLIOptions
   <*> switch
     ( long "widthtable"
     <> help "generate unicode width table for your terminal using vty" )
+  <*> switch
+    ( long "version"
+    <> short 'e'
+    <> help "show version" )
 
 
 
@@ -99,30 +104,33 @@ mainWithDebug = do
         exists <- doesFileExist x
         return $ if exists then Just x else Nothing
 
-  if _potatoCLIOptions_generateUnicodeWidthTable opts
+  if _potatoCLIOptions_version opts
     then do
-      mTermName <- V.currentTerminalName
-      case mTermName of
-        Just termName -> do
-          configdir <- tinytoolsConfigDir
-          let
-            fn = configdir </> (termName <> "_termwidthfile")
-          rslt <- try $ do
-            wt <- V.buildUnicodeWidthTable V.defaultUnicodeTableUpperBound
-            createDirectoryIfMissing False configdir
-            V.writeUnicodeWidthTable fn wt
-          case rslt of
-            Right _ -> do
-              putStrLn "\n"
-              putStrLn $ "successfully wrote " <> fn
-              exitSuccess
-            Left (SomeException e) -> do
-              putStrLn "\n"
-              die $ "failed to generate or write unicode width table " <> fn <> " with exception " <> show e
-        Nothing -> do
-          die "failed to generate unicode width table because could not obtain terminal name"
-
-    else return ()
+      putStrLn $ "tinytools-vty version " <> showVersion Paths_tinytools_vty.version
+      exitSuccess
+    else if _potatoCLIOptions_generateUnicodeWidthTable opts
+      then do
+        mTermName <- V.currentTerminalName
+        case mTermName of
+          Just termName -> do
+            configdir <- tinytoolsConfigDir
+            let
+              fn = configdir </> (termName <> "_termwidthfile")
+            rslt <- try $ do
+              wt <- V.buildUnicodeWidthTable V.defaultUnicodeTableUpperBound
+              createDirectoryIfMissing False configdir
+              V.writeUnicodeWidthTable fn wt
+            case rslt of
+              Right _ -> do
+                putStrLn "\n"
+                putStrLn $ "successfully wrote " <> fn
+                exitSuccess
+              Left (SomeException e) -> do
+                putStrLn "\n"
+                die $ "failed to generate or write unicode width table " <> fn <> " with exception " <> show e
+          Nothing -> do
+            die "failed to generate unicode width table because could not obtain terminal name"
+      else return ()
 
   homeDir <- getHomeDirectory
   let
