@@ -7,7 +7,7 @@ homepage:       https://github.com/minimapletinytools/tinytools-vty#readme
 bug-reports:    https://github.com/minimapletinytools/tinytools-vty/issues
 author:         minimaple
 maintainer:     minimapletinytools@gmail.com
-category:       tinytools
+category:       Graphics
 synopsis:       tinytools-vty is a terminal based monospace unicode diagram editing tool
 copyright:      2023 minimaple (Peter Lu)
 license:        BSD3
