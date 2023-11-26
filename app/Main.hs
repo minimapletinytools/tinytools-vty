@@ -50,7 +50,7 @@ sample = PotatoCLIOptions
     <> help "generate unicode width table for your terminal using vty" )
   <*> switch
     ( long "version"
-    <> short 'e'
+    <> short 'v'
     <> help "show version" )
 
 

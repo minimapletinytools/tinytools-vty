@@ -47,7 +47,6 @@ import qualified Data.Text.Encoding                as T
 import qualified Data.Text.Lazy                    as LT
 import qualified Data.Text.Lazy.Encoding           as LT
 import qualified Data.Text.IO as T
-import           Data.Time.Clock
 import qualified Data.ByteString.Lazy as LBS
 import Data.These
 
