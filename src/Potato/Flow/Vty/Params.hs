@@ -247,7 +247,7 @@ holdSuperStyleWidget pdpDyn inputDyn = constDyn $ mdo
             text (show i <> ". " <> constant (T.pack s))
             fmap (fmap (\_ -> s)) (mouseDown V.BLeft)
           return $ fmap superStyle_fromListFormat (leftmost presetClicks)
-        return (5, never, setStyleEv')
+        return (length presetSuperStyles + 2, never, setStyleEv')
       0 -> do
         -- TODO the awesome version of this has a toggle box so that you can choose to do horiz/vertical together (once you support separate horiz/vert left/right/top/down styles)
         -- TODO also a toggle for setting corners to common sets
