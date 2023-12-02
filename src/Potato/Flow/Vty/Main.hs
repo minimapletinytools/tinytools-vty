@@ -348,7 +348,7 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
   AppKbCmd {..} <- captureInputEvents (That inputCapturedByPopupBeh) holdAppKbCmd
 
   -- setup PotatoConfig
-  currentOpenFileDyn <- holdDyn Nothing $ fmap Just $ leftmost [saveSuccessEv, fmap snd eLoadFileEv]
+  currentOpenFileDyn <- holdDyn Nothing $ leftmost [fmap Just saveSuccessEv, fmap (Just . snd) eLoadFileEv, newEmptyFileEv $> Nothing]
   let
     potatoConfig = PotatoConfig {
         _potatoConfig_style = constant def
