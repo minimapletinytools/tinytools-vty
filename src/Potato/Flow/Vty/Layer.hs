@@ -19,6 +19,7 @@ import           Potato.Reflex.Vty.Widget
 import Potato.Flow.Vty.PotatoReader
 import Potato.Flow.Vty.Common
 import Potato.Reflex.Vty.Widget.ScrollBar
+import Potato.Reflex.Vty.Widget.TextInputHelpers
 
 
 import qualified Potato.Data.Text.Zipper
@@ -152,7 +153,7 @@ layerContents LayerWidgetConfig {..} scrollDyn = do
           Nothing -> V.text' attr label
           Just renaming -> img where
             dls = TZ.displayLines 999999 attrrenamingbg attrrenamingcur (coerceZipper renaming)
-            img = V.vertCat . images $ TZ._displayLines_spans dls
+            img = V.vertCat . images . addCursorSpace $ TZ._displayLines_spans dls
 
         r = t1 V.<|> t2
 
