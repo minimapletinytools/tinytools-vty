@@ -56,7 +56,10 @@ controllersWithId_to_llama = makePFCLlama . OwlPFCManipulate
 paramsNavigation :: (MonadWidget t m) => m (Event t Int)
 paramsNavigation = do
   tabEv <- key (V.KChar '\t')
-  returnEv <- key V.KEnter
+  -- TODO this will cause the return key to never get sent to Layers when in renaming mode so you can't confirm a rename with enter
+  -- I guess you need to disablee return navigation if you're in the layers menu...
+  --returnEv <- key V.KEnter
+  let returnEv = never
   let fwd  = fmap (const 1) $ leftmost [tabEv, returnEv]
   back <- fmap (const (-1)) <$> key V.KBackTab
   return $ leftmost [fwd, back]
