@@ -177,9 +177,11 @@ emptyWidget = return ()
 data SuperStyleCell = SSC_TL | SSC_TR | SSC_BL | SSC_BR | SSC_V | SSC_H | SSC_Fill deriving (Show)
 
 updateFromSuperStyle :: SuperStyleCell -> (SuperStyle -> TZ.TextZipper)
-updateFromSuperStyle ssc = TZ.top . TZ.fromText . T.singleton . gettfn ssc where
-  gettfn ssc' = fromMaybe ' ' . gettfn' ssc'
-  gettfn' = \case
+updateFromSuperStyle ssc = r where
+  r ss = case gettfn ssc ss of
+    Nothing -> TZ.empty
+    Just c -> TZ.top . TZ.fromText . T.singleton $ c
+  gettfn = \case
     SSC_TL -> _superStyle_tl
     SSC_TR -> _superStyle_tr
     SSC_BL -> _superStyle_bl
@@ -191,23 +193,23 @@ updateFromSuperStyle ssc = TZ.top . TZ.fromText . T.singleton . gettfn ssc where
       _ -> Nothing) . _superStyle_fill
 
 
-makeSuperStyleTextEntry :: (MonadWidget t m, HasPotato t m) => SuperStyleCell -> Dynamic t (Maybe SuperStyle) -> m (Behavior t PChar)
+makeSuperStyleTextEntry :: (MonadWidget t m, HasPotato t m) => SuperStyleCell -> Dynamic t (Maybe SuperStyle) -> m (Behavior t (Maybe PChar))
 makeSuperStyleTextEntry ssc mssDyn = do
   mss0 <- sample . current $ mssDyn
   let modifyEv = (fmap (maybe id (\ss -> const (updateFromSuperStyle ssc ss))) (updated mssDyn))
   ti <- singleCellTextInput modifyEv $ case mss0 of
     Nothing  -> ""
     Just ss0 -> updateFromSuperStyle ssc ss0
-  return . current . fmap (\t -> maybe ' ' (\(c,_) -> c) (T.uncons t)) $ ti
+  return . current . fmap (\t -> fmap (\(c,_) -> c) (T.uncons t)) $ ti
 
 makeSuperStyleEvent :: (Reflex t)
-  => Behavior t PChar
-  -> Behavior t PChar
-  -> Behavior t PChar
-  -> Behavior t PChar
-  -> Behavior t PChar
-  -> Behavior t PChar
-  -> Behavior t PChar
+  => Behavior t (Maybe PChar)
+  -> Behavior t (Maybe PChar)
+  -> Behavior t (Maybe PChar)
+  -> Behavior t (Maybe PChar)
+  -> Behavior t (Maybe PChar)
+  -> Behavior t (Maybe PChar)
+  -> Behavior t (Maybe PChar)
   -> Event t ()
   -> Event t SuperStyle
 makeSuperStyleEvent tl v bl h f tr br trig = pushAlways pushfn trig where
@@ -221,14 +223,14 @@ makeSuperStyleEvent tl v bl h f tr br trig = pushAlways pushfn trig where
     br' <- sample br
     return $ def {
         -- TODO Nothing is text cell was blank...
-        _superStyle_tl    = Just tl'
-        , _superStyle_tr     = Just tr'
-        , _superStyle_bl        = Just bl'
-        , _superStyle_br         = Just br'
-        , _superStyle_vertical   = Just v'
-        , _superStyle_horizontal = Just h'
+        _superStyle_tl    = tl'
+        , _superStyle_tr     = tr'
+        , _superStyle_bl        = bl'
+        , _superStyle_br         = br'
+        , _superStyle_vertical   = v'
+        , _superStyle_horizontal = h'
         --, _superStyle_point      :: PChar
-        , _superStyle_fill       = FillStyle_Simple f'
+        , _superStyle_fill       = maybe FillStyle_Blank FillStyle_Simple f'
       }
 
 -- TODO move to SELts.hs
