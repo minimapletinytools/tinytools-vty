@@ -92,13 +92,14 @@ vScrollBar scrollBarWidth contentSizeDyn = mdo
 
   -- TODO movement when you click on areas off the bar
   -- TODO maybe do ^ v arrows at top and bottom to click scroll through 1 at a time
-
   -- TODO ugg you probably need an inputCaptured event here :\ (or you could just get rid of keyboard movement...)
   -- keyboard/scroll movement
   kup <- key V.KUp
   kdown <- key V.KDown
   kpgup <- key V.KPageUp
   kpgdown <- key V.KPageDown
+
+  -- TODO this is a mouse input so it only works if mouse is over the pane, which is not what we want. So instead you you probably need to capture moues input in the parent pane and pass it in instead....
   mscroll <- mouseScroll
   let
     requestedScroll :: Event t Float

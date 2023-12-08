@@ -119,6 +119,7 @@ updateTextZipperForFilenameCharacters ev = case ev of
   _                                   -> Nothing
 
 
+-- DELETE
 -- UNTESTED
 -- prob don't need this version
 filenameInputFireEventOnLoseFocus
