@@ -79,8 +79,7 @@ holdLeftWidget LeftWidgetConfig {..} = do
   -- this only works because you use splitHDrag to split the Left/Canvas panels (it toggles the focus)
   focusDyn <- focus
   let
-
-    loseFocusEv = void $ ffilter (not . id) $ updated focusDyn
+    leftLoseFocusEv = void $ ffilter (not . id) $ updated focusDyn
 
   initLayout $ col $ mdo
 
@@ -167,24 +166,30 @@ holdLeftWidget LeftWidgetConfig {..} = do
           , _paramsWidgetConfig_canvasDyn = _goatWidget_canvas _layersWidgetConfig_goatW
           , _paramsWidgetConfig_defaultParamsDyn = _goatWidget_potatoDefaultParameters _layersWidgetConfig_goatW
           , _paramsWidgetConfig_toolDyn = _goatWidget_tool _layersWidgetConfig_goatW
-          , _paramsWidgetConfig_loseFocusEv = loseFocusEv
+          -- must manually remove focus from Params widget :|
+          , _paramsWidgetConfig_loseFocusEv = leftmost [leftLoseFocusEv, void refineFocusNoParamsEv]
         }
       paramsFocusEv' <- mouseFocus
       return (params', paramsFocusEv')
 
     let 
-      refinedFocusEv = leftmost
+      refineFocusNoParamsEv = leftmost
         [ fmap (const "menu") menuFocusEv
         , fmap (const "tools") toolsFocusEv
         , fmap (const "toolsOptions") toolsOptionsFocusEv
         , fmap (const "layers") layersFocusEv
         , fmap (const "info") infoFocusEv
+        
+        ]
+      refinedFocusEv = leftmost
+        [ refineFocusNoParamsEv
         , fmap (const "params") paramsFocusEv 
         ]
 
     refinedFocusDyn <- holdDyn "none" refinedFocusEv
 
     let      
+      
       setFocusDyn' = ffor2 focusDyn refinedFocusDyn $ \f1 f2 -> case (f1, f2) of
         (True, "layers") -> Just GoatFocusedArea_Layers
         (True, _)        -> Just GoatFocusedArea_Other
