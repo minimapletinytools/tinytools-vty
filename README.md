@@ -56,6 +56,10 @@ Use the box tool to create boxes. After creating or selecting a box, click on th
 
 Use the line tool to create lines. Lines can attach to existing boxes on either end. After selecting a line, you can move either end point of line or change their attachment. You click and drag in the middle of a line to add midpoints to your line. You can double click on a line to add a line label. Line labels can be moved by clicking and dragging on highlighted handle in the middle. You can change the styling of your lines in the left menu.
 
+### the [(t)ext] tool
+
+Same as the box tool except you can immediately add text to the box without additional clicking!
+
 ### the [pai(n)t] tool
 
 The paint tool lets you create areas that take free form text. After selecting a paint area, you can move the cursor anywhere inside and add text.
