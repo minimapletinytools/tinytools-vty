@@ -53,20 +53,22 @@ controllersWithId_to_llama :: ControllersWithId -> Llama
 controllersWithId_to_llama = makePFCLlama . OwlPFCManipulate
 
 
-paramsNavigation :: (MonadWidget t m) => m (Event t Int)
-paramsNavigation = do
+paramsNavigation :: (MonadWidget t m) => Behavior t Bool -> m (Event t Int)
+paramsNavigation allowReturnBeh = do
   tabEv <- key (V.KChar '\t')
   -- TODO this will cause the return key to never get sent to Layers when in renaming mode so you can't confirm a rename with enter
   -- I guess you need to disablee return navigation if you're in the layers menu...
-  --returnEv <- key V.KEnter
-  let returnEv = never
-  let fwd  = fmap (const 1) $ leftmost [tabEv, returnEv]
+  returnEv <- key V.KEnter
+  let fwd  = fmap (const 1) $ leftmost [tabEv, gate allowReturnBeh returnEv]
   back <- fmap (const (-1)) <$> key V.KBackTab
   return $ leftmost [fwd, back]
 
-repeatNavigation :: (MonadWidget t m, HasFocus t m) => m ()
+repeatNavigation :: (MonadWidget t m, HasFocus t m) =>  m ()
 repeatNavigation = do
-  navEv <- paramsNavigation
+  -- only allow navigation if we have focus
+  mfiddyn <- focusedId
+  let allowReturnBeh = fmap isJust (current mfiddyn)
+  navEv <- paramsNavigation allowReturnBeh
   requestFocus $ Refocus_Shift <$> navEv
 
 
@@ -697,6 +699,9 @@ holdParamsWidget ParamsWidgetConfig {..} = mdo
 
     -- show canvas params when nothing is selected
     mCanvasSizeInputDyn = ffor2 toolDyn selectionDyn (\t s -> if isParliament_null s then Just (isParliament_empty, Nothing, t) else Nothing)
+
+
+  
 
   -- TODO consider doing initManager_ within the widgets if you don't want to tab from one widget to the next
   (paramsOutputEv, captureEv, canvasSizeOutputEv, heightDyn) <- initManager_ $ col $ do
