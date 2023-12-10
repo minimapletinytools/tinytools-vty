@@ -142,7 +142,7 @@ layerContents LayerWidgetConfig {..} scrollDyn = do
 
           -- render folder hide lock icons
           -- <> [moveChar]
-          <> if' (layerEntry_isFolder lentry) (if' _layerEntry_isCollapsed [expandChar] [closeChar]) [' ']
+          <> if' (layerEntry_isFolder lentry) (if' _layerEntry_isCollapsed [expandChar] [closeChar]) ['●']
           <> if' (lockHiddenStateToBool _layerEntry_hideState) [hiddenChar] [visibleChar]
           <> if' (lockHiddenStateToBool _layerEntry_lockState) [lockedChar] [unlockedChar]
           <> " " 
