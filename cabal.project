@@ -1,5 +1,11 @@
 -- use this when releasing
--- packages: .
+packages: .
 
 -- use this when developing locally 
-packages: . tinytools 
+--packages: . tinytools 
+
+-- temp, do not release
+--source-repository-package
+--    type: git
+--    location: https://github.com/minimapletinytools/reflex-vty.git
+--    tag: 4fab5bdd617b8abdbc1de21e67ff2b9755d09503
