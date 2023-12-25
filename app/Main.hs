@@ -32,7 +32,7 @@ import qualified Graphics.Vty.UnicodeWidthTable.Query as V
 
 data PotatoCLIOptions = PotatoCLIOptions {
   _potatoCLIOptions_args                        :: [String]
-  , _potatoCLIOptions_empty                     :: Bool
+  , _potatoCLIOptions_tutorial                     :: Bool
   , _potatoCLIOptions_generateUnicodeWidthTable :: Bool
   , _potatoCLIOptions_version                   :: Bool
 }
@@ -42,9 +42,9 @@ sample :: Parser PotatoCLIOptions
 sample = PotatoCLIOptions
   <$> many (argument str (metavar "FILE"))
   <*> switch
-    ( long "empty"
-    <> short 'e'
-    <> help "open an empty document" )
+    ( long "tutorial"
+    <> short 't'
+    <> help "open the tutorial doc" )
   <*> switch
     ( long "widthtable"
     <> help "generate unicode width table for your terminal using vty" )
@@ -95,7 +95,7 @@ mainWithDebug = do
 
 
   -- see if the argument file we passed in exists or not
-  minitfile <- if _potatoCLIOptions_empty opts
+  minitfile <- if not (_potatoCLIOptions_tutorial opts)
     then
       return Nothing
     else case nonEmpty (_potatoCLIOptions_args opts) of
@@ -137,7 +137,7 @@ mainWithDebug = do
     config = MainPFWidgetConfig {
       _mainPFWidgetConfig_initialFile = minitfile
       , _mainPFWidgetConfig_homeDirectory = homeDir
-      , _mainPFWidgetConfig_initialState = if _potatoCLIOptions_empty opts
+      , _mainPFWidgetConfig_initialState = if not (_potatoCLIOptions_tutorial opts)
         then (owlpfstate_newProject, emptyControllerMeta)
         -- TODO load tutorial here owlpfstate_tutorial
         --else owlpfstate_attachments1
