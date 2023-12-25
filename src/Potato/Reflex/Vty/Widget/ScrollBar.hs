@@ -13,14 +13,8 @@ import           Potato.Reflex.Vty.Widget
 
 import qualified Graphics.Vty as V
 import           Reflex
-import           Reflex.Network
-import           Reflex.Potato.Helpers
 import           Reflex.Vty
 
-
-import           Data.Default
-import qualified Data.Sequence as Seq
-import Data.Fixed (div')
 import Data.These
 import Data.Align (align)
 
@@ -54,7 +48,7 @@ onlyIfSimultaneous eva evb = fforMaybe (align eva evb) $ \case
 -- TODO write UTs
 -- TODO reduce constraints
 -- dynamically scaling vertical scroll bar
-vScrollBar :: forall t m a. (MonadWidget t m)
+vScrollBar :: forall t m. (MonadWidget t m)
   => Int -- ^ width
   -> Dynamic t Int -- ^ content height
   -> m (Dynamic t Int) -- ^ offset
@@ -62,10 +56,7 @@ vScrollBar scrollBarWidth contentSizeDyn = mdo
   maxSizeDyn <- displayHeight
   let
     screen_over_content_dyn :: Dynamic t Float = liftA2 (\a b -> fromIntegral a / fromIntegral b ) maxSizeDyn contentSizeDyn
-    maxSizeDiffDyn = liftA2 (-) maxSizeDyn boxHeightDyn
-
     maxContentSizeDiffDyn = fromIntegral . max 0 <$> liftA2 (-) contentSizeDyn maxSizeDyn
-
     boxHeightDyn = fmap ceiling $ liftA2 (*) screen_over_content_dyn (fromIntegral <$> maxSizeDyn)
     boxRegionDyn = Region <$> 0 <*> offsetScreenUnitDyn <*> constDyn scrollBarWidth <*> boxHeightDyn
 

@@ -9,7 +9,6 @@ module Potato.Reflex.Vty.Widget.Popup (
 import           Relude
 
 import           Potato.Reflex.Vty.Helpers
-import           Potato.Reflex.Vty.Widget
 
 import qualified Graphics.Vty.Input.Events as V
 import           Reflex

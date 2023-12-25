@@ -23,10 +23,8 @@ module Reflex.Vty.Test.Monad.Host (
 import           Relude                   hiding (getFirst)
 
 import           Control.Monad.Ref
-import qualified Data.Map                 as Map
 
 import qualified Graphics.Vty             as V
-import           Potato.Reflex.Vty.Widget
 import           Reflex
 import           Reflex.Host.Class
 import           Reflex.Test.Monad.Host   (MonadReflexTest (..), ReflexTestT,
@@ -34,13 +32,6 @@ import           Reflex.Test.Monad.Host   (MonadReflexTest (..), ReflexTestT,
                                            TestGuestConstraints, TestGuestT,
                                            runReflexTestT)
 import           Reflex.Vty
-
-
--- for debug layout/widget stuff
-import           Control.Monad.Fix
-import           Data.Bimap               (Bimap)
-import qualified Data.Bimap               as Bimap
-import           Data.Semigroup
 
 
 
@@ -96,10 +87,10 @@ queueMouseEventInRegion :: (Reflex t, MonadSample t m, MonadRef m)
 queueMouseEventInRegion dr mouse = do
   let
     absCoords (Region l t _ _) (x,y) = (x+l, y+t)
-  region <- sample . current $ dr
+  reg <- sample . current $ dr
   case mouse of
-    Left (MouseDown b c mods) -> queueVtyEvent $ uncurry V.EvMouseDown (absCoords region c) b mods
-    Right (MouseUp b c) -> queueVtyEvent $ uncurry V.EvMouseUp (absCoords region c) b
+    Left (MouseDown b c mods) -> queueVtyEvent $ uncurry V.EvMouseDown (absCoords reg c) b mods
+    Right (MouseUp b c) -> queueVtyEvent $ uncurry V.EvMouseUp (absCoords reg c) b
 
 -- | queue mouse event in a 'DynRegion'
 -- if (local) mouse coordinates are outside of the (absolute) region, returns False and does not queue any event
@@ -108,18 +99,18 @@ queueMouseEventInRegionGated :: (Reflex t, MonadSample t m, MonadRef m)
   -> Either MouseDown MouseUp -- ^ mouse coordinates are LOCAL to the input region
   -> ReflexVtyTestT t uintref uout m Bool
 queueMouseEventInRegionGated dr mouse = do
-  region <- sample . current $ dr
+  reg <- sample . current $ dr
   let
     absCoords (Region l t _ _) (x,y) = (x+l, y+t)
     coordinates = case mouse of
       Left (MouseDown _ c _) -> c
       Right (MouseUp _ c)    -> c
     withinRegion (Region _ _ w h) (x,y) = not $ or [ x < 0, y < 0, x >= w, y >= h ]
-  if withinRegion region coordinates
+  if withinRegion reg coordinates
     then do
       case mouse of
-        Left (MouseDown b c mods) -> queueVtyEvent $ uncurry V.EvMouseDown (absCoords region c) b mods
-        Right (MouseUp b c) -> queueVtyEvent $ uncurry V.EvMouseUp (absCoords region c) b
+        Left (MouseDown b c mods) -> queueVtyEvent $ uncurry V.EvMouseDown (absCoords reg c) b mods
+        Right (MouseUp b c) -> queueVtyEvent $ uncurry V.EvMouseUp (absCoords reg c) b
       return True
     else return False
 

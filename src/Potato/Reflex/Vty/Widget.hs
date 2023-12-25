@@ -43,7 +43,6 @@ import           Reflex.Vty.Widget.Input.Mouse
 
 
 import Control.Monad.Fix
-import           Control.Monad.NodeId
 import           Control.Monad.Reader
 import           System.Clock
 
@@ -101,7 +100,7 @@ data DoubleClickConfig = DoubleClickConfig  {
     , _dobuleClickConfig_button      :: V.Button
   }
 
-doubleClick :: (Reflex t, MonadHold t m, MonadFix m, PerformEvent t m, MonadIO (Performable m), HasInput t m) => DoubleClickConfig -> m (Event t ())
+doubleClick :: (MonadHold t m, MonadFix m, PerformEvent t m, MonadIO (Performable m), HasInput t m) => DoubleClickConfig -> m (Event t ())
 doubleClick DoubleClickConfig {..} = do
   singleClickEv <- singleClickNoDragOffSimple _dobuleClickConfig_button
   singleClickTimeEv <- performEvent $ ffor singleClickEv $ \_ -> do
@@ -113,7 +112,7 @@ doubleClick DoubleClickConfig {..} = do
       then Just () 
       else Nothing
   
-doubleClickSimple :: (Reflex t, MonadHold t m, MonadFix m, PerformEvent t m, MonadIO (Performable m), HasInput t m) => m (Event t ())
+doubleClickSimple :: (MonadHold t m, MonadFix m, PerformEvent t m, MonadIO (Performable m), HasInput t m) => m (Event t ())
 doubleClickSimple = doubleClick DoubleClickConfig {
     --_doubleClickConfig_spaceTolerance = (0,0)
     _doubleClickConfig_timeTolerance = 300
@@ -127,7 +126,7 @@ integralFractionalDivide n d = fromIntegral n / fromIntegral d
 -- | A split of the available space into two parts with a draggable separator.
 -- Starts with half the space allocated to each, and the first pane has focus.
 -- Clicking in a pane switches focus.
-splitHDrag :: (Reflex t, MonadFix m, MonadHold t m, HasDisplayRegion t m, HasInput t m, HasImageWriter t m, HasFocusReader t m)
+splitHDrag :: (MonadFix m, MonadHold t m, HasDisplayRegion t m, HasInput t m, HasImageWriter t m, HasFocusReader t m)
   => Int -- ^ initial width of left panel
   -> m ()
   -> m a

@@ -31,7 +31,6 @@ module Potato.Reflex.Vty.Helpers (
 import           Relude
 
 import           Potato.Reflex.Vty.Widget
-import Reflex.Potato.Helpers (simultaneous)
 
 import           Control.Monad.Fix
 import           Control.Monad.NodeId
@@ -84,7 +83,7 @@ debugStream evs = do
   t <- holdDyn "" $ mergeWith (\a b -> a <> "\n" <> b) evs
   richText richTextConfig_simpleForeColorAttr (current t)
 
-debugStreamBeh :: (MonadHold t m, HasDisplayRegion t m, HasImageWriter t m, HasTheme t m) => [Behavior t Text] -> m ()
+debugStreamBeh :: (HasDisplayRegion t m, HasImageWriter t m, HasTheme t m) => [Behavior t Text] -> m ()
 debugStreamBeh behs = text $ foldr (liftA2 (\t1 t2 -> t1 <> " " <> t2)) "" behs
 
 countEv :: (Reflex t, MonadHold t m, MonadFix m) => Event t a -> m (Dynamic t Int)
@@ -135,18 +134,20 @@ dragAttachOnStart btn beh = mdo
 -}
 
 
+-- TODO DELETE UNUSED
 drag2AttachOnStart
   :: forall t m a. (Reflex t, MonadFix m, MonadHold t m, HasInput t m)
   => V.Button
   -> Behavior t a
   -> m (Event t (a, Drag2))
 drag2AttachOnStart btn beh = do
+  -- TODO pretty sure this should be btn?
   dragEv <- drag2 V.BLeft
   let
     foldfn d ma = do
       anew <- case ma of
         Nothing                                   -> sample beh
-        Just (a, _) | _drag2_state d == DragStart -> sample beh
+        Just (_, _) | _drag2_state d == DragStart -> sample beh
         Just (a, _)                               -> return a
       return $ Just (anew, d)
   dragBeh <- foldDynM foldfn Nothing dragEv
