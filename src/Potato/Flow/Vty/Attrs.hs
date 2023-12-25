@@ -50,6 +50,7 @@ lg_canvas_oob = lg_default `withBackColor` white
 renderHandlerColorToVtyColor :: RenderHandleColor -> Color
 renderHandlerColorToVtyColor = \case
   RHC_Default -> brightMagenta
+  RHC_Cursor -> brightBlue
   RHC_Attachment -> brightBlue
   RHC_AttachmentHighlight -> brightCyan
 
