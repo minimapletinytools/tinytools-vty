@@ -8,15 +8,12 @@ module Potato.Flow.Vty.Input (
 import           Relude
 
 import           Potato.Flow
-import           Potato.Flow.Controller
 
 import qualified Graphics.Vty              as V
-import qualified Graphics.Vty.Input.Events as V
 import           Reflex
 import           Reflex.Vty
 
 import           Control.Monad.Fix
-import qualified Data.Text.Encoding        as T
 
 convertModifiers :: [V.Modifier] -> [KeyModifier]
 convertModifiers = fmap $ \case

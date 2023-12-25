@@ -7,14 +7,11 @@ import           Relude
 
 import           Potato.Flow
 import qualified Potato.Flow.Serialization.SnakeWrangler as Snake
+import           Potato.Flow.TestStates
 
-import           Data.ByteString
 import qualified Data.ByteString.Lazy as LBS
 import           Data.FileEmbed  (embedFile)
 
-import qualified Data.Text as T
-import qualified Data.Aeson as Aeson
-import           Potato.Flow.TestStates
 
 
 

@@ -21,8 +21,7 @@ module Potato.Reflex.Vty.Host
 
 import Prelude
 
-import System.IO
-import Control.Concurrent (forkIO, killThread, MVar, newMVar, putMVar, readMVar, modifyMVar_)
+import Control.Concurrent (forkIO, killThread, MVar, newMVar, readMVar, modifyMVar_)
 import Control.Concurrent.Chan (newChan, readChan, writeChan)
 import Control.Exception (onException)
 import Control.Monad (forM, forM_, forever)
@@ -203,7 +202,7 @@ runVtyAppWithHandle vty vtyGuest = flip onException (V.shutdown vty) $
       modifyMVar_ chanSizeVar (return . (+1))
 
 
-    numFramesVar :: MVar Int <- liftIO $ newMVar 0
+    --numFramesVar :: MVar Int <- liftIO $ newMVar 0
 
     -- The main application loop. We wait for new events, fire those that
     -- have subscribers, and update the display. If we detect a shutdown
