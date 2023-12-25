@@ -11,11 +11,9 @@ module Potato.Flow.Vty.Layer (
 import           Relude
 
 import           Potato.Flow
-import           Potato.Flow.Controller
 import           Potato.Flow.Vty.Attrs
 import           Potato.Flow.Vty.Input
 import           Potato.Reflex.Vty.Helpers
-import           Potato.Reflex.Vty.Widget
 import Potato.Flow.Vty.PotatoReader
 import Potato.Flow.Vty.Common
 import Potato.Reflex.Vty.Widget.ScrollBar
@@ -23,21 +21,13 @@ import Potato.Reflex.Vty.Widget.TextInputHelpers
 
 
 import qualified Potato.Data.Text.Zipper
-import           Control.Monad.Fix
-import           Data.Align
-import           Data.Dependent.Sum          (DSum ((:=>)))
-import qualified Data.IntMap.Strict          as IM
 import qualified Data.List                   as L
 import qualified Data.Sequence               as Seq
 import qualified Data.Text                   as T
-import           Data.Text.Zipper
 import qualified Data.Text.Zipper            as TZ
-import           Data.These
 
 import qualified Graphics.Vty                as V
 import           Reflex
-import           Reflex.Network
-import           Reflex.Potato.Helpers
 import           Reflex.Vty
 
 
@@ -110,7 +100,6 @@ layerContents LayerWidgetConfig {..} scrollDyn = do
       LayersHandlerRenderEntryNormal selected mdots mrenaming lentry@LayerEntry{..} -> r where
         ident = layerEntry_depth lentry
         sowl = _layerEntry_superOwl
-        rid = _superOwl_id sowl
         label = hasOwlItem_name sowl
 
         attr = case selected of
@@ -132,6 +121,7 @@ layerContents LayerWidgetConfig {..} scrollDyn = do
           OwlSubItemBox _ -> "⧈"
           OwlSubItemLine _ -> "⤡"
           OwlSubItemTextArea _ -> "𐂂"
+          _ -> "?"
 
         t1 = V.text' attr . T.pack $
 
@@ -170,12 +160,6 @@ holdLayerWidget :: forall t m. (MonadWidget t m, HasPotato t m)
   => LayerWidgetConfig t
   -> m (LayerWidget t)
 holdLayerWidget lwc@LayerWidgetConfig {..} = do
-
-
-
-
-  potatostylebeh <- fmap _potatoConfig_style askPotato
-  PotatoStyle {..} <- sample potatostylebeh
 
   regionWidthDyn <- displayWidth
   --regionHeightDyn <- displayHeight

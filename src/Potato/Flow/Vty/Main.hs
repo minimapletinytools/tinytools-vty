@@ -208,7 +208,7 @@ welcomeWidget version = do
       }
   boxTitle (constant def) (constant $ "😱 tinytools-vty (beta v." <> version <> ") 😱") $ do
     initLayout $ col $ do
-      (grout . stretch) 1 $ scrollableText scrollcfg welcomeMessageDyn
+      _ <- (grout . stretch) 1 $ scrollableText scrollcfg welcomeMessageDyn
       (grout . fixed) 3 $ textButton def (constant "bye")
 
 
@@ -378,7 +378,7 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
         , _goatWidgetConfig_setFocusedArea = _leftWidget_setFocusEvent leftW
 
         -- TODO
-        --, _goatWidgetConfig_unicodeWidthFn =
+        , _goatWidgetConfig_unicodeWidthFn = Nothing
 
         -- debugging stuff
         , _goatWidgetConfig_setDebugLabel = never
@@ -397,7 +397,7 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
 
     rightPanel = do
       dreg' <- askRegion
-      let dreg = fmap (\region -> region { _region_left = 0, _region_top = 0}) dreg'
+      let dreg = fmap (\reg -> reg { _region_left = 0, _region_top = 0}) dreg'
       f <- focus
       pane dreg f $ holdCanvasWidget $ CanvasWidgetConfig {
           _canvasWidgetConfig_pan = _goatWidget_pan everythingW

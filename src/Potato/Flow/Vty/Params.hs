@@ -1,5 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE RecursiveDo     #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Potato.Flow.Vty.Params (
   ParamsWidgetConfig(..)
@@ -15,17 +16,12 @@ module Potato.Flow.Vty.Params (
 import           Relude
 
 import           Potato.Flow
-import Potato.Flow.OwlHelpers
 import           Potato.Flow.Vty.Common
 import           Potato.Reflex.Vty.Helpers
 import Potato.Flow.Vty.PotatoReader
-import Potato.Flow.Vty.Attrs
 import Potato.Reflex.Vty.Widget.TextInputHelpers
 
-import           Control.Monad.Fix
-import           Control.Monad.NodeId
 import           Data.Align
-import           Data.Char                         (isNumber)
 import           Data.Dependent.Sum                (DSum ((:=>)))
 import qualified Data.IntMap                       as IM
 import qualified Data.List.Extra                   as L
@@ -35,7 +31,6 @@ import qualified Data.Text                         as T
 import qualified Data.Text.Zipper                  as TZ
 import           Data.These
 import           Data.Tuple.Extra
-import qualified Data.List as List
 
 import qualified Graphics.Vty                      as V
 import           Reflex
@@ -105,7 +100,7 @@ selectParamsFromSelection ps (SuperOwlParliament selection) = r where
   subSelection = SuperOwlParliament $ Seq.fromList $ fmap fst params
   r = case values of
     [] -> Nothing
-    x:xs -> if L.allSame values
+    x:_ -> if L.allSame values
       then Just (subSelection, Just x)
       else Just (subSelection, Nothing)
 
@@ -121,9 +116,9 @@ makeLineStyleInputDyn :: Tool -> Selection -> PotatoDefaultParameters -> Maybe (
 makeLineStyleInputDyn tool selection pdp = r where
 
   selectLineStyleFromSelection :: Selection -> Maybe (Selection, Maybe (Maybe LineStyle, Maybe LineStyle))
-  selectLineStyleFromSelection (SuperOwlParliament selection) = r_d1 where
+  selectLineStyleFromSelection (SuperOwlParliament sel) = r_d1 where
     ps = (\x -> (getSEltLineStyle x, getSEltLineStyleEnd x)) . superOwl_toSElt_hack
-    rawparams = ffilter (\(_,(x,y)) -> isJust x || isJust y) . fmap (\sowl -> (sowl, ps sowl)) $ selection
+    rawparams = ffilter (\(_,(x,y)) -> isJust x || isJust y) . fmap (\sowl -> (sowl, ps sowl)) $ sel
     startvalues = catMaybes . toList . fmap fst . fmap snd $ rawparams
     endvalues = catMaybes . toList . fmap snd . fmap snd $ rawparams
     subSelection = SuperOwlParliament $ fmap fst rawparams
@@ -290,13 +285,13 @@ holdSuperStyleWidget pdpDyn inputDyn = constDyn $ mdo
           setStyleEv' = makeSuperStyleEvent tl v bl h f tr br (void $ updated focusDynUnique)
           captureEv' = leftmost [void setStyleEv', captureEv1]
         return (5, captureEv', setStyleEv')
+      _ -> error "radioList returned invalid index"
 
     setStyleEv <- switchHold never (fmap thd3 setStyleEvEv)
     captureEv <- switchHold never (fmap snd3 setStyleEvEv)
     heightDyn <- holdDyn 0 (fmap fst3 setStyleEvEv)
 
     let
-      selectionDyn = fmap fst3 inputDyn
       pushSuperStyleFn :: SuperStyle -> PushM t (Maybe (Either Llama SetPotatoDefaultParameters))
       pushSuperStyleFn ss = do
         (SuperOwlParliament selection, _, tool) <- sample . current $ inputDyn
@@ -411,6 +406,7 @@ holdLineStyleWidgetNew pdpDyn inputDyn = constDyn $ do
             0 -> if start == end then start else Nothing
             1 -> start
             2 -> end
+            _ -> error "radioList returned invalid index"
 
         (focusDyn,wasChangeDyn,l,r,u,d) <- do
           --(tile . fixed) 1 $ text (fmap (T.pack . superStyle_toListFormat . Data.Maybe.fromJust) $ current mssDyn)
@@ -439,13 +435,13 @@ holdLineStyleWidgetNew pdpDyn inputDyn = constDyn $ do
           setStyleEv' = makeLineStyleEvent (current l) (current r) (current u) (current d) (void $ gate (current wasChangeDyn) (updated focusDynUnique))
           captureEv' = leftmost [void setStyleEv', captureEv'']
         return (7, captureEv', setStyleEv')
+      _ -> error "radioList returned invalid index"
 
   setStyleEv <- switchHold never (fmap thd3 setStyleEvEv)
   captureEv <- switchHold never (fmap snd3 setStyleEvEv)
   heightDyn <- holdDyn 0 (fmap fst3 setStyleEvEv)
 
   let
-    selectionDyn = fmap fst3 inputDyn
     pushLineStyleFn :: Either () LineStyle -> PushM t (Maybe (Either Llama SetPotatoDefaultParameters))
     pushLineStyleFn eflipss = do
       pdp <- sample . current $ pdpDyn
@@ -456,6 +452,7 @@ holdLineStyleWidgetNew pdpDyn inputDyn = constDyn $ do
           0 -> SetLineStyleEnd_Both
           1 -> SetLineStyleEnd_Start
           2 -> SetLineStyleEnd_End
+          _ -> error "radioList returned invalid index"
         (setstart, setend) = case whichEnd of
           SetLineStyleEnd_Start -> (True, False)
           SetLineStyleEnd_End -> (False, True)
@@ -501,7 +498,6 @@ holdTextAlignmentWidget :: forall t m. (MonadLayoutWidget t m, HasPotato t m) =>
 holdTextAlignmentWidget _ inputDyn = constDyn $ do
   let
     mtaDyn = fmap snd3 inputDyn
-    selectionDyn = fmap fst3 inputDyn
 
   let
 
@@ -521,6 +517,7 @@ holdTextAlignmentWidget _ inputDyn = constDyn $ do
         0 -> TextAlign_Left
         1 -> TextAlign_Center
         2 -> TextAlign_Right
+        _ -> error "radioList returned invalid index"
       ) $ setAlignmentEv'
     pushAlignmentFn :: TextAlign -> PushM t (Maybe (Either Llama SetPotatoDefaultParameters))
     pushAlignmentFn ta = do
@@ -544,8 +541,6 @@ holdSBoxTypeWidget :: forall t m. (MonadLayoutWidget t m) => ParamsWidgetFn t m 
 holdSBoxTypeWidget _ inputDyn = constDyn $ do
   let
     mBoxType = fmap snd3 inputDyn
-    selectionDyn = fmap fst3 inputDyn
-  mbt0 <- sample . current $ mBoxType
 
   let
     stateDyn = ffor mBoxType $ \case
@@ -584,14 +579,14 @@ holdSBoxTypeWidget _ inputDyn = constDyn $ do
             where
               newbt = case bt of
                 This border -> make_sBoxType border (sBoxType_isText oldbt)
-                That text -> make_sBoxType (sBoxType_hasBorder oldbt) text
-                These border text -> make_sBoxType border text
+                That txt -> make_sBoxType (sBoxType_hasBorder oldbt) txt
+                These border txt -> make_sBoxType border txt
       return $  if toolOverrideSBoxType tool
         -- UNTESTED, it's probably currect but the tool overrides this default so I never actually tested it
         then Just . Right $ def { _setPotatoDefaultParameters_sBoxType = Just $ case bt of
             This border -> make_sBoxType border (snd curState)
-            That text -> make_sBoxType (fst curState) text
-            These border text -> make_sBoxType border text
+            That txt -> make_sBoxType (fst curState) txt
+            These border txt -> make_sBoxType border txt
           }
         else case Data.Maybe.mapMaybe fmapfn . toList $ selection of
           [] -> Nothing
@@ -635,10 +630,6 @@ holdCanvasSizeWidget canvasDyn _ _ = constDyn $ do
     --captureEv = leftmost [void outputEv, void (updated wDyn), void (updated hDyn)]
     captureEv = leftmost [void outputEv, captureEv1]
   return (3, captureEv, outputEv)
-
-data SEltParams = SEltParams {
-    --_sEltParams_sBox =
-  }
 
 data ParamsWidgetConfig t = ParamsWidgetConfig {
    _paramsWidgetConfig_selectionDyn :: Dynamic t Selection

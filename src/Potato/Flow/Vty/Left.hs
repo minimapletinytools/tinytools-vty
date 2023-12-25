@@ -13,7 +13,6 @@ import           Relude
 
 
 import           Potato.Flow
-import           Potato.Flow.Vty.Info
 import           Potato.Flow.Vty.Layer
 import           Potato.Flow.Vty.Params
 import           Potato.Flow.Vty.PotatoReader
@@ -173,7 +172,7 @@ holdLeftWidget LeftWidgetConfig {..} = do
       return (params', paramsFocusEv')
 
     let 
-      refineFocusNoParamsEv = leftmost
+      refineFocusNoParamsEv :: (Event t Text) = leftmost
         [ fmap (const "menu") menuFocusEv
         , fmap (const "tools") toolsFocusEv
         , fmap (const "toolsOptions") toolsOptionsFocusEv
