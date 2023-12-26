@@ -31,6 +31,7 @@ import Potato.Flow.Vty.OpenWindow
 import Potato.Flow.Vty.Alert
 import Potato.Flow.Vty.AppKbCmd
 import Potato.Flow.Vty.Attrs
+import Potato.Flow.DefaultTermWidthFile
 
 
 import System.Console.ANSI (hSetTitle)
@@ -39,7 +40,7 @@ import qualified System.Directory as FP
 
 import           Control.Concurrent
 import           Control.Monad.NodeId
-import Control.Exception (handle)
+import Control.Exception
 import           Data.Maybe
 import           Data.Default
 import qualified Data.Text as T
@@ -125,9 +126,22 @@ potatoMainWidget child = do
       Just termName -> configDir FP.</> (termName <> "_termwidthfile")
   doesWidthMapFileExist <- FP.doesFileExist widthMapFile
   doesDefaultWidthMapFileExist <- FP.doesFileExist defaultWidthMapFile
+  
+
   if doesWidthMapFileExist
     then putStrLn $ "attempting to load unicode width table file " <> widthMapFile
-    else putStrLn $ "could not find unicode width table file " <> widthMapFile <> " using the xterm-256 one by default instead. Please run --widthtable to generate unicode width table file"
+    else do 
+      putStrLn $ "could not find unicode width table file " <> widthMapFile <> " lease run --widthtable to generate unicode width table file"
+      if doesDefaultWidthMapFileExist
+        then putStrLn $ "attempting to load default unicode width table file " <> defaultWidthMapFile
+        else do
+          --putStrLn $ "default unicode width tabel file DNE, oops, NBD, but wide chars may not render correctly"
+          putStrLn $ "writing default unicode width table file to" <> configDir <> "/" <> defaultWidthMapFile
+          rslt <- try $ LBS.writeFile (configDir FP.</> defaultWidthMapFile) defaultTermWidthFileBS
+          case rslt of 
+            Left (SomeException e) -> putStrLn $ "could not write default unicode width table file to " <> (configDir FP.</> defaultWidthMapFile) <> " got exception \"" <> show e <> "\""
+            Right _ -> return ()
+
   let
     cfg' = cfg'' { V.mouseMode = Just True }
     cfg = if doesWidthMapFileExist
