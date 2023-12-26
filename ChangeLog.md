@@ -2,9 +2,9 @@
 
 ## [unreleased]
 
-## [0.1.0.6]
+## [0.1.0.7]
 - fix several bugs
-- update to use 0.1.0.6 of tinytools
+- update to use 0.1.0.7 of tinytools
 
 ## [0.1.0.5]
 - add version string to welcome popup title
