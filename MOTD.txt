@@ -1,4 +1,4 @@
-this is tinytools beta
+This is tinytools beta. Please send feedback and save often!!
 
 
 shortcuts:
