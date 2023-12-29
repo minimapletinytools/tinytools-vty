@@ -227,6 +227,7 @@ test-suite tinytools-vty-test
       Potato.Flow.Vty.SaveAsWindowSpec
       Potato.FlowSpecTH
       Potato.Reflex.Vty.Widget.PopupSpec
+      Potato.Reflex.Vty.WidgetSpec
       PotatoSpec
       Reflex.Vty.Test.Common
       Reflex.Vty.Test.Monad.HostSpec
