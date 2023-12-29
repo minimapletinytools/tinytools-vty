@@ -26,6 +26,8 @@ import           Reflex
 import           Reflex.Host.Class
 import           Reflex.Vty
 import           Reflex.Vty.Test.Monad.Host
+import           Reflex.Vty.Test.Monad.Host.TH
+
 import Reflex.Vty.Test.Common
 
 data BasicNetworkTest1 t (m :: Type -> Type)
@@ -124,6 +126,8 @@ test_basic = TestLabel "basic" $ TestCase $ runSpiderHost $
     -- escape cancel the popup
     queueVtyEvent $ V.EvKey V.KEsc []
     fireQueuedEventsAndRead readPopupStateEv >>= \a -> liftIO (checkSingleMaybe a False)
+
+
 
 
 spec :: Spec

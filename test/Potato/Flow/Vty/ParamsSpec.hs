@@ -3,7 +3,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE TemplateHaskell          #-}
 
-module Potato.Flow.ParamsSpec
+module Potato.Flow.Vty.ParamsSpec
   ( spec
   )
 where
