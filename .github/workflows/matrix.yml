@@ -9,22 +9,29 @@ on:
 permissions:
   contents: read
 
+
 jobs:
   build:
-
-    runs-on: ubuntu-latest
-
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        ghc: ['9.2.5', '9.6.2']
+        cabal: ['3.10.1.0']
+        os: [ubuntu-latest, macOS-latest, windows-latest]
+    name: Haskell GHC ${{ matrix.ghc }} sample
     steps:
     - uses: actions/checkout@v3
-    - uses: haskell-actions/setup@v2
+    - name: Setup Haskell
+      uses: haskell-actions/setup@v2
       with:
-        ghc-version: '9.6.2'
-        cabal-version: '3.10.1.0'
+        ghc-version: ${{ matrix.ghc }}
+        cabal-version: ${{ matrix.cabal }}
+
 
     - name: Cache
       uses: actions/cache@v3
       env:
-        cache-name: cache-cabal
+        cache-name: cache-cabal-${{ matrix.ghc }}
       with:
         path: ~/.cabal
         key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/*.cabal') }}-${{ hashFiles('**/cabal.project') }}
@@ -41,25 +48,3 @@ jobs:
       run: cabal build --enable-tests --enable-benchmarks all
     - name: Run tests
       run: cabal test all --enable-tests
-
-    - name: TEST RELEASE ARTIFACT
-      uses: actions/upload-artifact@v3
-      with:
-        name: tinytoolsexe
-        path: dist-newstyle/build/x86_64-linux/ghc-9.6.2/tinytools-vty-0.1.0.7/x/tinytools/build/tinytools
-        retention-days: 5
-
-
-
-  parse-cabal-file:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-
-    - uses: haskell-actions/parse-cabal-file@v1
-      id: cabal_file
-      with:
-        cabal_file: tinytools-vty.cabal
-
-    - run: echo ${{ steps.cabal_file.outputs.version }}
-
