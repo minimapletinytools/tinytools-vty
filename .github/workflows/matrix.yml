@@ -1,4 +1,4 @@
-name: Haskell CI
+name: Haskell CI WIP Matrix Ver
 
 on:
   push:
@@ -15,7 +15,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        ghc: ['9.2.5', '9.6.2']
+        ghc: ['9.6.2']
         cabal: ['3.10.1.0']
         os: [ubuntu-latest, macOS-latest, windows-latest]
     name: Haskell GHC ${{ matrix.ghc }} sample
@@ -48,3 +48,11 @@ jobs:
       run: cabal build --enable-tests --enable-benchmarks all
     - name: Run tests
       run: cabal test all --enable-tests
+
+
+    - name: Release Binary Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: tinytools
+        path: dist-newstyle/build/${{ matrix.os }}/${{ matrix.ghc }}/tinytools-vty-0.1.0.7/x/tinytools/build/tinytools
+        retention-days: 5

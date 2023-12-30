@@ -42,10 +42,10 @@ jobs:
     - name: Run tests
       run: cabal test all --enable-tests
 
-    - name: TEST RELEASE ARTIFACT
+    - name: Binary Artifact
       uses: actions/upload-artifact@v3
       with:
-        name: tinytoolsexe
+        name: tinytools
         path: dist-newstyle/build/x86_64-linux/ghc-9.6.2/tinytools-vty-0.1.0.7/x/tinytools/build/tinytools
         retention-days: 5
 
