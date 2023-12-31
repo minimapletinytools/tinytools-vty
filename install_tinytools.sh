@@ -39,8 +39,9 @@ case "$OS" in
     ;;
 esac
 
-# Define the directory to extract the files
-INSTALL_DIR="/usr/local/bin"
+# Prompt the user for the installation directory
+read -p "Enter the installation directory (default: /usr/local/bin): " INSTALL_DIR
+INSTALL_DIR=${INSTALL_DIR:-/usr/local/bin}
 
 # Create a temporary directory to download and extract files
 TEMP_DIR=$(mktemp -d)
@@ -59,10 +60,12 @@ curl -L "$ZIP_URL" -o "$TEMP_DIR/tinytools.zip"
 unzip "$TEMP_DIR/tinytools.zip" -d "$TEMP_DIR"
 
 # Move the binary to the installation directory
-echo "Installing tinytools..."
-mv "$TEMP_DIR/tinytools" "$INSTALL_DIR/"
-
-# Set execute permissions
-chmod +x "$INSTALL_DIR/tinytools"
-
-echo "tinytools $RELEASE_VERSION has been installed to $INSTALL_DIR"
+echo "Installing tinytools to $INSTALL_DIR..."
+if mv "$TEMP_DIR/tinytools" "$INSTALL_DIR/"; then
+  # Set execute permissions
+  chmod +x "$INSTALL_DIR/tinytools"
+  echo "tinytools $RELEASE_VERSION has been successfully installed to $INSTALL_DIR"
+else
+  echo "Error: Failed to move tinytools to $INSTALL_DIR. Installation failed."
+  exit 1
+fi

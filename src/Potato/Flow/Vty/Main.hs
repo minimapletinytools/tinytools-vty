@@ -129,11 +129,11 @@ potatoMainWidget child = do
   
 
   if doesWidthMapFileExist
-    then putStrLn $ "attempting to load unicode width table file " <> widthMapFile
+    then putStrLn $ "loading unicode width table file " <> widthMapFile
     else do 
       putStrLn $ "could not find unicode width table file " <> widthMapFile <> " lease run --widthtable to generate unicode width table file"
       if doesDefaultWidthMapFileExist
-        then putStrLn $ "attempting to load default unicode width table file " <> defaultWidthMapFile
+        then putStrLn $ "loading default unicode width table file " <> defaultWidthMapFile
         else do
           --putStrLn $ "default unicode width tabel file DNE, oops, NBD, but wide chars may not render correctly"
           putStrLn $ "writing default unicode width table file to" <> configDir <> "/" <> defaultWidthMapFile
