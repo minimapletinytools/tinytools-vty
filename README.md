@@ -11,7 +11,7 @@ tinytools is still in BETA and may be unstable. Save often!!!
 Binaries are available for x86-64 OSX and Linux:
 
 ```
-curl -sSL https://raw.githubusercontent.com/minimapletinytools/tinytools-vty/main/install_tinytools.sh | bash
+curl -sSL https://raw.githubusercontent.com/minimapletinytools/tinytools-vty/potato/install_tinytools.sh | bash
 ```
 
 Or see [https://github.com/minimapletinytools/tinytools-vty/releases](releases)
