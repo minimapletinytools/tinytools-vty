@@ -15,6 +15,7 @@ data AppKbCmd t = AppKbCmd {
   , _appKbCmd_quit :: Event t ()
   , _appKbCmd_forceQuit :: Event t ()
   , _appKbCmd_new :: Event t ()
+  , _appKbCmd_debugToggleMouse :: Event t ()
   , _appKbCmd_capturedInput :: Event t ()
 }
 
@@ -32,6 +33,9 @@ holdAppKbCmd = do
     quitEv = captureKeyWithCtrl 'q'
     newEv = captureKeyWithCtrl 'n'
 
+    debugToggleMouseEv = never
+    --debugToggleMouseEv = captureKeyWithCtrl 'm'
+
     -- TODO this doesn't seem to work, prob cuz vty isn't handling shift correctly on mac
     forceQuitEv = fforMaybe inp $ \i -> case i of
       V.EvKey (V.KChar 'q') [V.MCtrl, V.MShift] -> Just ()
@@ -47,5 +51,6 @@ holdAppKbCmd = do
       , _appKbCmd_quit = quitEv
       , _appKbCmd_forceQuit = forceQuitEv
       , _appKbCmd_new = newEv
+      , _appKbCmd_debugToggleMouse = debugToggleMouseEv
       , _appKbCmd_capturedInput = captureEv
     }

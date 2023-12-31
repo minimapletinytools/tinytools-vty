@@ -329,8 +329,15 @@ mainPFWidgetWithBypass MainPFWidgetConfig {..} bypassEvent = mdo
   let
     setOpenFileStateEv = updated $ ffor2 currentOpenFileDyn (_goatWidget_unsavedChanges everythingW) (,)
   performEvent_ $ ffor setOpenFileStateEv $ \(mfn, dirty) -> do
+    -- TODO use the vty function for this after upgrading
     -- this only seems to sometimes work 🤷🏼‍♀️
     liftIO $ hSetTitle stdout $ fromMaybe "<>" mfn <> (if dirty then "*" else "")
+
+  -- toggle mouse
+  performEvent_ $ ffor _appKbCmd_debugToggleMouse $ \_ -> do
+    -- TODO do this after upgrading
+    --liftIO $ V.setMode (V.outputIface stdout) V.Mouse True
+    return ()
 
 
   let
