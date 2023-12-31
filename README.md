@@ -1,23 +1,22 @@
 # tinytools-vty
 
-`tinytools-vty` is a mono-space unicode diagram editor written in Haskell
-
-This repository contains the [reflex-vty](https://hackage.haskell.org/package/reflex-vty) based view/controller implementation built on top of the [tinytools](https://github.com/minimapletinytools/tinytools) model.
+`tinytools` is a mono-space unicode diagram editor written in Haskell and `tinytools-vty` is the [reflex-vty](https://hackage.haskell.org/package/reflex-vty) based view/controller built over the core [tinytools](https://github.com/minimapletinytools/tinytools) model library.
 
 ![](screenshot.png)
 
-tinytools is still in BETA and may be quite unstable. Save often!!!
+tinytools is still in BETA and may be unstable. Save often!!!
 
 # installation 
 
-## binaries
+Binaries are available for x86-64 OSX and Linux:
 
-Binaries are available for x86-64 OSX and Linux
+```
+curl -sSL https://raw.githubusercontent.com/minimapletinytools/tinytools-vty/main/install_tinytools.sh | bash
+```
 
-`curl -sSL https://raw.githubusercontent.com/minimapletinytools/tinytools-vty/main/install_tinytools.sh | bash`
+Or see [https://github.com/minimapletinytools/tinytools-vty/releases](releases)
 
-Or see [https://github.com/minimapletinytools/tinytools-vty/releases](releases).
-
+And perhaps someone will eventually upload this to a package manager for us 🥺
 
 ## from source
 
