@@ -10,6 +10,17 @@ tinytools is still in BETA and may be quite unstable. Save often!!!
 
 # installation 
 
+## binaries
+
+Binaries are available for x86-64 OSX and Linux
+
+`curl -sSL https://raw.githubusercontent.com/minimapletinytools/tinytools-vty/main/install_tinytools.sh | bash`
+
+Or see [https://github.com/minimapletinytools/tinytools-vty/releases](releases).
+
+
+## from source
+
 ### pre-requisites
 [text-icu](https://github.com/haskell/text-icu) is required as a prerequisite. On mac
 
