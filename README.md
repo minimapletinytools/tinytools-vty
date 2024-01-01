@@ -62,9 +62,50 @@ click + drag in the canvas area with the pan tool to pan the canvas.
 
 Use the box tool to create boxes. After creating or selecting a box, click on the top border to add or modify a label. Click inside the box to add or modify text. You can change the styling of your lines in the left menu.
 
+```
+                                                                                               
+         ╔this is a box label══════╗                                                           
+         ║                         ║                                                           
+         ║this is a box ╔══════════════════════╗                                               
+         ║              ║you can align the text║                                               
+         ║              ║     in different ways║                                               
+         ╚══════════════║                      ║                                               
+                        ║                      ║                                               
+           ███████████████████═════════════════╝                                               
+           █and change the@@@█                                                                 
+           █style of the box@█                                                                 
+           █@@@@@@@@@@@@@@@@@█                                                                 
+           █@@@@@@@@@@@@@@@@@█                                                                 
+           █@@@@@@@@@@@@@@@@@█                                                                 
+           ███████████████████                                                                 
+                                                  
+```
+
 ### the [(l)ine] tool
 
 Use the line tool to create lines. Lines can attach to existing boxes on either end. After selecting a line, you can move either end point of line or change their attachment. You click and drag in the middle of a line to add midpoints to your line. You can double click on a line to add a line label. Line labels can be moved by clicking and dragging on highlighted handle in the middle. You can change the styling of your lines in the left menu.
+
+```
+                                                                                               
+    O────different endpoints────────────┐                                                      
+                                        O                                                      
+                              ╔══════════════════╗                                             
+                              ║lines can be      ║                                             
+    <═══line label═══════════>║attached to boxes ║                                             
+                              ║                  ║<╗                                           
+   ^     ╔══════╗             ║                  ║ ║                                           
+   ║     ║      ║             ╚══════════════════╝ ║                                           
+   ║     ║      ║     |                ^           ║                                           
+   ║     ║      ║     |                ╚═══════════╝                                           
+   ║     ║      ║     |                                                                        
+   ║     ║      ║     |                                                                        
+   ║     ║      ║     |                                                                        
+   ║     ║      ║     *------different styles------>                                           
+   ║     ║      ║                                                                              
+   ║     ║      ║                                                                              
+   ╚═════╝      ╚═══multi-point line═══>                                                       
+                                                                                               
+```
 
 ### the [(t)ext] tool
 
@@ -73,6 +114,13 @@ Same as the box tool except you can immediately add text to the box without addi
 ### the [pai(n)t] tool
 
 The paint tool lets you create areas that take free form text. After selecting a paint area, you can move the cursor anywhere inside and add text.
+
+```
+       ╱|、
+     (˚ˎ 。7  
+      |、˜〵          
+     じしˍ,)ノ
+```
 
 ## layers
 
@@ -112,3 +160,13 @@ Unicode character display width seems to vary by terminal. `tinytools-vty` uses 
 Also note that many mono-space text displays do not display unicode widechars at a width consistent with its mono-spacing 😕. 
 
 
+# development
+
+`tinytools`` is still actively being worked on. Here are some things to look out for in the future:
+
+- more native shapes and custom shape support
+- glyph widget for easy emoji or ASCII art insertion
+- multi-character ASCII font support 
+- multi-document support
+- multi-user support
+- web based frontend
