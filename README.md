@@ -8,6 +8,37 @@ tinytools is still in BETA and may be unstable. Save often!!!
 
 # installation 
 
+## pre-requisites
+
+This library depends on [text-icu](https://hackage.haskell.org/package/text-icu) which depends on the well-respected [ICU
+library](https://icu.unicode.org/) which must be installed separately:
+
+### macOS
+
+    brew install icu4c
+    brew link icu4c --force
+
+You might also need:
+
+    export PKG_CONFIG_PATH="$(brew --prefix)/opt/icu4c/lib/pkgconfig"
+
+### Debian/Ubuntu
+
+    sudo apt-get update
+    sudo apt-get install libicu-dev
+
+### Fedora/CentOS
+
+    sudo dnf install unzip libicu-devel
+
+### Nix/NixOS
+
+    nix-shell --packages icu
+
+
+## from binaries
+
+
 Binaries are available for x86-64 OSX and Linux:
 
 ```
@@ -20,16 +51,7 @@ And perhaps someone will eventually upload this to a package manager for us 🥺
 
 ## from source
 
-### pre-requisites
-[text-icu](https://github.com/haskell/text-icu) is required as a prerequisite. On mac
-
-```
-brew install icu4c
-brew link icu4c --force
-export PKG_CONFIG_PATH="$(brew --prefix)/opt/icu4c/lib/pkgconfig"
-```
-
-You will also need the haskell build tool cabal. The best way to do this is using [ghcup](https://www.haskell.org/ghcup/)
+If you wish to compile from source, you will also need the haskell build tool cabal. The best way to do this is using [ghcup](https://www.haskell.org/ghcup/)
 
 To install tiny tools run `cabal install tinytools-vty` and then you can run `tinytools` 
 Or if you are building locally then `cabal run tinytools`
