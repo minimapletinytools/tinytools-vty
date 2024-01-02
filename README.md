@@ -11,7 +11,7 @@ tinytools is still in BETA and may be unstable. Save often!!!
 Binaries are available for x86-64 OSX and Linux:
 
 ```
-curl -sSL https://raw.githubusercontent.com/minimapletinytools/tinytools-vty/potato/install_tinytools.sh | sh
+curl -sSL https://raw.githubusercontent.com/minimapletinytools/tinytools-vty/potato/install_tinytools.sh | bash
 ```
 
 Or see [https://github.com/minimapletinytools/tinytools-vty/releases](releases)
@@ -124,7 +124,13 @@ The paint tool lets you create areas that take free form text. After selecting a
 
 ## layers
 
-On the left hand side is a very sophisticated layering system. All elements will show up in the layer system. You can drag elements around to reorder them. You can add folders to create a hierarchical layer system. You can hide or lock elements in the layers menu. You can select elements in the layers menu.
+On the left hand side is a very sophisticated layering system. All elements will show up in the layer system. You can drag elements around to reorder them. You can add folders to create a hierarchical layer system. You can hide or lock elements in the layers menu. You can select elements in the layers menu to modify.
+
+## the styling menu
+
+In the bottom left corner, there is a selection-sensitive menu for modifying box line and text styles and setting the canvas size.
+Setting the style while elements are selected will modify the style for those elements.
+Setting the style while an element creation tool is active will set the default style for all elements to be created.
 
 ## shortucts
 
