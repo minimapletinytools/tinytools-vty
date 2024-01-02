@@ -40,7 +40,7 @@ case "$OS" in
 esac
 
 # Prompt the user for the installation directory
-read -p "Enter the installation directory (default: ~/bin): " INSTALL_DIR
+read -p "Enter the installation directory (default: /usr/local/bin): " INSTALL_DIR
 INSTALL_DIR=${INSTALL_DIR:-/usr/local/bin}
 
 # Create a temporary directory to download and extract files
