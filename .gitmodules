@@ -2,7 +2,3 @@
 	path = tinytools
 	url = git@github.com:pdlla/tinytools.git
 	branch = potato
-[submodule "reflex-potatoes"]
-	path = reflex-potatoes
-	url = git@github.com:pdlla/reflex-potatoes.git
-	branch = master
