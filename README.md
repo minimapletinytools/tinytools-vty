@@ -11,33 +11,9 @@ tinytools is still in BETA and may be unstable. Save often!!!
 ## pre-requisites
 
 This library depends on [text-icu](https://hackage.haskell.org/package/text-icu) which depends on the well-respected [ICU
-library](https://icu.unicode.org/) which must be installed separately:
-
-### macOS
-
-    brew install icu4c
-    brew link icu4c --force
-
-You might also need:
-
-    export PKG_CONFIG_PATH="$(brew --prefix)/opt/icu4c/lib/pkgconfig"
-
-### Debian/Ubuntu
-
-    sudo apt-get update
-    sudo apt-get install libicu-dev
-
-### Fedora/CentOS
-
-    sudo dnf install unzip libicu-devel
-
-### Nix/NixOS
-
-    nix-shell --packages icu
-
+library](https://icu.unicode.org/) which must be installed separately. Please see [text-icu](https://hackage.haskell.org/package/text-icu) for instructions on how to install icu.
 
 ## from binaries
-
 
 Binaries are available for x86-64 OSX and Linux:
 
@@ -46,8 +22,11 @@ curl -sSL https://raw.githubusercontent.com/minimapletinytools/tinytools-vty/pot
 ```
 
 Or see [https://github.com/minimapletinytools/tinytools-vty/releases](releases)
+NOTE currently ICU is dynamically linked and it's hardcoded to a specific version. 
+The linux version is hard-linked to v70 and the mac binary is hard-linked to v73
+the mac one should work fine if you installed icu4c via brew, however different linux distros seem to ship different versions of libicu-dev so that may not work for you :(. 
 
-And perhaps someone will eventually upload this to a package manager for us 🥺
+If the binaries do not work, please build from source until I figure out a better way around this :(
 
 ## from source
 
