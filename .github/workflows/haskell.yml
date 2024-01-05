@@ -38,8 +38,6 @@ jobs:
 
     - name: Install dependencies
       run: |  
-        sudo apt-get update
-        sudo apt-get install libicu-dev
         cabal update
         cabal build --only-dependencies --enable-tests --enable-benchmarks
     - name: Build
