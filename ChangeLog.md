@@ -1,6 +1,7 @@
 # Changelog for tinytools-vty
 
-## [unreleased]
+## [0.1.0.8]
+- remove `text-icu` dependency
 
 ## [0.1.0.7]
 - fix several bugs
