@@ -16,6 +16,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+      with:
+        submodules: recursive
+        token: ${{ secrets.PAT_TOKEN }}
     - uses: haskell-actions/setup@v2
       with:
         ghc-version: '9.6.2'

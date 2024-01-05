@@ -1,8 +1,8 @@
 -- use this when releasing
-packages: ./
+--packages: ./
 
 -- use this when developing locally 
---packages: . tinytools
+packages: . tinytools
 
 -- temp, do not release
 --source-repository-package
