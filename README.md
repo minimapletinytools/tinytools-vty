@@ -127,6 +127,13 @@ The paint tool lets you create areas that take free form text. After selecting a
 
 On the left hand side is a very sophisticated layering system. All elements will show up in the layer system. You can drag elements around to reorder them. You can add folders to create a hierarchical layer system. You can hide or lock elements in the layers menu. You can select elements in the layers menu to modify.
 
+- to expand/contract a folder, click the `»`/`⇊` 
+- to hide/unhide an element and its children, click the `e`/`-` 
+- to lock/unlock an element and its children, click thet `a`/`@`
+- to create a new folder, click the `[new folder]` button at the bottom
+- hold shift to select multiple elements
+- selecting a folder impliicitly selects all of its children recursively
+
 ## the styling menu
 
 In the bottom left corner, there is a selection-sensitive menu for modifying box line and text styles and setting the canvas size.
