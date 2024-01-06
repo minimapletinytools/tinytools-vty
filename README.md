@@ -22,10 +22,12 @@ Or see [https://github.com/minimapletinytools/tinytools-vty/releases](releases)
 
 ## from source
 
-If you wish to compile from source, you will also need the haskell build tool cabal. The best way to do this is using [ghcup](https://www.haskell.org/ghcup/)
+If you wish to compile from source, you will also need the haskell build tool cabal. The best way to do this is using [ghcup](https://www.haskell.org/ghcup/).
 
 To install tiny tools run `cabal install tinytools-vty` and then you can run `tinytools` 
 Or if you are building locally then `cabal run tinytools`
+
+It should just work with ghc 9.2 9.4 and 9.6 and Cabal. Other version MAY run into some dependency issues.
 
 NOTE that `tinytools` is also the name of the base model library for `tinytools-vty`. If you just `cabal install tinytools` you will install the library and not the exe!!!
 
