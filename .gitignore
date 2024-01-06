@@ -10,3 +10,4 @@ stderr.txt
 *.prof
 tags
 tt.txt
+cabal.project.freeze
