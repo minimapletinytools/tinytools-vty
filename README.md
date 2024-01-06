@@ -20,6 +20,10 @@ curl -sSL https://raw.githubusercontent.com/minimapletinytools/tinytools-vty/pot
 
 Or see [https://github.com/minimapletinytools/tinytools-vty/releases](releases)
 
+*Unfortunately, the linux binary has a version specific dependency on icu-i18n/icuuc v70 right now so it won't work unless you have that specific version of libicu-dev installed (you can try `apt-get install libicu-dev`)
+
+This should be fixed soon. The icu dependency should have been removed and I have no idea why it's still being linked.
+
 ## from source
 
 If you wish to compile from source, you will also need the haskell build tool cabal. The best way to do this is using [ghcup](https://www.haskell.org/ghcup/).
