@@ -59,6 +59,8 @@ holdToolsWidget ToolWidgetConfig {..} = mdo
     textb = void $ ffilter (==4) radioEvs
     textareaB = void $ ffilter (==5) radioEvs
 
+  -- TODO if shape tool, show shape options
+
   let
     setTool = leftmost
       [Tool_Select <$ leftmost [selectB]
