@@ -43,6 +43,7 @@ toolWidgetToIndex = \case
   Tool_Line -> 3
   Tool_Text -> 4
   Tool_TextArea -> 5
+  Tool_Shape -> 6
   _ -> 0
 
 holdToolsWidget :: forall t m. (PostBuild t m, MonadWidget t m)
@@ -50,7 +51,7 @@ holdToolsWidget :: forall t m. (PostBuild t m, MonadWidget t m)
   -> m (ToolWidget t)
 holdToolsWidget ToolWidgetConfig {..} = mdo
 
-  (radioEvs, heightDyn) <- radioList (constDyn ["(v)select","(p)an","(b)ox","(l)ine","(t)ext","pai(n)t"]) (fmap ((:[]) . toolWidgetToIndex) _toolWidgetConfig_tool) (Just _toolWidgetConfig_widthDyn)
+  (radioEvs, heightDyn) <- radioList (constDyn ["(v)select","(p)an","(b)ox","(l)ine","(t)ext","pai(n)t", "(s)hape"]) (fmap ((:[]) . toolWidgetToIndex) _toolWidgetConfig_tool) (Just _toolWidgetConfig_widthDyn)
   let
     selectB = void $ ffilter (==0) radioEvs
     panB = void $ ffilter (==1) radioEvs
@@ -58,6 +59,7 @@ holdToolsWidget ToolWidgetConfig {..} = mdo
     lineB = void $ ffilter (==3) radioEvs
     textb = void $ ffilter (==4) radioEvs
     textareaB = void $ ffilter (==5) radioEvs
+    shapeB = void $ ffilter (==6) radioEvs
 
   -- TODO if shape tool, show shape options
 
@@ -68,7 +70,9 @@ holdToolsWidget ToolWidgetConfig {..} = mdo
       , Tool_Box <$ leftmost [boxB]
       , Tool_Line <$ leftmost [lineB]
       , Tool_Text <$ leftmost [textb]
-      , Tool_TextArea <$ leftmost [textareaB]]
+      , Tool_TextArea <$ leftmost [textareaB]
+      , Tool_Shape <$ leftmost [shapeB]
+      ]
 {-
   vLayoutPad 4 $ debugStream [
     never
