@@ -135,7 +135,6 @@ library
     , relude >= 1.2.1 && < 1.3
     , vty>=5.28 && <5.39
     , optparse-applicative >= 0.18.1 && < 0.19
-  pkgconfig-depends: icu-i18n, icu-uc
   default-language: Haskell2010
 
 executable tinytools
